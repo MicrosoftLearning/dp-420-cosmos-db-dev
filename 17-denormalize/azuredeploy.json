@@ -1,0 +1,670 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "accountName": {
+            "type": "string",
+            "defaultValue": "[concat('cosmicworks-', uniqueString(resourceGroup().id))]",
+            "metadata": {
+                "description": "Cosmos DB account name, max length 44 characters, lowercase"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for the Cosmos DB account."
+            }
+        },
+        "autoscaleMaxThroughput": {
+            "type": "int",
+            "defaultValue": 4000,
+            "minValue": 4000,
+            "maxValue": 1000000,
+            "metadata": {
+                "description": "Maximum throughput when using Autoscale Throughput Policy for the database"
+            }
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts",
+            "apiVersion": "2021-04-15",
+            "name": "[parameters('accountName')]",
+            "location": "[parameters('location')]",
+            "kind": "GlobalDocumentDB",
+            "properties": {
+                "databaseAccountOfferType": "Standard",
+                "consistencyPolicy": {
+                    "defaultConsistencyLevel": "Session"
+                },
+                "locations": [
+                    {
+                        "locationName": "[parameters('location')]",
+                        "failoverPriority": 0,
+                        "isZoneRedundant": false
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "database-v1"
+                },
+                "options": {}
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v2')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "database-v2"
+                },
+                "options": {}
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v3')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "database-v3"
+                },
+                "options": {}
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v4')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "database-v4"
+                },
+                "options": {}
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/customer')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "customer",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/customerAddress')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "customerAddress",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/customerPassword')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "customerPassword",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/product')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "product",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/productCategory')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "productCategory",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/productTag')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "productTag",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/productTags')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "productTags",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/salesOrder')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "salesOrder",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v1/salesOrderDetail')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v1')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "salesOrderDetail",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v2/customer')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v2')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "customer",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v2/product')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v2')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "product",
+                    "partitionKey": {
+                        "paths": [
+                            "/categoryId"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v2/productCategory')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v2')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "productCategory",
+                    "partitionKey": {
+                        "paths": [
+                            "/type"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v2/productTag')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v2')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "productTag",
+                    "partitionKey": {
+                        "paths": [
+                            "/type"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v2/salesOrder')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v2')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "salesOrder",
+                    "partitionKey": {
+                        "paths": [
+                            "/customerId"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v3/customer')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v3')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "customer",
+                    "partitionKey": {
+                        "paths": [
+                            "/id"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v3/product')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v3')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "product",
+                    "partitionKey": {
+                        "paths": [
+                            "/categoryId"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v3/productCategory')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v3')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "productCategory",
+                    "partitionKey": {
+                        "paths": [
+                            "/type"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+                {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v3/productTag')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v3')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "productTag",
+                    "partitionKey": {
+                        "paths": [
+                            "/type"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v3/salesOrder')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v3')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "salesOrder",
+                    "partitionKey": {
+                        "paths": [
+                            "/customerId"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v4/customer')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v4')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "customer",
+                    "partitionKey": {
+                        "paths": [
+                            "/customerId"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v4/product')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v4')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "product",
+                    "partitionKey": {
+                        "paths": [
+                            "/categoryId"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v4/productMeta')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v4')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "productMeta",
+                    "partitionKey": {
+                        "paths": [
+                            "/type"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+            "apiVersion": "2021-04-15",
+            "name": "[concat(parameters('accountName'), '/database-v4/salesByCategory')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'database-v4')]",
+                "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            ],
+            "properties": {
+                "resource": {
+                    "id": "salesByCategory",
+                    "partitionKey": {
+                        "paths": [
+                            "/categoryId"
+                        ],
+                        "kind": "Hash"
+                    }
+                },
+                "options": {
+                    "autoscaleSettings": {
+                        "maxThroughput": "[parameters('autoscaleMaxThroughput')]" }
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "uri": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.DocumentDb/databaseAccounts/', parameters('accountName'))).documentEndpoint]"
+        },
+        "key": {
+            "type": "string",
+            "value": "[listKeys(resourceId('Microsoft.DocumentDb/databaseAccounts', parameters('accountName')), '2021-04-15').primaryMasterKey]"
+        }
+    }
+}
