@@ -1,3 +1,9 @@
+---
+lab:
+    title: 'Paginate cross-product query results with the Azure Cosmos DB SQL API SDK'
+    module: 'Module 5 - Execute queries in Azure Cosmos DB SQL API'
+---
+
 # Paginate cross-product query results with the Azure Cosmos DB SQL API SDK
 
 Azure Cosmos DB queries will typically have multiple pages of results. Pagination is done automatically server-side when Azure Cosmos DB cannot return all query results in one single execution. In many applications, you will want to write code using the SDK to process your query results in batches in a performant manner.

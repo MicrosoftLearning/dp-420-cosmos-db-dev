@@ -1,3 +1,9 @@
+---
+lab:
+    title: 'Review the default index policy for an Azure Cosmos DB SQL API container with the portal'
+    module: 'Module 6 - Define and implement an indexing strategy for Azure Cosmos DB SQL API'
+---
+
 # Review the default index policy for an Azure Cosmos DB SQL API container with the portal
 
 Every container in Azure Cosmos DB has an indexing policy that directs the service on how to index items within the container. By default, this indexing policy indexes every property of every item. The default indexing policy makes it easy to get started with Azure Cosmos DB quickly as you don't have to think about indexing, performance, and management at the start of a project.

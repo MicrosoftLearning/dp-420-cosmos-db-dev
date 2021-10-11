@@ -1,3 +1,9 @@
+---
+lab:
+    title: 'Create a stored procedure with the Azure portal'
+    module: 'Module 13 - Create server-side programming constructs in Azure Cosmos DB SQL API'
+---
+
 # Create a stored procedure with the Azure portal
 
 Stored procedures are one of the ways you can execute business logic server-side in Azure Cosmos DB. With a stored procedure, you can perform basic CRUD (Create, Read, Update, Delete) operations with a container on multiple documents within a single transactional scope.

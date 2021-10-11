@@ -1,3 +1,9 @@
+---
+lab:
+    title: 'Configure the Azure Cosmos DB SQL API SDK for offline development'
+    module: 'Module 3 - Connect to Azure Cosmos DB SQL API with the SDK'
+---
+
 # Configure the Azure Cosmos DB SQL API SDK for offline development
 
 The Azure Cosmos DB Emulator is a local tool that emulates the Azure Cosmos DB service for development and testing. The emulator supports the SQL API and can be used in place of the cloud service when developing code using the Azure SDK for .NET.

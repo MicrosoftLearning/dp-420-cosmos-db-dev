@@ -1,4 +1,10 @@
-# Create Resource Group
+---
+lab:
+    title: 'Create lab resource group'
+    module: 'Setup'
+---
+
+# Create lab resource group
 
 Before completing this lab, you should create a new [resource group][docs.microsoft.com/azure/azure-resource-manager/management/manage-resource-groups-portal] to place the newly deployed Azure resource into.
 

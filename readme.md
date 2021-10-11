@@ -1,4 +1,4 @@
-# DP420: Develop Solutions for Azure Cosmos DB SQL API
+# DP-420: Develop Solutions for Azure Cosmos DB SQL API
 
 - **Are you a MCT?** - Have a look at our [GitHub User Guide for MCTs](https://microsoftlearning.github.io/MCT-User-Guide/)
 

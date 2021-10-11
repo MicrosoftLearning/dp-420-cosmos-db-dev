@@ -1,3 +1,9 @@
+---
+lab:
+    title: 'Create an Azure Cosmos DB SQL API account'
+    module: 'Module 1 - Get started with Azure Cosmos DB SQL API'
+---
+
 # Create an Azure Cosmos DB SQL API account
 
 Before diving too deeply into Azure Cosmos DB, it's important to get a handle on the basics of creating the resources you will use the most. In most scenarios, you will need to be comfortable creating accounts, databases, containers, and items. In a real-world scenario, you should also have a few basic queries "on hand" to test that you created all of your resources correctly.
