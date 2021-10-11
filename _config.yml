@@ -1,5 +1,5 @@
 title: 'DP-420: Develop Solutions for Azure Cosmos DB SQL API'
-remote_theme: MicrosoftLearning/Jekyll-Theme
+remote_theme: MicrosoftLearning/Jekyll-Theme-Online
 exclude:
   - readme.md
   - .github/
