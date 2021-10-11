@@ -1,6 +1,6 @@
 ---
 lab:
-    title: 'Configure an Azure Cosmos DB SQL API container's index policy with the portal'
+    title: 'Configure an Azure Cosmos DB SQL API container''s index policy with the portal'
     module: 'Module 6 - Define and implement an indexing strategy for Azure Cosmos DB SQL API'
 ---
 

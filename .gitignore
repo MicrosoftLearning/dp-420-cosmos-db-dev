@@ -452,3 +452,11 @@ $RECYCLE.BIN/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+## Jekyll + GitHub Pages
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+Gemfile
+Gemfile.lock
