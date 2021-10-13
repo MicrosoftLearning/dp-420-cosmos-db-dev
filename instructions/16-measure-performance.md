@@ -6,7 +6,7 @@ lab:
 
 # Cost of denormalizing data and aggregates and using the change feed for referential integrity
 
-Using the Relational model could allow us to place different entities in their own containers.  However in NoSQL databases there are no *joins* between containers so we need to start denormalizing our data to prevent these *joins*. Additionally, NoSQL reduces the number of request by modeling the data so the applications can fetch their data in as fewer requests as possible. One problem that rises when denormalizing our data could be the referential integrity between our entities, for this we can use the change feed to keep the data in sync. Denormalizing your aggregates like group by counts can also help us reduce requests.  
+Using the Relational model could allow us to place different entities in their own containers.  However in NoSQL databases there are no *joins* between containers so we need to start denormalizing our data to eliminate the use of *joins*. Additionally, NoSQL reduces the number of request by modeling the data so the applications can fetch their data in as fewer requests as possible. One problem that rises when denormalizing our data could be the referential integrity between our entities, for this we can use the change feed to keep the data in sync. Denormalizing your aggregates like group by counts can also help us reduce requests.  
 
 In this lab, you'll look at the benefits of how denormalizing data and aggregates can help us reduce cost and how we can use the change feed to mantain referential integrity on the denormalized data.
 
