@@ -41,7 +41,8 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     dotnet run --load-data
 
     ```
- 1. Close the integrated terminal.
+
+1. Close the integrated terminal.
 
 ## Measure performance of entities in separate containers
 
@@ -51,7 +52,10 @@ In Database-v1, data is stored in individual containers. In that database, run q
 
 In Database-v1, run a query to get the customer entity and review the request charge.
 
-1. Sign in to the [Azure portal](https://portal.azure.com/learn.docs.microsoft.com?azure-portal=true) with the provided lab credentials.
+1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
+
+1. Sign into the portal using the Microsoft credentials associated with your subscription.
+
 1. On the Azure portal menu, or from the **Home** page, select **Azure Cosmos DB**.
 1. Select the Azure Cosmos DB account with the name that starts with **cosmicworks**.
 1. Select **Data Explorer** on the left side.
@@ -63,6 +67,7 @@ In Database-v1, run a query to get the customer entity and review the request ch
     ```sql
     SELECT * FROM c WHERE c.id = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
    ```
+
 1. Select the **Query Stats** tab and note the request charge of 2.83.
 
     ![Screenshot that shows the query stats for customer query in the database.](media/17-customer-query-v1.png)
@@ -134,3 +139,4 @@ When you compare the RU/s for each query that you ran, you see that the last que
 
 When you're searching for a single item and know the partition key and ID of the data, you can retrieve this data via a *point-read* by calling `ReadItemAsync()` in the Azure Cosmos DB SDK. A point-read is even faster than our query. For the same customer data, the cost is just 1 RU/s, which is a nearly threefold improvement.
 
+[code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks

@@ -43,7 +43,8 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     dotnet run --load-data
 
     ```
- 1. Close the integrated terminal.
+
+1. Close the integrated terminal.
 
 ## Exercise 1: Measure performance cost when denormalizing data
 
@@ -51,7 +52,10 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 In the **database-v2** container, where data is stored in individual containers, run a query to get the product category name, and then view the request charge for that query.
 
-1. Sign in to the [Azure portal](https://portal.azure.com/learn.docs.microsoft.com?azure-portal=true) with the provided lab credentials.
+1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
+
+1. Sign into the portal using the Microsoft credentials associated with your subscription.
+
 1. On the left pane, select **Azure Cosmos DB**.
 1. Select the Azure Cosmos DB account with the name that starts with **cosmicworks**.
 1. On the left pane, select **Data Explorer**.
@@ -89,7 +93,6 @@ Next, query the product container to get all the products in the "Components, He
 1. Select the **Query Stats** tab, and note the request charge of 2.9 RUs.
 
     ![Screenshot of Azure Cosmos DB Data Explorer that shows the results of the query to the product container.](media/16-product-results.png)
-
 
 ### Query for each product's tags
 
@@ -154,9 +157,9 @@ Last, run a query to return the tags for ML Headset.
 Now, let's add up all the RU costs from each of the queries you ran.
 
 | Query | RU cost |
-| - | - | 
+| - | - |
 | Category name | 2.93 |
-| Product | 2.9 | 
+| Product | 2.9 |
 | HL product tags | 3.06 |
 | LL product tags | 3.47 |
 | ML product tags | 3.2 |
@@ -179,14 +182,14 @@ Let's query for the same information but in the denormalized database.
     The results will look something like the following:
 
     ![Screenshot of the results of the query to the product container in the newly modeled product container.](media/16-product-query-v2.png)
- 
+
 1. Review the data that's returned in this query. It contains all the information you need to render the products for this category, including the category name and tag names for each of the three products.
 
 1. Select the **Query Stats** tab, and note the request charge of 2.9 RUs.
 
 ### Compare the performance of the two models
 
-In the relational model, where data is stored in individual containers, you ran five queries to get the name of the category, all the products for that category, and all the product tags for each of the products. The request charge for the five queries totaled 15.56 RUs. 
+In the relational model, where data is stored in individual containers, you ran five queries to get the name of the category, all the products for that category, and all the product tags for each of the products. The request charge for the five queries totaled 15.56 RUs.
 
 To get the same information in the NoSQL model, you ran one query, and its request charge was 2.9 RUs.
 
@@ -312,7 +315,7 @@ Now that you've completed the code for change feed, let's see it in action.
 1. Press any key to return to the main menu.
 
 1. Select **b** on the main menu to update the product category name. The following sequence takes place:
-    
+
     a. Queries the products container for the "Accessories, Tires, and Tubes" category, and counts how many products are in that category.  
     b. Updates the category name and replaces the word "and" with an ampersand (&).  
     c. Change feed picks up that change and, using the code you wrote, updates all the products for that category.  
@@ -386,7 +389,7 @@ To get to the code that you'll use in this unit, do the following:
 
     Farther down, you can also see the two products for the order that make up the details section in your sales order.
 
-1. Scroll a little farther to another `//To-Do:` comment. Here, you need to add code that inserts a new sales order and updates the customer record by using transactional batch. 
+1. Scroll a little farther to another `//To-Do:` comment. Here, you need to add code that inserts a new sales order and updates the customer record by using transactional batch.
 
 1. Copy the following code snippet, and then paste it on the line below the `//To-Do:` comment.
 
@@ -522,4 +525,4 @@ Let's look at the query for your top 10 customers.
 
     The companion lab to this one pointed out that you should strive to avoid cross-partition queries. However, in reality, such queries can be OK in situations where the container is still small or the query is run infrequently. If the query is run frequently or the container is exceptionally large, it would be worth exploring the cost of materializing this data into another container and using it to serve this query.
 
-
+[code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
