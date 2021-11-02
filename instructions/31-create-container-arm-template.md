@@ -41,7 +41,6 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
         "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
         "contentVersion": "1.0.0.0",
         "resources": [
-
         ]
     }
     ```
@@ -95,6 +94,14 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
     ```
     echo $resourceGroup
     ```
+
+1. Begin the interactive login procedure for the Azure CLI using the following command:
+
+    ```
+    az login
+    ```
+
+1. The Azure CLI will automatically open a web browser window or tab. within the browser instance, sign into the Azure CLI using the Microsoft credentials associated with your subscription.
 
 1. Deploy the Azure Resource Manager template using the [az deployment group create][docs.microsoft.com/cli/azure/deployment/group] command:
 

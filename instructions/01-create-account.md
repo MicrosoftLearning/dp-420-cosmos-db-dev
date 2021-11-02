@@ -51,21 +51,14 @@ The Data Explorer will be your primary tool to manage the Azure Cosmos DB SQL AP
 
 1. From within the **Azure Cosmos DB account** pane, select **Data Explorer** from the resource menu.
 
-1. In the **Data Explorer** pane, select **New Database**.
-
-1. In the **New Database** popup, enter the following values for each setting, and then select **OK**:
-
-    | **Setting** | **Value** |
-    | --: | :-- |
-    | **Database id** | *cosmicworks* |
-    | **Provision throughput** | *Do not select* |
-
-1. Back in the **Data Explorer** pane, select **New Container**.
+1. In the **Data Explorer** pane, select **New Container**.
 
 1. In the **New Container** popup, enter the following values for each setting, and then select **OK**:
 
     | **Setting** | **Value** |
     | --: | :-- |
+    | **Database id** | *cosmicworks* |
+    | **Provision throughput** | *Do not select* |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
     | **Container id** | *products* |
     | **Partition key** | */categoryId* |
@@ -136,6 +129,6 @@ Finally, the Data Explorer has a built-in query editor that is used to issue que
 
 1. Still in the **Query** tab, observe the value of the **Request Charge** field within the **Query Statistics** section.
 
-    > &#128221; Typically, the request charge for this simple query is between 2 and 3 RU/s.
+    > &#128221; Typically, the request charge for this simple query is between 2 and 3 RU/s when the container size is small.
 
 1. Close your web browser window or tab.

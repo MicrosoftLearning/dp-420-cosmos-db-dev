@@ -173,6 +173,12 @@ The Azure CLI can be used to migrate a container between manual and autoscale pr
 
 1. Wait for the **migrate** command to finish execution and return before proceeding forward with this lab.
 
+1. Query the the **products** container to determine the minimum possible throughput value using the following command:
+
+    ```
+    az cosmosdb sql container throughput show --name "products" --query "resource.minimumThroughput" --output "tsv" --database-name "cosmicworks" --account-name $accountName --resource-group $resourceGroup
+    ```
+
 1. Update the maximum autoscale throughput of the **products** container from the default value of **4,000** to a new value of **5,000** using the following command:
 
     ```

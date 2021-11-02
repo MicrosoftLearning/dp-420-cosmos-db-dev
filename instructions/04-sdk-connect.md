@@ -8,8 +8,6 @@ lab:
 
 The Azure SDK for .NET is a suite of libraries that provides a consistent developer interface to interact with many Azure services. The Azure SDK for .NET is built to the .NET Standard 2.0 specification ensuring that it can be used in .NET Framework (4.6.1 or above), .NET Core (2.1 or above), and .NET (5 or above) applications.
 
-> &#128161; The Azure Cosmos DB SQL API library within the Azure SDK for .NET is still in a technical preview. Library features may change between now and the initial stable release.
-
 In this lab, you'll connect to an Azure Cosmos DB SQL API account using the Azure SDK for .NET.
 
 ## Prepare your development environment
@@ -67,7 +65,7 @@ The NuGet website contains a searchable index of packages that are available to 
 
 1. Review the description of NuGet, the package manager for .NET, and its capabilities.
 
-1. Navigate to the landing page for the **Microsoft.Azure.Cosmos** library on NuGet ([nuget.org/packages/Microsoft.Azure.Cosmos/3.21.0]).
+1. Search for the **Microsoft.Azure.Cosmos** library on NuGet.org.
 
 1. Select the **.NET CLI** tab to observe the command required to import this library into a .NET project.
 
