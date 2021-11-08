@@ -154,7 +154,7 @@ You will now use the set of asynchronous methods in the Microsoft.Azure.Cosmos.C
 
     > &#128221; Do not close the editor for the **script.cs** file.
 
-1. Observe the **Product** class within this code file. This class represents a product item that will be stored and mainpulated within this container.
+1. Observe the **Product** class within this code file. This class represents a product item that will be stored and manipulated within this container.
 
 1. Return to the editor tab for the **script.cs** code file.
 
@@ -321,7 +321,7 @@ You will now use the set of asynchronous methods in the Microsoft.Azure.Cosmos.C
     dotnet run
     ```
 
-1. Observe the output from the terminal. Specficially, observe the formatted output text with the id, name, and price from the item.
+1. Observe the output from the terminal. Specifically, observe the formatted output text with the id, name, and price from the item.
 
 1. Close the integrated terminal.
 
