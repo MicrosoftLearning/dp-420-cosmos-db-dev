@@ -109,33 +109,182 @@ First, let’s create a simple transactional batch that makes two fictional prod
     Product handlebar = new("012A", "Rusty Handlebar", "9603ca6c-9e28-4a02-9194-51cdb7fea816");
     ```
 
+1. Create a variable of type **PartitionKey** named **partitionKey** passing in **9603ca6c-9e28-4a02-9194-51cdb7fea816** as a constructor parameter:
 
+    ```
+    PartitionKey partitionKey = new ("9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    ```
 
+1. Invoke the [CreateTransactionalBatch][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.createtransactionalbatch] method of the **container** variable passing in the **partitionkey** variable as a method parameter and using the fluent syntax to invoke the [CreateItem<>][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatch.createitem] generic methods passing in the **saddle** and **handlebar** variables as items to create in individual operations and store the result in a variable named **batch** of type **TransactionalBatch**:
 
+    ```
+    TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
+        .CreateItem<Product>(saddle)
+        .CreateItem<Product>(handlebar);
+    ```
 
+1. Within a using statement, asynchronously invoke the **ExecuteAsync** method of the **batch** variable and store the result in a variable of type **TransactionalBatchResponse** named **response**:
 
+    ```
+    using TransactionalBatchResponse response = await batch.ExecuteAsync();
+    ```
 
+1. Invoke the static **Console.WriteLine** method to output the value of the **StatusCode** property of the **response** variable:
 
+    ```
+    Console.WriteLine($"Status:\t{response.StatusCode}");
+    ```
 
+1. Once you are done, your code file should now include:
+  
+    ```
+    using System;
+    using Microsoft.Azure.Cosmos;
+    
+    string endpoint = "<cosmos-endpoint>";
+    string key = "<cosmos-key>";
+    
+    CosmosClient client = new (endpoint, key);
+        
+    Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
+    Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId", 400);
 
+    Product saddle = new("0120", "Worn Saddle", "9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    Product handlebar = new("012A", "Rusty Handlebar", "9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    
+    PartitionKey partitionKey = new ("9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    
+    TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
+        .CreateItem<Product>(saddle)
+        .CreateItem<Product>(handlebar);
+    
+    using TransactionalBatchResponse response = await batch.ExecuteAsync();
+    
+    Console.WriteLine($"Status:\t{response.StatusCode}");
+    ```
 
+1. **Save** the **script.cs** code file.
 
+1. In **Visual Studio Code**, open the context menu for the **06-sdk-crud** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
+1. Build and run the project using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command:
 
+    ```
+    dotnet run
+    ```
 
+1. Observe the output from the terminal. The status code should be an HTTP 200 **OK**.
 
+1. Close the integrated terminal.
 
+## Creating an errant transactional batch
 
+Now, let’s create a transactional batch that will error purposefully. This batch will attempt to insert two items that have different logical partition keys. We will create a flickering strobe light in the “used accessories” category and a new helmet in the “pristine accessories” category. By definition, this should be a bad request and return an error when performing this transaction.
 
+1. Return to the editor tab for the **script.cs** code file.
 
+1. Delete the following lines of code:
 
+    ```
+    Product saddle = new("0120", "Worn Saddle", "9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    Product handlebar = new("012A", "Rusty Handlebar", "9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    
+    PartitionKey partitionKey = new ("9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    
+    TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
+        .CreateItem<Product>(saddle)
+        .CreateItem<Product>(handlebar);
+    
+    using TransactionalBatchResponse response = await batch.ExecuteAsync();
+    
+    Console.WriteLine($"Status:\t{response.StatusCode}");
+    ```
 
+1. Create a **Product** variable named **light** with a unique identifier of **012B**, a name of **Flickering Strobe Light**, and a category identifier of **9603ca6c-9e28-4a02-9194-51cdb7fea816**:
 
+    ```
+    Product light = new("012B", "Flickering Strobe Light", "9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    ```
 
+1. Create a **Product** variable named **helmet** with a unique identifier of **012C**, a name of **New Helmet**, and a category identifier of **0feee2e4-687a-4d69-b64e-be36afc33e74**:
 
+    ```
+    Product helmet = new("012C", "New Helmet", "0feee2e4-687a-4d69-b64e-be36afc33e74");
+    ```
 
+1. Create a variable of type **PartitionKey** named **partitionKey** passing in **9603ca6c-9e28-4a02-9194-51cdb7fea816** as a constructor parameter:
 
+    ```
+    PartitionKey partitionKey = new ("9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    ```
+
+1. Invoke the **CreateTransactionalBatch** method of the **container** variable passing in the **partitionkey** variable as a method parameter and using the fluent syntax to invoke the **CreateItem<>** generic methods passing in the **saddle** and **handlebar** variables as items to create in individual operations and store the result in a variable named **batch** of type **TransactionalBatch**:
+
+    ```
+    TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
+        .CreateItem<Product>(light)
+        .CreateItem<Product>(helmet);
+    ```
+
+1. Within a using statement, asynchronously invoke the **ExecuteAsync** method of the **batch** variable and store the result in a variable of type **TransactionalBatchResponse** named **response**:
+
+    ```
+    using TransactionalBatchResponse response = await batch.ExecuteAsync();
+    ```
+
+1. Invoke the static **Console.WriteLine** method to output the value of the **StatusCode** property of the **response** variable:
+
+    ```
+    Console.WriteLine($"Status:\t{response.StatusCode}");
+    ```
+
+1. Once you are done, your code file should now include:
+  
+    ```
+    using System;
+    using Microsoft.Azure.Cosmos;
+    
+    string endpoint = "<cosmos-endpoint>";
+    string key = "<cosmos-key>";
+    
+    CosmosClient client = new (endpoint, key);
+        
+    Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
+    Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId", 400);
+
+    Product light = new("012B", "Flickering Strobe Light", "9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    Product helmet = new("012C", "New Helmet", "0feee2e4-687a-4d69-b64e-be36afc33e74");
+    
+    PartitionKey partitionKey = new ("9603ca6c-9e28-4a02-9194-51cdb7fea816");
+    
+    TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
+        .CreateItem<Product>(light)
+        .CreateItem<Product>(helmet);
+    
+    using TransactionalBatchResponse response = await batch.ExecuteAsync();
+    
+    Console.WriteLine($"Status:\t{response.StatusCode}");
+    ```
+
+1. **Save** the **script.cs** code file.
+
+1. In **Visual Studio Code**, open the context menu for the **06-sdk-crud** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+
+1. Build and run the project using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command:
+
+    ```
+    dotnet run
+    ```
+
+1. Observe the output from the terminal. The status code should be an HTTP 400 **Bad Request**.
+
+1. Close the integrated terminal.
+
+1. Close **Visual Studio Code**.
+
+[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.createtransactionalbatch]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.createtransactionalbatch
 [docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatch]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatch
+[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatch.createitem]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatch.createitem
 [docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatchresponse]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatchresponse
 [docs.microsoft.com/dotnet/core/tools/dotnet-build]: https://docs.microsoft.com/dotnet/core/tools/dotnet-build
 [docs.microsoft.com/dotnet/core/tools/dotnet-run]: https://docs.microsoft.com/dotnet/core/tools/dotnet-run
