@@ -6,7 +6,7 @@ lab:
 
 # Migrate existing data using Azure Data Factory
 
-In Azure Data Factory, Azure Cosmos DB is supported as a source of data ingest and as a target (sink) of data output. 
+In Azure Data Factory, Azure Cosmos DB is supported as a source of data ingest and as a target (sink) of data output.
 
 In this lab, we will populate Azure Cosmos DB using a helpful command-line utility and then use Azure Data Factory to move a subset of data from one container to another.
 
@@ -78,6 +78,8 @@ To accompany the products container, you will create a **flatproducts** containe
 
 1. Close the integrated terminal.
 
+1. Close **Visual Studio Code**.
+
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
@@ -121,91 +123,93 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
     | **Name** | *Enter a globally unique name* |
     | **Region** | *Choose any available region* |
     | **Version** | *V2* |
+    | **Git configuration** | *Configure Git later* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
 1. Wait for the deployment task to complete before continuing with this task.
 
+1. Go to the newly created **Azure Data Factory** resource and select **Open Azure Data Factory Studio**.
 
+    > &#128161; Alternatively, you can navigate to (``adf.azure.com/home``), select your newly created Data Factory resource, and then select the home icon.
 
+1. From the home screen. Select the **Ingest** option to begin the quick wizard to perform a one-time copy data at scale operation and move to the **Properties** step of the wizard.
 
+1. Starting with the **Properties** step of the wizard, in the **Task type** section, select **Built-in copy task**.
 
+1. In the **Task cadence or task schedule** section, select **Run once now** and then select **Next** to move to the **Source** step of the wizard.
 
+1. In the **Source** step of the wizard, in the **Source type** list, select **Azure Cosmos DB (SQL API)**.
 
+1. In the **Connection** section, select **+ New connection**.
 
+1. In the **New connection (Azure Cosmos DB (SQL API))** popup, configure the new connection with the following values, and then select **Create**:
 
+    | **Setting** | **Value** |
+    | ---: | :--- |
+    | **Name** | *CosmosSqlConn* |
+    | **Connect via integration runtime** | *AutoResolveIntegrationRuntime* |
+    | **Authentication method** | *Account key* &vert; *Connection string* |
+    | **Account selection method** | *From Azure subscription* |
+    | **Azure subscription** | *Your existing Azure subscription* |
+    | **Azure Cosmos DB account name** | *Your existing Azure Cosmos DB account name you chose earlier in this lab* |
+    | **Database name** | *cosmicworks* |
 
+1. Back in the **Source data store** section, within the **Source tables** section, select **Use query**.
 
+1. In the **Table name** list, select **products**.
 
+1. In the **Query** editor, delete the existing content and enter the following query:
 
+    ```
+    SELECT 
+        p.name, 
+        p.categoryName as category, 
+        p.price 
+    FROM 
+        products p
+    ```
 
+1. Select **Preview data** to test the query's validity. Select **Next** to move to the **Target** step of the wizard.
 
+1. In the **Target** step of the wizard, in the **Target type** list, select **Azure Cosmos DB (SQL API)**.
 
+1. In the **Connection** list, select **CosmosSqlConn**.
 
+1. In the **Target** list, select **flatproducts** and then select **Next** to move to the **Settings** step of the wizard.
 
+1. In the **Settings** step of the wizard, in teh **Task name** field, enter **FlattenAndMoveData**.
 
+1. Leave all remaining fields to their default blank values and then select **Next** to move to the final step of the wizard.
 
+1. Review the **Summary** of the steps you have selected in the wizard and then select **Next**.
 
+1. Observe the various steps in the deployment. When the deployment has finished, select **Finish**.
 
+1. Close your web browser window or tab.
 
+1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
+1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
+1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
 
+1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
+1. In the **Data Explorer**, expand the **cosmicworks** database node, select the **flatproducts** container node, and then select **New SQL Query**.
 
+1. Delete the contents of the editor area.
 
+1. Create a new SQL query that will return all documents where the **name** is equivalent to **HL Headset**:
 
-## Move data between containers
+    ```
+    SELECT p.name, p.category, p.price FROM p
+    ```
 
+1. Select **Execute Query**.
 
+1. Observe the results of the query.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-1. Close **Visual Studio Code**.
+1. Close your web browser window or tab.
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
