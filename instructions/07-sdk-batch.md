@@ -39,7 +39,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
     | **Capacity mode** | *Provisioned throughput* |
-    | **Apply Free Tier Discount** | *Apply* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
