@@ -12,6 +12,10 @@ In this lab, we will populate Azure Cosmos DB using a helpful command-line utili
 
 ## Create and seed your Azure Cosmos DB SQL API account
 
+You will use a command-line utility that creates a **cosmicworks** database and a **products** container at **4,000** request units per second (RU/s). Once created, you will adjust the throughput down to 400 RU/s.
+
+To accompany the products container, you will create a **flatproducts** container manually that will be the target of the ETL transformation and load operation at the end of this lab.
+
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
@@ -82,7 +86,9 @@ In this lab, we will populate Azure Cosmos DB using a helpful command-line utili
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then expand the new **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Items**.
+
+1. Observe and select the various JSON items in the **products** container. These are the items created by the command-line tool used in previous steps.
 
 1. Select the **Scale & Settings** node. In the **Scale & Settings** tab, select **Manual**, update the **required throughput** setting from **4000 RU/s** to **400 RU/s** and then **Save** your changes**.
 
@@ -104,6 +110,8 @@ In this lab, we will populate Azure Cosmos DB using a helpful command-line utili
 
 ## Create Azure Data Factory resource
 
+Now that the Azure Cosmos DB SQL API resources are in place, you will create an Azure Data Factory resource and configure all of the necessary components and connections to perform a one-time data movement from one SQL API container to another to extract data, transform it, and load it to another SQL API container.
+
 1. Select **+ Create a resource**, search for *Data Factory*, and then create a new **Azure Data Factory** resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
@@ -117,6 +125,86 @@ In this lab, we will populate Azure Cosmos DB using a helpful command-line utili
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
 1. Wait for the deployment task to complete before continuing with this task.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Move data between containers
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 1. Close **Visual Studio Code**.
 
