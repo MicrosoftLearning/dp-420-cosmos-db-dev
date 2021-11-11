@@ -118,10 +118,10 @@ When processing query results, you must make sure your code progresses through a
 
     > &#128221; For example, if your key is: **fDR2ci9QgkdkvERTQ==**, then the C# statement would be: **string key = "fDR2ci9QgkdkvERTQ==";**.
 
-1. Create a new variable named **sql** of type *string* with a value of **SELECT * FROM products p WHERE p.price > 500**:
+1. Create a new variable named **sql** of type *string* with a value of **SELECT p.name, t.name AS tag FROM products p JOIN t IN p.tags**:
 
     ```
-    string sql = "SELECT * FROM products p WHERE p.price > 500";
+    string sql = "SELECT p.name, t.name AS tag FROM products p JOIN t IN p.tags";
     ```
 
 1. Create a new variable of type [QueryDefinition][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.querydefinition] passing in the **sql** variable as a parameter to the constructor:
@@ -206,7 +206,7 @@ When processing query results, you must make sure your code progresses through a
 
     Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId");
 
-    string sql = "SELECT * FROM products p WHERE p.price > 500";
+    string sql = "SELECT p.name, t.name AS tag FROM products p JOIN t IN p.tags";
     QueryDefinition query = new (sql);
 
     QueryRequestOptions options = new ();
