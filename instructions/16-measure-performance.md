@@ -22,9 +22,9 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **17-denormalize** folder.
+1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **16-measure-performance** folder.
 
-1. Open the context menu for the **17-denormalize** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+1. Open the context menu for the **16-measure-performance** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
 1. If the terminal opens as a **Windows Powershell** terminal, open a new **Git Bash** terminal.
 
@@ -34,7 +34,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
     ```bash
     az login
-    cd 17-denormalize
+    cd 16-measure-performance
     bash init.sh
     dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
     dotnet build
