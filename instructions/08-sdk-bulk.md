@@ -63,7 +63,6 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     | **Share throughput across containers** | *selected* |
     | **Database throughput** | *Autoscale* &vert; *4000* |
     | **Container id** | *products* |
-    | **Indexing** | *Automatic* |
     | **Partition key** | */categoryId* |
 
 1. Close your web browser window or tab.
