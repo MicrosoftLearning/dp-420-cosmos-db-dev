@@ -101,11 +101,11 @@ The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.
     );
     ```
 
-1. Add a new object of type [IncludedPath][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.includedpath] with its [Path][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.includedpath.path] property set to a value of **/name/*** to the [IncludedPaths][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.indexingpolicy.includedpaths] collection property in the **policy** variable:
+1. Add a new object of type [IncludedPath][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.includedpath] with its [Path][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.includedpath.path] property set to a value of **/name/?** to the [IncludedPaths][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.indexingpolicy.includedpaths] collection property in the **policy** variable:
 
     ```
     policy.IncludedPaths.Add(
-        new IncludedPath{ Path = "/name/*" }
+        new IncludedPath{ Path = "/name/?" }
     );
     ```
 
@@ -153,7 +153,7 @@ The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.
         new ExcludedPath{ Path = "/*" }
     );
     policy.IncludedPaths.Add(
-        new IncludedPath{ Path = "/name/*" }
+        new IncludedPath{ Path = "/name/?" }
     );
 
     ContainerProperties options = new ("products", "/categoryId");
@@ -205,7 +205,7 @@ Just like with any other indexing policy, you can use the Data Explorer to view 
       "automatic": true,
       "includedPaths": [
         {
-          "path": "/name/*"
+          "path": "/name/?"
         }
       ],
       "excludedPaths": [
