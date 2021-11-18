@@ -236,5 +236,5 @@ To wrap up things, you will use the Data Explorer to issue a SQL query that will
 
 1. Close your web browser window or tab.
 
-[azure.github.io/azure-cosmosdb-js-server/context.html]: http://azure.github.io/azure-cosmosdb-js-server/Context.html
-[azure.github.io/azure-cosmosdb-js-server/global.html]: http://azure.github.io/azure-cosmosdb-js-server/global.html
+[azure.github.io/azure-cosmosdb-js-server/context.html]: https://azure.github.io/azure-cosmosdb-js-server/Context.html
+[azure.github.io/azure-cosmosdb-js-server/global.html]: https://azure.github.io/azure-cosmosdb-js-server/global.html
