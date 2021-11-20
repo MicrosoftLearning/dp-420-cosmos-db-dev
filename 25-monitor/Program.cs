@@ -9,10 +9,8 @@ using System.IO;
 public class Program
 {
 
-    //private static readonly string endpoint = "<cosmos-endpoint>";
-    //private static readonly string key = "<cosmos-key>";
-    private static readonly string endpoint = "https://calopezw420labs02.documents.azure.com:443/";
-    private static readonly string key = "NTqv17VuWc6JVPI3sMEdeidk1SFGKjRVScqAaiGBdRd2qW6LSc60Ft3gZM6fwwwcY53J3nWnX1ck4cMIjm5ziA==";
+    private static readonly string endpoint = "<cosmos-endpoint>";
+    private static readonly string key = "<cosmos-key>";
 
     private static readonly string connectionString = "AccountEndpoint=" + endpoint + ";AccountKey=" + key;
 
@@ -125,7 +123,7 @@ public class Program
         Console.WriteLine(DateTime.Now.ToString(@"MM\/dd\/yyyy hh:mm:ss tt"));
 
         Console.WriteLine("");
-        Console.WriteLine("Creating simulated background workload, wait 5-10 minutes and go to the next step of the lab.");
+        Console.WriteLine("Creating simulated background workload, wait 5-10 minutes and go to the next step of the exercise.");
         Console.WriteLine(DateTime.Now.ToString(@"MM\/dd\/yyyy hh:mm:ss tt"));
 
        await CreateSimulatedLoad(client);
