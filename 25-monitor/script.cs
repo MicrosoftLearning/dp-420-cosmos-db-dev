@@ -44,8 +44,6 @@ public class Program
         JArray database3_salesOrder = (JArray) JArray.Parse(File.ReadAllText(@"..\data\fullset\database-v3\salesOrder"));
         //JArray database4_customer = (JArray) JArray.Parse(File.ReadAllText(@"..\data\fullset\database-v4\customer"));
 
-        await CreateSimulatedLoad(client);
-
         Console.WriteLine("");
         DateTime CurrentTime = DateTime.Now;
         Console.WriteLine(CurrentTime.ToString(@"MM\/dd\/yyyy hh:mm:ss tt"));
@@ -105,7 +103,11 @@ public class Program
         Console.WriteLine("Loaded " + database3_customer.Count.ToString() + " items into database-v3 customer container in " + LoadTime.ToString(@"mm\:ss"));
         Console.WriteLine(DateTime.Now.ToString(@"MM\/dd\/yyyy hh:mm:ss tt"));
 
-        await CreateSimulatedLoad(client);
+        Console.WriteLine("");
+        Console.WriteLine("Creating simulated background workload");
+        Console.WriteLine(DateTime.Now.ToString(@"MM\/dd\/yyyy hh:mm:ss tt"));
+
+       await CreateSimulatedLoad(client);
     }
 
     static async Task CreateSimulatedLoad(CosmosClient client)
