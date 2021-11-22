@@ -130,7 +130,7 @@ This lab has a pre-built test .NET application that will take a large JSON objec
 
     > &#128221; You will re-use this terminal later in this exercise. It's important to leave the terminal open so you can compare the original and updated RU charges.
 
-## Update the indexing policy and re-run the .NET application
+## Update the indexing policy and rerun the .NET application
 
 This lab scenario will assume that our future queries focus primarily on the name and categoryName properties. To optimize for our large JSON item, you will exclude all other fields from the index by creating an indexing policy that starts by excluding all paths. Then the policy will selectively include specific paths.
 
@@ -150,44 +150,43 @@ This lab scenario will assume that our future queries focus primarily on the nam
 
     ```
     {
-        "indexingMode": "consistent",
-        "automatic": true,
-        "includedPaths": [
-            {
-                "path": "/*"
-            }
-        ],
-        "excludedPaths": [
-            {
-                "path": "/\"_etag\"/?"
-            }
-        ]
-    }
-    
+      "indexingMode": "consistent",
+      "automatic": true,
+      "includedPaths": [
+        {
+          "path": "/*"
+        }
+      ],
+      "excludedPaths": [
+        {
+          "path": "/\"_etag\"/?"
+        }
+      ]
+    }    
     ```
 
 1. Replace the indexing policy with this modified JSON object and then **Save** the changes:
 
     ```
     {
-        "indexingMode": "consistent",
-        "automatic": true,
-        "includedPaths": [
-            {
-                "path": "/name/?"
-            },
-            {
-                "path": "/categoryName/?"
-            }
-        ],
-        "excludedPaths": [
-            {
-                "path": "/*"
-            },
-            {
-                "path": "/\"_etag\"/?"
-            }
-        ]
+      "indexingMode": "consistent",
+      "automatic": true,
+      "includedPaths": [
+        {
+          "path": "/name/?"
+        },
+        {
+          "path": "/categoryName/?"
+        }
+      ],
+      "excludedPaths": [
+        {
+          "path": "/*"
+        },
+        {
+          "path": "/\"_etag\"/?"
+        }
+      ]
     }
     ```
 
@@ -195,7 +194,7 @@ This lab scenario will assume that our future queries focus primarily on the nam
 
 1. Return to **Visual Studio Code**. Return to the open terminal.
 
-1. Build and run the project at least two more times using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command. Observe the new RU charge in the console output which should be significantly less than the original charge:
+1. Build and run the project at least two more times using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command. Observe the new RU charge in the console output, which should be significantly less than the original charge:
 
     ```
     dotnet run
@@ -219,7 +218,7 @@ This lab scenario will assume that our future queries focus primarily on the nam
 
     ```
     {
-        "indexingMode": "none"
+      "indexingMode": "none"
     }
     ```
 
@@ -227,7 +226,7 @@ This lab scenario will assume that our future queries focus primarily on the nam
 
 1. Return to **Visual Studio Code**. Return to the open terminal.
 
-1. Build and run the project at least two more times using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command. Observe the new RU charge in the console output which should be slightly less than the original charge:
+1. Build and run the project at least two more times using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command. Observe the new RU charge in the console output, which should be slightly less than the original charge:
 
     ```
     dotnet run
