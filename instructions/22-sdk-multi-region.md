@@ -176,7 +176,7 @@ The fluent **WithApplicationRegion** method is used to configure the preferred r
     Product item = new (id, "Polished Bike Frame", categoryId);
     ```
 
-1. Asynchronously invoke the **CreateItemAsync\<\>** method of the **container** variable passing in the **item** variable as a parameter and storing the result in a variable named **response.
+1. Asynchronously invoke the **CreateItemAsync\<\>** method of the **container** variable passing in the **item** variable as a parameter and storing the result in a variable named **response**:
 
     ```
     var response = await container.CreateItemAsync<Product>(item);
@@ -228,7 +228,7 @@ The fluent **WithApplicationRegion** method is used to configure the preferred r
     dotnet run
     ```
 
-1. Observe the output from the terminal. The name of the container and the current configured throughput should print to the console output.
+1. Observe the output from the terminal. The HTTP status code and request charge (in RUs) should be printed to the console.
 
 1. Close the integrated terminal.
 
