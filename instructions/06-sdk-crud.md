@@ -281,7 +281,7 @@ You will now use the set of asynchronous methods in the Microsoft.Azure.Cosmos.C
     Product saddle = await container.ReadItemAsync<Product>(id, partitionKey);
     ```
 
-1. Invoke the static **Console.WriteLine** method to print the print the saddle object using a formatted output string:
+1. Invoke the static **Console.WriteLine** method to print the saddle object using a formatted output string:
 
     ```
     Console.WriteLine($"[{saddle.id}]\t{saddle.name} ({saddle.price:C})");

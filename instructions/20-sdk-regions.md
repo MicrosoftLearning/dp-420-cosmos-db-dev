@@ -10,8 +10,6 @@ When you enable geo-redundancy for an Azure Cosmos DB SQL API account, you can t
 
 In this lab, you will configure the CosmosClient class to connect to read regions in a fallback order that you manually configure.
 
-
-
 ## Prepare your development environment
 
 If you have not already cloned the lab code repository for **DP-420** to the environment where you're working on this lab, follow these steps to do so. Otherwise, open the previously cloned folder in **Visual Studio Code**.
@@ -49,7 +47,33 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Wait for the deployment task to complete before continuing with this task.
 
-1. Go to the newly created **Azure Cosmos DB** account resource and navigate to the **Keys** pane.
+1. Go to the newly created **Azure Cosmos DB** account resource and navigate to the **Replicate data globally** pane.
+
+1. In the **Replicate data globally** pane, add two extra read regions to the account and then **Save** your changes.
+
+1. Wait for the replication task to complete before continuing with this task.
+
+    > &#128221; This operation can take approximately 5-10 minutes.
+
+1. Record the values of the **Write** (primary) region and the two **Read** regions. You will use these region values later in this exercise.
+
+1. In the resource blade, navigate to the **Data Explorer** pane.
+
+1. In the **Data Explorer** pane, select **New Container**.
+
+1. In the **New Container** popup, enter the following values for each setting, and then select **OK**:
+
+    | **Setting** | **Value** |
+    | --: | :-- |
+    | **Database id** | *Create new* &vert; *cosmicworks* |
+    | **Share throughput across containers** | *Do not select* |
+    | **Container id** | *products* |
+    | **Partition key** | */categoryId* |
+    | **Container throughput** | *Manual* &vert; *800* |
+
+1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
+
+1. In the resource blade, navigate to the **Keys** pane.
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
@@ -63,11 +87,11 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 Using the credentials from the newly created account, you will connect with the SDK classes and create a new database and container instance. Then, you will use the Data Explorer to validate that the instances exist in the Azure portal.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **06-sdk-crud** folder.
+1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **20-sdk-regions** folder.
 
-1. Open the context menu for the **06-sdk-crud** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+1. Open the context menu for the **20-sdk-regions** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
-    > &#128221; This command will open the terminal with the starting directory already set to the **06-sdk-crud** folder.
+    > &#128221; This command will open the terminal with the starting directory already set to the **20-sdk-regions** folder.
 
 1. Build the project using the [dotnet build][docs.microsoft.com/dotnet/core/tools/dotnet-build] command:
 
@@ -75,4 +99,129 @@ Using the credentials from the newly created account, you will connect with the 
     dotnet build
     ```
 
+    > &#128221; You may see a compiler warning that the **endpoint** and **key** variables are current unused. You can safely ignore this warning as you will use these variable in this task.
+
 1. Close the integrated terminal.
+
+1. Open the **script.cs** code file within the **20-sdk-regions** folder.
+
+    > &#128221; The **[Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1]** library has already been pre-imported from NuGet.
+
+1. Locate the **string** variable named **endpoint**. Set its value to the **endpoint** of the Azure Cosmos DB account you created earlier.
+  
+    ```
+    string endpoint = "<cosmos-endpoint>";
+    ```
+
+    > &#128221; For example, if your endpoint is: **https&shy;://dp420.documents.azure.com:443/**, then the C# statement would be: **string endpoint = "https&shy;://dp420.documents.azure.com:443/";**.
+
+1. Locate the **string** variable named **key**. Set its value to the **key** of the Azure Cosmos DB account you created earlier.
+
+    ```
+    string key = "<cosmos-key>";
+    ```
+
+    > &#128221; For example, if your key is: **fDR2ci9QgkdkvERTQ==**, then the C# statement would be: **string key = "fDR2ci9QgkdkvERTQ==";**.
+
+1. **Save** the **script.cs** code file.
+
+## Configure the .NET SDK with a preferred region list
+
+The **CosmosClientOptions** class includes a property to configure the list of regions you would like to connect to with the SDK. The list is ordered by failover priority, attempting to connect to each region in the order that you configure.
+
+1. Create a new variable of generic type **List\<string\>** that contains a list of the regions you configured with your account, starting with the third region and ending with the first (primary) region. For example, if you created your Azure Cosmos DB SQL API account in the **West US** region, and then added **South Africa North**, and finally added **East Asia**; then your string variable would contain:
+
+    ```
+    List<string> regions = new()
+    {
+        "East Asia",
+        "South Africa North",
+        "West US"
+    };
+    ```
+
+1. Create a new instance of the **CosmosClientOptions** named **options** class with the [ApplicationPreferredRegions][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclientoptions.applicationpreferredregions] property set to the **regions** variable:
+
+    ```
+    CosmosClientOptions options = new () 
+    { 
+        ApplicationPreferredRegions = regions
+    };
+    ```
+
+1. Create a new instance of the **CosmosClient** class named **client** passing in the **endpoint**, **key**, and **options** variables as constructor parameters:
+
+    ```
+    CosmosClient client = new (endpoint, key, options); 
+    ```
+
+1. Use the **GetContainer** method of the **client** variable to retrieve the existing container using the name of the database (*cosmicworks*) and the name of the container (*products*):
+
+    ```
+    Container container = client.GetContainer("cosmicworks", "products");
+    ```
+
+1. Use the [ReadThroughputAsync][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readthroughputasync] method of the **container** variable to retrieve the currently configured throughput amount from the server and store the result in a variable named **throughput** of the nullable **int** type:
+
+    ```
+    int? throughput = await container.ReadThroughputAsync();
+    ```
+
+1. Invoke the static **Console.WriteLine** method to print the current container identifier and throughput:
+
+    ```
+    Console.WriteLine($"Container:\t{container.Id}");
+    Console.WriteLine($"Throughput:\t{throughput}");
+    ```
+
+1. Once you are done, your code file should now include:
+  
+    ```
+    using Microsoft.Azure.Cosmos;
+
+    string endpoint = "<cosmos-endpoint>";
+    string key = "<cosmos-key>";
+
+    List<string> regions = new()
+    {
+        "<read-region-2>",
+        "<read-region-1>",
+        "<write-region>"
+    };
+    
+    CosmosClientOptions options = new () 
+    { 
+        ApplicationPreferredRegions = regions
+    };
+    
+    using CosmosClient client = new(endpoint, key, options);
+    
+    Container container = client.GetContainer("cosmicworks", "products");
+    
+    int? throughput = await container.ReadThroughputAsync();
+    
+    Console.WriteLine($"Container:\t{container.Id}");
+    Console.WriteLine($"Throughput:\t{throughput}");
+    ```
+
+1. **Save** the **script.cs** code file.
+
+1. In **Visual Studio Code**, open the context menu for the **20-sdk-regions** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+
+1. Build and run the project using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command:
+
+    ```
+    dotnet run
+    ```
+
+1. Observe the output from the terminal. The name of the container and the current configured throughput should print to the console output.
+
+1. Close the integrated terminal.
+
+1. Close **Visual Studio Code**.
+
+[code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
+[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readthroughputasync]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readthroughputasync
+[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclientoptions.applicationpreferredregions]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclientoptions.applicationpreferredregions
+[docs.microsoft.com/dotnet/core/tools/dotnet-build]: https://docs.microsoft.com/dotnet/core/tools/dotnet-build
+[docs.microsoft.com/dotnet/core/tools/dotnet-run]: https://docs.microsoft.com/dotnet/core/tools/dotnet-run
