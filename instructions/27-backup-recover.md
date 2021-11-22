@@ -7,7 +7,7 @@ Lab:
 
 Azure Automatically takes encrypted backups of your data. These backups are taken in two modes, **Periodic** and **Continuous** backup modes.
 
-In this lab, you'll do `backup` and `restores` using the continuous backup mode. First, you'll Create an Azure Cosmos DB account. You could enable the continuous mode during creation, but for this lab, you'll enable it later. You'll create two containers and add a few documents to them. Next, you'll then update a couple of the documents in those containers. Finally you'll first restore one container, then you'll restore the whole database before both containers were updated.
+In this lab, you'll do `backup` and `restores` using the continuous backup mode. First, you'll Create an Azure Cosmos DB account. You'll create two containers and add a few documents to them. Next, you'll then update a couple of the documents in those containers. Finally you'll first restore one container, then you'll restore the whole database before both containers were updated.
 
 ## Create an Azure Cosmos DB SQL API account
 
