@@ -38,7 +38,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.select **Data Explorer** from the resource menu.
+    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+ 
+1. Select **Data Explorer** from the resource menu.
 
 1. In the **Data Explorer** pane, expand **New Container** and then select **New Database**.
 
@@ -205,6 +207,10 @@ The function you created earlier is a C# script that is edited in-portal. You wi
 
 You will use a command-line utility that creates a **cosmicworks** database and a **products** container. The tool will then create a set of items that you will observe using the change feed processor running in your terminal window.
 
+1. Start **Visual Studio Code**.
+
+    > &#128221; If you are not already familiar with the Visual Studio Code interface, review the [Get Started guide for Visual Studio Code][code.visualstudio.com/docs/getstarted]
+
 1. In **Visual Studio Code**, open the **Terminal** menu and then select **Split Terminal** to open a new terminal side by side with your existing instance.
 
 1. Install the [cosmicworks][nuget.org/packages/cosmicworks] command-line tool for global use on your machine.
@@ -242,6 +248,7 @@ You will use a command-line utility that creates a **cosmicworks** database and 
 
 1. Close your web browser window or tab.
 
+[code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
 [docs.microsoft.com/dotnet/api/microsoft.azure.documents]: https://docs.microsoft.com/dotnet/api/microsoft.azure.documents
 [docs.microsoft.com/dotnet/api/microsoft.azure.documents.document]: https://docs.microsoft.com/dotnet/api/microsoft.azure.documents.document
 [docs.microsoft.com/dotnet/api/microsoft.azure.documents.resource.id]: https://docs.microsoft.com/dotnet/api/microsoft.azure.documents.resource.id
