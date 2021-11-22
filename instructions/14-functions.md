@@ -39,7 +39,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
 
     1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
- 
+
 1. Select **Data Explorer** from the resource menu.
 
 1. In the **Data Explorer** pane, expand **New Container** and then select **New Database**.

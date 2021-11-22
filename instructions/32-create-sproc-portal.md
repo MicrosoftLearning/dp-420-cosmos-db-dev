@@ -88,7 +88,7 @@ Stored procedures are authored in language-integrated JavaScript and support exe
     };
     ```
 
-1. Invoke the [createDocument][] method of the container object passing in the result of invoking the [getSelfLink][] method of the container object and the new document as parameters:
+1. Invoke the **createDocument** method of the container object passing in the result of invoking the **getSelfLink** method of the container object and the new document as parameters:
 
     ```
     container.createDocument(
