@@ -213,3 +213,4 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 1. Close your web browser window or tab.
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
+[nuget.org/packages/cosmicworks]: https://www.nuget.org/packages/cosmicworks

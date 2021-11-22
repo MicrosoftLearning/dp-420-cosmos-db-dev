@@ -124,7 +124,7 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
     CosmosClient client = new (endpoint, key, options); 
     ```
 
-1. Use the [GetContainer][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclient.getcontainer] method of the **container** variable to retrieve the existing container using the name of the database (*cosmicworks*) and the name of the container (*products*):
+1. Use the [GetContainer][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclient.getcontainer] method of the **client** variable to retrieve the existing container using the name of the database (*cosmicworks*) and the name of the container (*products*):
 
     ```
     Container container = client.GetContainer("cosmicworks", "products");
