@@ -1,0 +1,311 @@
+{
+    "id": "<unique-identifier>",
+    "categoryId": "26C74104-40BC-4541-8EF5-9892F7F03D72",
+    "categoryName": "Components, Saddles",
+    "sku": "SE-R581",
+    "name": "LL Road Seat/Saddle",
+    "description": "Dolor amet cupidatat cupidatat ullamco aliquip aute deserunt officia. Cupidatat pariatur dolore consectetur magna exercitation magna cillum ad minim non ullamco fugiat tempor. Fugiat nulla sunt enim exercitation irure excepteur aute fugiat duis pariatur ut.\r\nAliquip pariatur culpa eiusmod dolor laborum aliquip ad laborum qui mollit. In sunt deserunt cillum anim mollit. In labore ad ea labore sint non nulla ipsum reprehenderit do. Pariatur dolor eu minim veniam magna laboris enim laborum quis eiusmod consequat quis ea.\r\nId irure elit quis Lorem ad elit deserunt ea nulla veniam dolor non commodo. Deserunt do duis pariatur proident laboris nostrud laborum qui veniam. Commodo amet laborum sit culpa. Dolor commodo elit velit sint adipisicing. Esse excepteur Lorem cillum tempor incididunt aliquip mollit irure elit veniam irure exercitation et. Cillum duis tempor esse culpa cillum sunt commodo ullamco.\r\nAliquip ullamco ad nulla occaecat mollit incididunt. Dolore irure deserunt consectetur velit amet cupidatat et ullamco mollit nostrud adipisicing laborum deserunt. Ipsum excepteur cupidatat proident magna consequat incididunt nulla labore esse deserunt. Velit officia deserunt quis cillum. Amet anim nulla labore laboris. Sunt duis do magna officia.\r\nCommodo qui excepteur minim elit qui sit mollit nulla sint. Et pariatur esse pariatur dolor nostrud qui magna duis qui incididunt consequat veniam sit. Laboris adipisicing incididunt ea culpa esse duis ullamco minim officia occaecat aliqua minim. Quis ipsum culpa consectetur esse cillum Lorem ut Lorem ea sunt. Laborum anim cupidatat in ipsum.\r\n",
+    "price": 27.12,
+    "tags": [
+      {
+        "id": "a0a38e35-c776-4d92-b0d2-b184af3fda15",
+        "name": "reprehenderit"
+      },
+      {
+        "id": "a17b0915-658c-41c5-a1e7-32b5c8b05af3",
+        "name": "veniam"
+      },
+      {
+        "id": "9e9687f6-341a-48f4-b2eb-55bda63a64bc",
+        "name": "ullamco"
+      },
+      {
+        "id": "0a2827d7-ad86-45cd-9e7d-c4f02caad0bc",
+        "name": "ullamco"
+      },
+      {
+        "id": "2d695199-9623-490f-99c3-05d50b378ce6",
+        "name": "reprehenderit"
+      },
+      {
+        "id": "7b2e34ef-986c-41f8-b120-0cf119deec63",
+        "name": "in"
+      },
+      {
+        "id": "c4e7bae8-ecb4-4c5f-af1e-f56a70f7302c",
+        "name": "velit"
+      },
+      {
+        "id": "96bd8a01-7d78-4a05-b517-c8431614edae",
+        "name": "duis"
+      },
+      {
+        "id": "7f089b9c-06a0-470a-a4f8-7da6ab815db5",
+        "name": "pariatur"
+      },
+      {
+        "id": "e9c69bdb-9553-4976-a377-667899b5f2da",
+        "name": "ipsum"
+      },
+      {
+        "id": "be907691-4dff-43a1-90fc-6e5dfa14021a",
+        "name": "sunt"
+      },
+      {
+        "id": "5fe7b3b6-2f90-4f7e-9137-e9ae6b3b06ce",
+        "name": "et"
+      },
+      {
+        "id": "b0e50053-fed8-4881-b39b-b792d052fdeb",
+        "name": "proident"
+      },
+      {
+        "id": "3414a98c-317d-44b5-980f-87628a7c13d0",
+        "name": "voluptate"
+      },
+      {
+        "id": "3765f85f-4b53-48d0-8e7f-f7f7a8389aa6",
+        "name": "consectetur"
+      },
+      {
+        "id": "8a192839-6c5f-44a1-8b0c-3c39aff10bf2",
+        "name": "nulla"
+      },
+      {
+        "id": "437233ec-f9fa-4dc5-8e90-7ffc46a7f512",
+        "name": "aute"
+      },
+      {
+        "id": "ecae43b2-7595-4e70-a094-fbb9cd406084",
+        "name": "nostrud"
+      },
+      {
+        "id": "5d80363d-81e2-4c9f-853e-5da121350343",
+        "name": "ut"
+      },
+      {
+        "id": "ea136bc6-d7ed-4809-915f-f45a355babce",
+        "name": "sit"
+      },
+      {
+        "id": "a73976b7-7ef2-432b-8745-74896b8c7ad5",
+        "name": "aliquip"
+      },
+      {
+        "id": "f8c9faf9-5d77-4b0a-baa9-0a4940a197af",
+        "name": "laboris"
+      },
+      {
+        "id": "b3054942-6b29-4cd4-bb8d-19e725230335",
+        "name": "amet"
+      },
+      {
+        "id": "68ce8cd0-8d30-487c-923d-b97489edbdda",
+        "name": "amet"
+      },
+      {
+        "id": "cfa58551-6be7-4961-bcfa-539de58c7de7",
+        "name": "ipsum"
+      },
+      {
+        "id": "0b68a13a-39af-49fa-b933-0e0cc252f5c9",
+        "name": "eu"
+      },
+      {
+        "id": "67f61aba-a837-4820-b9ef-0723be827820",
+        "name": "commodo"
+      },
+      {
+        "id": "029e5604-049c-44d6-ab63-85c3235652f3",
+        "name": "qui"
+      },
+      {
+        "id": "a0741c07-ad8e-4b51-90a9-e5d4a603a333",
+        "name": "dolore"
+      },
+      {
+        "id": "ca6eb10a-1c58-4e88-878c-84a39fd6ba8c",
+        "name": "mollit"
+      },
+      {
+        "id": "7cdf1d81-44ec-4d1d-ae80-492acbf650b1",
+        "name": "eu"
+      },
+      {
+        "id": "561a4f18-1ab4-4cb9-a920-822611b195eb",
+        "name": "sunt"
+      },
+      {
+        "id": "b5b9bf57-83cb-4eaa-95ad-8251be8748a8",
+        "name": "aute"
+      },
+      {
+        "id": "70f1e9e5-0941-4c5c-8d49-9609617291e0",
+        "name": "sit"
+      },
+      {
+        "id": "99c38615-1d82-4e5a-9961-8f78d6c19fa0",
+        "name": "cupidatat"
+      },
+      {
+        "id": "d547769e-86ac-460c-9014-83252295d509",
+        "name": "duis"
+      },
+      {
+        "id": "dc0a23f0-8c26-4c2f-9280-eb7503190306",
+        "name": "cillum"
+      },
+      {
+        "id": "e0512315-8c0b-4579-b07f-16683bd5be0c",
+        "name": "ea"
+      },
+      {
+        "id": "9209740f-66bd-439d-a0f0-c7adc96f950b",
+        "name": "anim"
+      },
+      {
+        "id": "8701271b-b6d6-48dd-8a43-abed4c29cee9",
+        "name": "adipisicing"
+      },
+      {
+        "id": "e432e151-dadb-4bdb-8cf7-bd6f803d65c5",
+        "name": "et"
+      },
+      {
+        "id": "5a045efc-86b4-4549-8347-590a95459130",
+        "name": "veniam"
+      },
+      {
+        "id": "43b9bc4a-8da1-47f7-a26e-703e24213bfd",
+        "name": "et"
+      },
+      {
+        "id": "ac7c3b73-f1ca-4b8b-a3d6-cd0b63a2a46a",
+        "name": "nostrud"
+      },
+      {
+        "id": "354fb0b2-b23f-47e3-b5b3-f778d46355d7",
+        "name": "veniam"
+      },
+      {
+        "id": "6738a4cf-9ae9-41c5-8110-789f2acef372",
+        "name": "nisi"
+      },
+      {
+        "id": "1ac3480b-efe9-488b-8a3a-fa723aaf8b37",
+        "name": "pariatur"
+      },
+      {
+        "id": "74088a50-4787-4bae-b05a-38f68c386206",
+        "name": "non"
+      },
+      {
+        "id": "775ed8f1-09b8-46a9-ad70-a08a6a8deb9e",
+        "name": "tempor"
+      },
+      {
+        "id": "a4b6508d-d0cb-4d7c-a5e9-1885e694a8aa",
+        "name": "enim"
+      },
+      {
+        "id": "ebffba9a-f236-4efc-83db-a371baa1dff1",
+        "name": "voluptate"
+      },
+      {
+        "id": "e8079930-77da-4436-b727-1742bee1b88c",
+        "name": "sunt"
+      },
+      {
+        "id": "434bdb95-50bb-4eb6-9285-904dee387b01",
+        "name": "consequat"
+      },
+      {
+        "id": "59811a4e-fd11-4f20-b99c-07bf334ac702",
+        "name": "minim"
+      },
+      {
+        "id": "10565132-f205-48a8-b8c6-e382c7667353",
+        "name": "voluptate"
+      },
+      {
+        "id": "037ee65a-f5ab-4642-9abe-054c9ebedd14",
+        "name": "reprehenderit"
+      },
+      {
+        "id": "831a5e63-70db-4b46-b3cd-7acac13495ce",
+        "name": "magna"
+      },
+      {
+        "id": "1fd7a602-932a-4e1e-b2b2-4458154aa336",
+        "name": "officia"
+      },
+      {
+        "id": "279e8584-abf4-4235-9b6e-9b089a3eda35",
+        "name": "do"
+      },
+      {
+        "id": "2a149c87-973b-4318-999a-4bb1b7a5d0bb",
+        "name": "consectetur"
+      },
+      {
+        "id": "ecddfb23-b920-4856-8a67-7c74bf68c8b4",
+        "name": "culpa"
+      },
+      {
+        "id": "80369a52-2bd1-4060-bbc6-c75985f93e57",
+        "name": "in"
+      },
+      {
+        "id": "91c7ed03-30b9-47b3-87ce-c638e8b539f6",
+        "name": "anim"
+      },
+      {
+        "id": "d693cc34-8023-4377-8340-b78d4ad49340",
+        "name": "consequat"
+      },
+      {
+        "id": "dfd78ce1-bc28-4a69-b617-f62edf7bc316",
+        "name": "reprehenderit"
+      },
+      {
+        "id": "eac4733c-ad0f-43af-9383-51278f099f8d",
+        "name": "magna"
+      },
+      {
+        "id": "93aef359-26d9-40f4-9cd5-f6d903506086",
+        "name": "magna"
+      },
+      {
+        "id": "ff0826eb-5c6c-4102-8770-6b6b4be993f0",
+        "name": "commodo"
+      },
+      {
+        "id": "7a64eca0-4403-40a6-b9f6-b67d9fe3b5dd",
+        "name": "elit"
+      },
+      {
+        "id": "27975d45-3443-4a29-91f8-7334b4ec0ba8",
+        "name": "excepteur"
+      },
+      {
+        "id": "42d6673d-12d5-4b51-bf07-9a9f464646d0",
+        "name": "incididunt"
+      },
+      {
+        "id": "2acb6556-a64f-4440-852f-22996f09245a",
+        "name": "est"
+      },
+      {
+        "id": "861d2683-1a7d-4f8f-8cc6-55a2db0a09c4",
+        "name": "irure"
+      },
+      {
+        "id": "ba68c611-f1d7-4497-8f74-c7a7cc7f6696",
+        "name": "deserunt"
+      },
+      {
+        "id": "0d08cb67-4c49-4307-97dc-44f3b2936f30",
+        "name": "consequat"
+      }
+    ]
+  }
