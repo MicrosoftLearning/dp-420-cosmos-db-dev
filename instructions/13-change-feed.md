@@ -86,6 +86,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Container id** | *productslease* |
     | **Partition key** | */partitionKey* |
 
+1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **productslease** container node within the hierarchy.
+
 1. Close your web browser window or tab.
 
 ## Implement the change feed processor in the .NET SDK
@@ -130,9 +132,9 @@ The **Microsoft.Azure.Cosmos.Container** class ships with a series of methods to
 
 1. Create a new delegate variable named **handleChanges** of type [ChangesHandler<>][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.changefeedhandler-1] using an empty asynchronous anonymous function that has two input parameters:
 
-    1. A parameter named **changes** of type **IReadOnlyCollection\<Product\>**
+    1. A parameter named **changes** of type **IReadOnlyCollection\<Product\>**.
 
-    1. A parameter named **cancellationToken** of type **CancellationToken**
+    1. A parameter named **cancellationToken** of type **CancellationToken**.
 
     ```
     ChangesHandler<Product> handleChanges = async (
