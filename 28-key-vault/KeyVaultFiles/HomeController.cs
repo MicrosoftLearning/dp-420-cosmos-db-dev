@@ -94,6 +94,7 @@ namespace _28_key_vault.Controllers
             else
                 return new Tuple<string,bool>($"\n\nSomething went wrong, the key vault secret was returned successfully, but no document was created",false);
         }
+        
         private static async Task<Tuple<bool,string>>  GetKeyVaultSecret()
         {
             AzureServiceTokenProvider azureServiceTokenProvider = new AzureServiceTokenProvider("RunAs=App;");
