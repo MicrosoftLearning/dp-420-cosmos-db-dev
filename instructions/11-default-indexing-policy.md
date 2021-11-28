@@ -139,7 +139,7 @@ When a container is created by code, portal, or a tool; the indexing policy is s
       "automatic": true,
       "includedPaths": [
         {
-          "path": "/price/*"
+          "path": "/price/?"
         }
       ],
       "excludedPaths": [
