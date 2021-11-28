@@ -1,6 +1,6 @@
 ---
 lab:
-    title: 'Optimize an Azure Cosmos DB SQL API container's indexing policy for write operations'
+    title: 'Optimize an Azure Cosmos DB SQL API container indexing policy for write operations'
     module: 'Module 10 - Optimize query performance in Azure Cosmos DB SQL API'
 ---
 
