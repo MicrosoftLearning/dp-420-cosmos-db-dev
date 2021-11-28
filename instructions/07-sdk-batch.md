@@ -276,7 +276,7 @@ Now, let’s create a transactional batch that will error purposefully. This bat
     dotnet run
     ```
 
-1. Observe the output from the terminal. The status code should be an HTTP 400 **Bad Request**.
+1. Observe the output from the terminal. The status code should be an HTTP 400 **Bad Request**. This occured because all items within the transaction did not share the same partition key value as the transactional batch.
 
 1. Close the integrated terminal.
 
