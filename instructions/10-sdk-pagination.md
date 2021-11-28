@@ -175,7 +175,7 @@ When processing query results, you must make sure your code progresses through a
 1. Within the **foreach** loop, use the built-in **Console.WriteLine** static method to format and print the **id**, **name**, and **price** properties of the **product** variable:
 
     ```
-    Console.WriteLine($"[{product.id}]\t{product.name,35}\t{product.price,15:C}");
+    Console.WriteLine($"[{product.name,40}]\t{product.tag}");
     ```
 
 1. Back within the **while** loop, use the built-in **Console.WriteLine** static method to print the message *Press any key to get more results*:
@@ -219,7 +219,7 @@ When processing query results, you must make sure your code progresses through a
         FeedResponse<Product> products = await iterator.ReadNextAsync();
         foreach (Product product in products)
         {
-            Console.WriteLine($"[{product.id}]\t{product.name,25}\t{product.price,5:C}");
+            Console.WriteLine($"[{product.name,40}]\t{product.tag}");
         }
 
         Console.WriteLine("Press any key for next page of results");
