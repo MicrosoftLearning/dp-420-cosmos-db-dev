@@ -58,7 +58,7 @@ The Data Explorer will be your primary tool to manage the Azure Cosmos DB SQL AP
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *cosmicworks* |
-    | **Provision throughput** | *Do not select* |
+    | **Share throughput across containers** | *Do not select* |
     | **Container id** | *products* |
     | **Partition key** | */categoryId* |
     | **Container throughput (autoscale)** | *Manual* |
