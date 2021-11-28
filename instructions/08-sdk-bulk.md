@@ -138,7 +138,7 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
         .RuleFor(o => o.id, f => Guid.NewGuid().ToString())
         .RuleFor(o => o.name, f => f.Commerce.ProductName())
         .RuleFor(o => o.price, f => Convert.ToDouble(f.Commerce.Price(max: 1000, min: 10, decimals: 2)))
-        .RuleFor(o => o.categoryId, (f, o) => o.id)
+        .RuleFor(o => o.categoryId, f => f.Commerce.Department(1))
         .Generate(25000);
     ```
 
@@ -198,7 +198,7 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
         .RuleFor(o => o.id, f => Guid.NewGuid().ToString())
         .RuleFor(o => o.name, f => f.Commerce.ProductName())
         .RuleFor(o => o.price, f => Convert.ToDouble(f.Commerce.Price(max: 1000, min: 10, decimals: 2)))
-        .RuleFor(o => o.categoryId, (f, o) => o.id)
+        .RuleFor(o => o.categoryId, f => f.Commerce.Department(1))
         .Generate(25000);
         
     List<Task> concurrentTasks = new List<Task>();
