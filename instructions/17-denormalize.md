@@ -34,7 +34,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. In the **Git Bash terminal**, run the following commands. The commands open a browser window to connect to the azure portal where you will use the provided lab credentials, run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *Once the script ask you for the provided credential for the azure account, the build can take 15-20 minutes to finish, so it might be a good time to get some coffee or tea*.
 
-    ```bash
+    ```
     az login
     cd 17-denormalize
     bash init.sh
@@ -64,7 +64,7 @@ In the **database-v2** container, where data is stored in individual containers,
 1. At the top of the page, select **New SQL Query**.
 1. On the **Query 1** pane, paste the following SQL code, and then select **Execute Query**.
 
-    ```sql
+    ```
     SELECT * FROM c where c.type = 'category' and c.id = "AB952F9F-5ABA-4251-BC2D-AFF8DF412A4A"
     ```
 
@@ -84,7 +84,7 @@ Next, query the product container to get all the products in the "Components, He
 1. At the top of the page, select **New SQL Query**.
 1. On the **Query 2** pane, paste the following SQL code, and then select **Execute Query**.
 
-    ```sql
+    ```
     SELECT * FROM c where c.categoryId = "AB952F9F-5ABA-4251-BC2D-AFF8DF412A4A"
     ```
 
@@ -106,7 +106,7 @@ First, run a query to return the tags for HL Headset.
 1. At the top of the page, select **New SQL Query**.
 1. On the **Query 3** pane, paste the following SQL code, and then select **Execute Query**.
 
-    ```sql
+    ```
     SELECT * FROM c where c.type = 'tag' and c.id IN ('87BC6842-2CCA-4CD3-994C-33AB101455F4', 'F07885AF-BD6C-4B71-88B1-F04295992176')
     ```
 
@@ -124,7 +124,7 @@ Next, run a query to return the tags for LL Headset.
 1. At the top of the page, select **New SQL Query**.
 1. On the **Query 4** pane, paste the following SQL code, and then select **Execute Query**.
 
-    ```sql
+    ```
     SELECT * FROM c where c.type = 'tag' and c.id IN ('18AC309F-F81C-4234-A752-5DDD2BEAEE83', '1B387A00-57D3-4444-8331-18A90725E98B', 'C6AB3E24-BA48-40F0-A260-CB04EB03D5B0', 'DAC25651-3DD3-4483-8FD1-581DC41EF34B', 'E6D5275B-8C42-47AE-BDEC-FC708DB3E0AC')
     ```
 
@@ -142,7 +142,7 @@ Last, run a query to return the tags for ML Headset.
 1. At the top of the page, select **New SQL Query**.
 1. On the **Query 5** pane, paste the following SQL code, and then select **Execute Query**.
 
-    ```sql
+    ```
     SELECT * FROM c where c.type = 'tag' and c.id IN ('A34D34F7-3286-4FA4-B4B0-5E61CCEEE197', 'BA4D7ABD-2E82-4DC2-ACF2-5D3B0DEAE1C1', 'D69B1B6C-4963-4E85-8FA5-6A3E1CD1C83B')
     ```
 
@@ -175,7 +175,7 @@ Let's query for the same information but in the denormalized database.
 1. At the top of the page, select **New SQL Query**.
 1. On the **Query 6** pane, paste the following SQL code, and then select **Execute Query**.
 
-    ```sql
+    ```
    SELECT * FROM c where c.categoryId = "AB952F9F-5ABA-4251-BC2D-AFF8DF412A4A"
    ```
 
@@ -242,7 +242,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
 1. At line 609, you need to add some code that will be called when change feed has a new change that needs to be processed. To do so, copy the following code snippet and paste it below the line that starts with `//To-Do:`
 
-    ```csharp
+    ```
     //Fetch each change to productCategory container
     foreach (ProductCategory item in input)
     {
@@ -265,7 +265,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
 1. Copy the following code snippet and paste it below the line that starts with **//To-Do:**. The function does two things. It first queries the product container for all the products for the passed in `categoryId`. It then updates each product with the new product category name.
 
-    ```csharp
+    ```
     //Loop through all products
     foreach (Product product in response)
     {
@@ -295,7 +295,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
 1. To compile and execute the project, run the following command:
 
-    ```bash
+    ```
     dotnet build
     dotnet run
     ```
@@ -368,7 +368,7 @@ To get to the code that you'll use in this unit, do the following:
 
 1. At line 486, below the `//To-Do:` comment, increment the value of `salesOrderCount` by pasting the following code snippet:
 
-    ```csharp
+    ```
     //Increment the salesOrderTotal property
     customer.salesOrderCount++;
     ```
@@ -393,7 +393,7 @@ To get to the code that you'll use in this unit, do the following:
 
 1. Copy the following code snippet, and then paste it on the line below the `//To-Do:` comment.
 
-    ```csharp
+    ```
     TransactionalBatchResponse txBatchResponse = await container.CreateTransactionalBatch(
         new PartitionKey(salesOrder.customerId))
         .CreateItem<SalesOrder>(salesOrder)
@@ -418,7 +418,7 @@ To get to the code that you'll use in this unit, do the following:
 
 1. To compile and execute the project, run the following command:
 
-    ```bash
+    ```
     dotnet build
     dotnet run
     ```
@@ -500,7 +500,7 @@ Let's look at the query for your top 10 customers.
 
     Near the top is the definition for your query.
 
-    ```sql
+    ```
     SELECT TOP 10 c.firstName, c.lastName, c.salesOrderCount
         FROM c WHERE c.type = 'customer'
         ORDER BY c.salesOrderCount DESC
@@ -513,7 +513,7 @@ Let's look at the query for your top 10 customers.
 1. Select CTRL+Q to close Visual Studio Code.
 1. To start the application again, run the following command:
 
-    ```bash
+    ```
     dotnet run
     ```
 

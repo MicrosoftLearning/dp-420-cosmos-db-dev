@@ -72,7 +72,7 @@ Let's add some documents to those containers.
 
 1. Under **Data Explorer**, add the following two documents to the **customer** container.
 
-```Json
+```
   {
     "id": "0012D555-C7DE-4C4B-B4A4-2E8A6B8E1161",
     "title": "",
@@ -98,7 +98,7 @@ Let's add some documents to those containers.
   }
 ```
 
-```Json
+```
   {
     "id": "001C8C0B-9B91-47A5-A198-8770E60CFF38",
     "title": "",
@@ -125,7 +125,7 @@ Let's add some documents to those containers.
 ```
 1. Under **Data Explorer**, add the following three documents to the **salesOrder** container.
 
-```Json
+```
   {
     "id": "000C23D8-B8BC-432E-9213-6473DFDA2BC5",
     "customerId": "0012D555-C7DE-4C4B-B4A4-2E8A6B8E1161",
@@ -148,7 +148,7 @@ Let's add some documents to those containers.
   }
   ```
 
-  ```Json
+  ```
   {
     "id": "001676F7-0B70-400B-9B7D-24BA37B97F70",
     "customerId": "001C8C0B-9B91-47A5-A198-8770E60CFF38",
@@ -171,7 +171,7 @@ Let's add some documents to those containers.
   }
   ```
 
-  ```Json
+  ```
   {
     "id": "0019092E-BD25-48F5-8050-7051B2655BC5",
     "customerId": "0012D555-C7DE-4C4B-B4A4-2E8A6B8E1161",
@@ -214,7 +214,7 @@ Let's add some documents to those containers.
 
 1. Under **Data Explorer**, run the following query to get the current date and time. Copy that timestamp to notepad. This Time stamp should be in UTC.
 
-```SQL
+```
 SELECT GetCurrentDateTime ()
 ```
 
@@ -244,7 +244,7 @@ SELECT GetCurrentDateTime ()
 
 1. Under **Data Explorer**, run the following query to get the current date and time. Copy that timestamp to notepad.
 
-```SQL
+```
 SELECT GetCurrentDateTime ()
 ```
 

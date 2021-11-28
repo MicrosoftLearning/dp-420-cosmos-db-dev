@@ -152,7 +152,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
 
 1. The **GetKeyVaultSecret** user-defined function will get the Azure Cosmos DB account secret. The function start in *line 98*, should look like the script below.
 
-```C#
+```
         private static async Task<Tuple<bool,string>>  GetKeyVaultSecret()
         {
             AzureServiceTokenProvider azureServiceTokenProvider = new AzureServiceTokenProvider("RunAs=App;");
@@ -184,7 +184,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
 
 1.  Before we can deploy our webapp, we still need to send the **Secret Identifier** URL.  On *line 107*, replace the string **\<Key Vault Secret Identifier\>** with the **Secret Identifier** URL we recorded in the *secret* section and save the file.
 
-```C#
+```
         var KeyVaultSecret = await KVClient.GetSecretAsync("<Key Vault Secret Identifier>")
 ```
 

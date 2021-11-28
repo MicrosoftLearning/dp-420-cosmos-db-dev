@@ -367,7 +367,7 @@ While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK a
 
 1. Modify the **saddle** variable again by setting the value of the **name** property to **Road LL Saddle**:
 
-    ```bash
+    ```
     saddle.name = "Road LL Saddle";
     ```
 

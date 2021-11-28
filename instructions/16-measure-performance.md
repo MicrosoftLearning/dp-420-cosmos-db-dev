@@ -32,7 +32,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. In the **Git Bash terminal**, run the following commands. The commands open a browser window to connect to the azure portal where you will use the provided lab credentials, run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *Once the script ask you for the provided credential for the azure account, the build can take 15-20 minutes to finish, so it might be a good time to get some coffee or tea*.
 
-    ```bash
+    ```
     az login
     cd 16-measure-performance
     bash init.sh
@@ -64,7 +64,7 @@ In Database-v1, run a query to get the customer entity and review the request ch
 1. At the top of the screen, select **New SQL Query**.
 1. Copy and paste the following SQL text and then select **Execute Query**.
 
-    ```sql
+    ```
     SELECT * FROM c WHERE c.id = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
    ```
 
@@ -80,7 +80,7 @@ Run a query to get the customer address entity and review the request charge.
 1. At the top of the screen, select **New SQL Query**.
 1. Copy and paste the following SQL text and then select **Execute Query**.
 
-    ```sql
+    ```
     SELECT * FROM c WHERE c.customerId = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
    ```
 
@@ -96,7 +96,7 @@ Run a query to get the customer password entity and review the request charge.
 1. At the top of the screen, select **New SQL Query**.
 1. Copy and paste the following SQL text and then select **Execute Query**.
 
-    ```sql
+    ```
     SELECT * FROM c WHERE c.id = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
    ```
 
@@ -123,7 +123,7 @@ Now we're going to query for the same information but with the entities embedded
 1. Select the **Customer** container.
 1. Run the following query.
 
-    ```sql
+    ```
     SELECT * FROM c WHERE c.id = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
    ```
 
