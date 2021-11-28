@@ -178,7 +178,7 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
 1. In the **Target** list, select **flatproducts** and then select **Next** to move to the **Settings** step of the wizard.
 
-1. In the **Settings** step of the wizard, in teh **Task name** field, enter **FlattenAndMoveData**.
+1. In the **Settings** step of the wizard, in the **Task name** field, enter **FlattenAndMoveData**.
 
 1. Leave all remaining fields to their default blank values and then select **Next** to move to the final step of the wizard.
 
