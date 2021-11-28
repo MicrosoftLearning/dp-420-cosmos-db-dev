@@ -57,7 +57,7 @@ To accompany the products container, you will create a **flatproducts** containe
     dotnet tool install --global cosmicworks
     ```
 
-    > &#128161; This command will output the warning message (*Tool 'cosmicworks' is already installed') if you have already installed the latest version of this tool in the past.
+    > &#128161; This command may take a couple of minutes to complete. This command will output the warning message (*Tool 'cosmicworks' is already installed') if you have already installed the latest version of this tool in the past.
 
 1. Run cosmicworks to seed your Azure Cosmos DB account with the following command-line options:
 
