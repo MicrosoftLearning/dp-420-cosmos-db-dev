@@ -40,7 +40,7 @@ Let’s start simple by creating a serverless account. There’s not much to con
 
 1. Select **Review + Create** to navigate to the **Review + Create** tab, and then select **Create**.
 
-    > &#128221; It can take 2-5 minutes for the Azure Cosmos DB SQL API account to be ready for use.
+    > &#128221; It can take 10-15 minutes for the Azure Cosmos DB SQL API account to be ready for use.
 
 1. Observe the **Deployment** pane. When the deployment is complete, the pane will update with a **Deployment successful** message.
 
@@ -97,7 +97,7 @@ Now, we are going to create a provisioned throughput account with more tradition
 
 1. Select **Review + Create** to navigate to the **Review + Create** tab, and then select **Create**.
 
-    > &#128221; It can take 2-5 minutes for the Azure Cosmos DB SQL API account to be ready for use.
+    > &#128221; It can take 10-15 minutes for the Azure Cosmos DB SQL API account to be ready for use.
 
 1. Observe the **Deployment** pane. When the deployment is complete, the pane will update with a **Deployment successful** message.
 
