@@ -115,7 +115,7 @@ Before you can begin writing code, you will need to create the Azure Functions r
     | **Collection name for leases** | *productslease* |
     | **Create lease collection if it does not exist** | *No* |
 
-## Implement function code in C#
+## Implement function code in .NET
 
 The function you created earlier is a C# script that is edited in-portal. You will now use the portal to write a short function to output the unique identifier of any item inserted or updated in the container.
 
