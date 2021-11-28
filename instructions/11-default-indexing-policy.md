@@ -170,42 +170,5 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 
 1. Still in the **Query** tab, observe the value of the **Request Charge** field within the **Query Statistics** section.
 
-## Create a container without automatic indexing
-
-Using the portal, you can create a new container with indexing disabled. You will configure a container that doesn't automatically index all paths, and then observe the resultant indexing policy.
-
-1. In the **Data Explorer**, select **New Container**, and then create a new container with the following settings, leaving all remaining settings to their default values:
-
-    | **Setting** | **Value** |
-    | ---: | :--- |
-    | **Database id** | *Use existing* &vert; *cosmicworksduplicate* |
-    | **Share throughput across containers** | *selected* |
-    | **Database throughput** | *Manual* &vert; *400* |
-    | **Container id** | *productsduplicate* |
-    | **Indexing** | *Off* |
-    | **Partition key** | */categoryId* |
-
-1. Still within the **Data Explorer**, expand the **cosmicworksduplicate** database node,  expand the new **productsduplicate** container node and then select **Scale & Settings** within the **SQL API** navigation tree.
-
-1. Observe the indexing policy within the **Indexing Policy** section:
-
-    ```
-    {
-      "indexingMode": "consistent",
-      "automatic": true,
-      "includedPaths": [],
-      "excludedPaths": [
-        {
-          "path": "/*"
-        },
-        {
-          "path": "/\"_etag\"/?"
-        }
-      ]
-    }
-    ```
-
-1. Close your web browser window or tab.
-
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
 [nuget.org/packages/cosmicworks]: https://www.nuget.org/packages/cosmicworks/
