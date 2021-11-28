@@ -259,7 +259,7 @@ Now that your materialized view of the Azure Cosmos DB SQL API data is in the se
     red&$count=true
     ```
 
-1. Observe that this search query returns results with the term **yellow**, but also now includes a metadata field indicating the total count of results even if they are not all included in the same page.
+1. Observe that this search query returns results with the term **red**, but also now includes a metadata field indicating the total count of results even if they are not all included in the same page.
 
 1. In the **Query string** editor, enter the following query and then select **Search**:
 
