@@ -203,7 +203,14 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 1. Create a new SQL query that will return all documents where the **name** is equivalent to **HL Headset**:
 
     ```
-    SELECT p.name, p.category, p.price FROM p
+    SELECT 
+        p.name, 
+        p.category, 
+        p.price 
+    FROM
+        products p
+    WHERE
+        p.name = 'HL Headset'
     ```
 
 1. Select **Execute Query**.
