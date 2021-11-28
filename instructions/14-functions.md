@@ -1,10 +1,10 @@
 ---
 lab:
-    title: 'Archive Azure Cosmos DB SQL API data using Azure Functions'
+    title: 'Process Azure Cosmos DB SQL API data using Azure Functions'
     module: 'Module 7 - Integrate Azure Cosmos DB SQL API with Azure services'
 ---
 
-# Archive Azure Cosmos DB SQL API data using Azure Functions
+# Process Azure Cosmos DB SQL API data using Azure Functions
 
 The Azure Cosmos DB trigger for Azure Functions is implemented using a change feed processor. You can create functions that respond to create and update operations in your Azure Cosmos DB SQL API container with this knowledge. If you have implemented a change feed processor manually, the setup for Azure Functions is similar.
 
@@ -115,7 +115,7 @@ Before you can begin writing code, you will need to create the Azure Functions r
     | **Collection name for leases** | *productslease* |
     | **Create lease collection if it does not exist** | *No* |
 
-## Implement function code in C\#
+## Implement function code in C#
 
 The function you created earlier is a C# script that is edited in-portal. You will now use the portal to write a short function to output the unique identifier of any item inserted or updated in the container.
 
