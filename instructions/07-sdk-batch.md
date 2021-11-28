@@ -218,7 +218,7 @@ Now, let’s create a transactional batch that will error purposefully. This bat
     PartitionKey partitionKey = new ("9603ca6c-9e28-4a02-9194-51cdb7fea816");
     ```
 
-1. Invoke the **CreateTransactionalBatch** method of the **container** variable passing in the **partitionkey** variable as a method parameter and using the fluent syntax to invoke the **CreateItem<>** generic methods passing in the **saddle** and **handlebar** variables as items to create in individual operations and store the result in a variable named **batch** of type **TransactionalBatch**:
+1. Invoke the **CreateTransactionalBatch** method of the **container** variable passing in the **partitionkey** variable as a method parameter and using the fluent syntax to invoke the **CreateItem<>** generic methods passing in the **light** and **helmet** variables as items to create in individual operations and store the result in a variable named **batch** of type **TransactionalBatch**:
 
     ```
     TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
