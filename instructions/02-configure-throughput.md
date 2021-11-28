@@ -6,11 +6,9 @@ lab:
 
 # Configure throughput for Azure Cosmos DB SQL API with the Azure portal
 
-One of the most important things to wrap your head around is configuring throughput in Azure Cosmos DB.
+One of the most important things to wrap your head around is configuring throughput in Azure Cosmos DB SQL API. To create an Azure Cosmos DB SQL API container, you must first create an account and then a database; in that order.
 
-In this lab, we will try to configure throughput in the most configurations reasonably possible for a single hands-on lab. We will create a serverless account, a provisioned throughput account. We will provision throughput manually, using autoscale, at the database and the container level. We will mix-and-match, and we may get a little confused.
-
-Let’s begin.
+In this lab, you will provision throughput using various methods in the Data Explorer. You will provision throughput either manually or using autoscale, at the database and the container level.
 
 ## Create a serverless account
 
