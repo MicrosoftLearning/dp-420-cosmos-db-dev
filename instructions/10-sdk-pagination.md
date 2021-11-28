@@ -239,7 +239,7 @@ When processing query results, you must make sure your code progresses through a
 
 1. The script will now output the first set of 50 items that match the query. Press any key to get the next set of 50 items until the query has iterated over all matching items.
 
-    > &#128161; The query will match ~120 items in the products container.
+    > &#128161; The query will match hundreds of items in the products container.
 
 1. Close the integrated terminal.
 
