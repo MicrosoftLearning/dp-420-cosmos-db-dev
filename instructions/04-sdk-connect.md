@@ -67,9 +67,9 @@ The NuGet website contains a searchable index of packages that are available to 
 
 1. Search for the **Microsoft.Azure.Cosmos** library on NuGet.org.
 
-1. Select the **.NET CLI** tab to observe the command required to import this library into a .NET project.
+1. Select the **.NET CLI** tab to observe the command required to import the latest version of this library into a .NET project.
 
-    > &#128161; You will use this command later in this exercise.
+    > &#128161; No need to record this command. You will use a specific version of the library later in this exercise.
 
 1. Close your web browser window or tab.
 
