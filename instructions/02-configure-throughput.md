@@ -155,6 +155,5 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **RU/s** | *1000* |
     | **Container id** | *childcontainer* |
     | **Partition key** | */primarykey* |
-    | **Provision dedicated throughput for this container** | *Do not select* |
 
 1. Back in the **Data Explorer** pane, expand the **flexibledb** database node and then observe the **childcontainer** container node within the hierarchy.
