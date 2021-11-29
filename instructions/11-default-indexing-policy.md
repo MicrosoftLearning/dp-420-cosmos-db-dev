@@ -164,7 +164,7 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 
 1. Select **Execute Query**.
 
-1. Observe the 13 results of the query.
+1. Observe the results of the query.
 
 1. In the **Query** tab, select **Query Stats**.
 
