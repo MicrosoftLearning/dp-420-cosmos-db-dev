@@ -147,11 +147,11 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *flexibledb* |
+    | **Database id** | *Create new* &vert; *manualthroughputdb* |
     | **Share throughput across containers** | *Select this option* |
     | **Database throughput** | *Manual* |
     | **RU/s** | *1000* |
     | **Container id** | *childcontainer* |
     | **Partition key** | */primarykey* |
 
-1. Back in the **Data Explorer** pane, expand the **flexibledb** database node and then observe the **childcontainer** container node within the hierarchy.
+1. Back in the **Data Explorer** pane, expand the **manualthroughputdb** database node and then observe the **childcontainer** container node within the hierarchy.
