@@ -247,10 +247,10 @@ Now that you have sent 25,000 items to Azure Cosmos DB let’s go and look at th
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will return all documents where the **name** is equivalent to **HL Headset**:
+1. Create a new SQL query that will return a count of all documents created using the bulk operation:
 
     ```
-    SELECT COUNT(1) FROM items;
+    SELECT COUNT(1) FROM items
     ```
 
 1. Select **Execute Query**.
