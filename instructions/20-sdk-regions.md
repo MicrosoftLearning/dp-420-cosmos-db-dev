@@ -87,7 +87,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 ## Connect to the Azure Cosmos DB SQL API account from the SDK
 
-Using the credentials from the newly created account, you will connect with the SDK classes and create a new database and container instance. Then, you will use the Data Explorer to validate that the instances exist in the Azure portal.
+Using the credentials from the newly created account, you will connect with the SDK classes and access the database and container instance from a different region.
 
 1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **20-sdk-regions** folder.
 
