@@ -34,7 +34,7 @@ Your environment should already have the emulator pre-installed. If not, refer t
 
     > &#128161; The Azure Cosmos DB Emulator is pinned to both the Windows taskbar and Start Menu.
 
-1. Wait for the emulator to automatically open your default browser and navigate to the **localhost:8081/_explorer/** landing page.
+1. Wait for the emulator to automatically open your default browser and navigate to the **localhost:8081/_explorer/index.html** landing page.
 
 1. In the **Azure Cosmos DB Emulator** landing page, navigate to the **Quickstart** pane.
 
