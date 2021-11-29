@@ -73,7 +73,7 @@ The NuGet website contains a searchable index of packages that are available to 
 
 1. Close your web browser window or tab.
 
-## Import the Microsoft.Azure.Cosmos library into a .NET script
+## Import the Microsoft.Azure.Cosmos library into a .NET project
 
 The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotnet-add-package] command to import packages from a pre-configured package feed. A .NET installation uses NuGet as its default package feed.
 
@@ -91,7 +91,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
 
 1. Close the integrated terminal.
 
-## Use the Microsoft.Azure.Cosmos library in a script
+## Use the Microsoft.Azure.Cosmos library
 
 Once the Azure Cosmos DB library from the Azure SDK for .NET has been imported, you can immediately use its classes within the [Microsoft.Azure.Cosmos][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos] namespace to connect to an Azure Cosmos DB SQL API account. The [CosmosClient][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclient] class is the core class that is used to make the initial connection to an Azure Cosmos DB SQL API account.
 
