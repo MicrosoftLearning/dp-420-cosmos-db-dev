@@ -165,17 +165,18 @@ The **CosmosClientOptions** class includes a property to configure the list of r
     Container container = client.GetContainer("cosmicworks", "products");
     ```
 
-1. Use the [ReadThroughputAsync][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readthroughputasync] method of the **container** variable to retrieve the currently configured throughput amount from the server and store the result in a variable named **throughput** of the nullable **int** type:
+1. Use the [ReadContainerAsync][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readcontainerasync] method of the **container** variable to retrieve the container's metadata from the server and store the result in a variable named **response** of the nullable [ContainerResponse][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerresponse] type:
 
     ```
-    int? throughput = await container.ReadThroughputAsync();
+    ContainerResponse response = await container.ReadContainerAsync();
     ```
 
-1. Invoke the static **Console.WriteLine** method to print the current container identifier and throughput:
+1. Invoke the static **Console.WriteLine** method to print the current container identifier and the JSON diagnostic data:
 
     ```
     Console.WriteLine($"Container:\t{container.Id}");
-    Console.WriteLine($"Throughput:\t{throughput}");
+    Console.WriteLine($"Response Diagnostics JSON");
+    Console.WriteLine($"{response.Diagnostics}");
     ```
 
 1. Once you are done, your code file should now include:
@@ -202,10 +203,11 @@ The **CosmosClientOptions** class includes a property to configure the list of r
     
     Container container = client.GetContainer("cosmicworks", "products");
     
-    int? throughput = await container.ReadThroughputAsync();
+    ContainerResponse response = await container.ReadContainerAsync();
     
     Console.WriteLine($"Container:\t{container.Id}");
-    Console.WriteLine($"Throughput:\t{throughput}");
+    Console.WriteLine($"Response Diagnostics JSON");
+    Console.WriteLine($"{response.Diagnostics}");
     ```
 
 1. **Save** the **script.cs** code file.
@@ -218,14 +220,19 @@ The **CosmosClientOptions** class includes a property to configure the list of r
     dotnet run
     ```
 
-1. Observe the output from the terminal. The name of the container and the current configured throughput should print to the console output.
+1. Observe the output from the terminal. The name of the container and the JSON diagnostic data should print to the console output.
+
+1. Review the JSON diagnostic data. Search for a property named **HttpResponseStats** and a child property named **RequestUri**. The value of this property should be a URI that includes the name and region you configured earlier in this lab.
+
+    > &#128221; For example, if your account name is: **dp420** and the first region you configured is **East Asia**; then the value of the JSON property would be: **dp420-eastasia.documents.azure.com/dbs/cosmicworks/colls/products**.
 
 1. Close the integrated terminal.
 
 1. Close **Visual Studio Code**.
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
-[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readthroughputasync]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readthroughputasync
+[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readcontainerasync]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readcontainerasync
+[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerresponse]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerresponse
 [docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclientoptions.applicationpreferredregions]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclientoptions.applicationpreferredregions
 [docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.regions]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.regions
 [docs.microsoft.com/dotnet/core/tools/dotnet-build]: https://docs.microsoft.com/dotnet/core/tools/dotnet-build
