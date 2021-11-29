@@ -55,7 +55,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     > &#128221; This operation can take approximately 5-10 minutes.
 
-1. Record the values of the **Write** (primary) region and the two **Read** regions. You will use these region values later in this exercise.
+1. Record the names of the **Write** (primary) region and the two **Read** regions. You will use these region names later in this exercise.
+
+    > &#128221; For example, if your primary region is **North Europe**, and your two read secondary regions are **East US 2**, and **South Africa North**; you will record all three of those names as-is.
 
 1. In the resource blade, navigate to the **Data Explorer** pane.
 
