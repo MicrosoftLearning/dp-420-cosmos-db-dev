@@ -153,6 +153,28 @@ Before you modify the indexing policy, first, you will run a few sample SQL quer
 
 Now, you will need to create a composite index if you sort your items using multiple properties. In this task, you will create a composite index to sort items by their categoryName, and then their actual name.
 
+1. In the **Data Explorer**, expand the **cosmicworks** database node, select the **products** container node, and then select **New SQL Query**.
+
+1. Delete the contents of the editor area.
+
+1. Create a new SQL query that will order the results by the **categoryName** in descending order first, and then by the **price** in ascending order:
+
+    ```
+    SELECT 
+        p.name,
+        p.categoryName,
+        p.price
+    FROM
+        products p
+    ORDER BY
+        p.categoryName DESC,
+        p.price ASC
+    ```
+
+1. Select **Execute Query**.
+
+1. Observe the results and stats of the query. The request unit charge should be pretty high since we do not have a composite index for the multiple order-by expressions.
+
 1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Settings**.
 
 1. In the **Settings** tab, navigate to the **Indexing Policy** section.
@@ -223,7 +245,28 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Select **Execute Query**.
 
-1. Observe the results and stats of the query. The request unit charge should be  similar to the last query that ordered items despite the increase in complexity.
+1. Observe the results and stats of the query. The request unit charge should be smaller now that the composite index is in place.
+
+1. Delete the contents of the editor area.
+
+1. Create a new SQL query that will order the results by the **categoryName** in descending order first, then by **name** in ascending order, and then finally by the **price** in ascending order:
+
+    ```
+    SELECT 
+        p.name,
+        p.categoryName,
+        p.price
+    FROM
+        products p
+    ORDER BY
+        p.categoryName DESC,
+        p.name ASC,
+        p.price ASC
+    ```
+
+1. Select **Execute Query**.
+
+1. Observe the results and stats of the query. The request unit charge is higher again because of the complexity of the query and the lack of a supporting composite index.
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Settings** again.
 
@@ -248,6 +291,16 @@ Now, you will need to create a composite index if you sort your items using mult
             "order": "descending"
           },
           {
+            "path": "/price",
+            "order": "ascending"
+          }
+        ],
+        [
+          {
+            "path": "/categoryName",
+            "order": "descending"
+          },
+          {
             "path": "/name",
             "order": "ascending"
           },
@@ -264,7 +317,7 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will order the results by the **categoryName** in descending order first, and then by the **price** in ascending order:
+1. Create a new SQL query that will order the results by the **categoryName** in descending order first, then by **name** in ascending order, and then finally by the **price** in ascending order:
 
     ```
     SELECT 
@@ -281,7 +334,7 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Select **Execute Query**.
 
-1. Observe the results and stats of the query. The request unit charge is still relatively stable since the last query.
+1. Observe the results and stats of the query. The request unit charge should be lower now that a composite index is in place.
 
 1. Close your web browser window or tab.
 
