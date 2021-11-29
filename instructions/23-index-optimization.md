@@ -110,7 +110,7 @@ This lab has a pre-built test .NET application that will take a large JSON objec
 
 1. **Save** the **script.cs** code file.
 
-1. In **Visual Studio Code**, open the context menu for the **21-sdk-consistency-model** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+1. In **Visual Studio Code**, open the context menu for the **23-index-optimization** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
 1. Build and run the project using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command:
 
