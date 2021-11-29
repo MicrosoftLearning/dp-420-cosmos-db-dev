@@ -93,28 +93,13 @@ You will use a command-line utility that creates a **cosmicworks** database and 
 
 1. Close **Visual Studio Code**.
 
-## Create Azure Cognitive Services and Azure Cognitive Search resources
+## Create Azure Cognitive Search resource
 
-The search index you will build in Azure Cognitive Search requires creating an Azure Cognitive Services account to enrich a large set of documents.
+Before continuing with this exercise, you must first create a new Azure Cognitive Search instance.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **+ Create a resource**, search for *Cognitive Services*, and then create a new **Azure Cognitive Services** account resource with the following settings, leaving all remaining settings to their default values:
-
-    | **Setting** | **Value** |
-    | ---: | :--- |
-    | **Subscription** | *Your existing Azure subscription* |
-    | **Resource group** | *Select an existing or create a new resource group* |
-    | **Region** | *Choose any available region* |
-    | **Name** | *Enter a globally unique name* |
-    | **Pricing tier** | *Standard S0* |
-    | **Acknowledgment checkbox** | *First, read terms, and then select if you have read and understood the terms* |
-
-    > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
-
-1. Wait for the deployment task to complete before continuing with this task.
 
 1. Select **+ Create a resource**, search for *Cognitive Search*, and then create a new **Azure Cognitive Search** account resource with the following settings, leaving all remaining settings to their default values:
 
@@ -170,21 +155,6 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 1. Select **Next: Add cognitive skills**.
 
-1. In the **Add cognitive skills** step of the wizard, expand the **Attach Cognitive Services** section.
-
-1. In the list of cognitive services options, select the account you created earlier.
-
-1. Expand the **Add enrichments** section.
-
-1. Configure the enrichments with the following settings, leaving all remaining settings to their default values:
-
-    | **Setting** | **Value** |
-    | ---: | :--- |
-    | **Skillset name** | *products-translate-skillset* |
-    | **Source data field** | *name* |
-
-1. In the **Text Cognitive Skills** section, select only the **Translate text** option, configure the **Target Language** to **German**, and then enter **name_de** for the **Field name** column.
-
 1. Select **Next: Customize target index**.
 
 1. In the **Customize target index** step of the wizard, configure the index with the following settings, leaving all remaining settings to their default values:
@@ -202,7 +172,6 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
     | **categoryId** | &#10004; | &#10004; | &#10004; | &#10004; | |
     | **name** | &#10004; | &#10004; | &#10004; | | &#10004; (English - Microsoft) |
     | **price** | &#10004; | &#10004; | &#10004; | &#10004; | |
-    | **name_de** | &#10004; | &#10004; | &#10004; | | &#10004; (German - Microsoft) |
 
 1. Select **Next: Create an indexer**.
 
@@ -242,16 +211,6 @@ Now that your materialized view of the Azure Cosmos DB SQL API data is in the se
     ```
 
 1. Observe that this search query returns results that contain either the terms **touring** or **3000** giving a higher score to results that contains both terms. The results are then sorted in descending order by the **@search.score** field.
-
-1. In the **Query string** editor, enter the following query and then select **Search**:
-
-    ```
-    straßenreifen
-    ```
-
-    > &#128161; This word roughly translates to "road tire" in the English language.
-
-1. Observe that this search query returns results that specifically include this german word in either the **name** or **name_de** fields. Similar terms are also included, but their score is far lower.
 
 1. In the **Query string** editor, enter the following query and then select **Search**:
 
