@@ -153,6 +153,8 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 1. Select the **Query results ordered by _ts** checkbox.
 
+    > &#128221; This checkbox lets Azure Cognitive Search know that the query sorts results by the **_ts** field. This type of sorting enables incremental progress tracking. If the indexer fails, it can pick right back up form the same **_ts** value since the results are ordered by the timestamp.
+
 1. Select **Next: Add cognitive skills**.
 
 1. Select **Next: Customize target index**.
