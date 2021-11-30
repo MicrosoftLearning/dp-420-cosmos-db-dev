@@ -240,7 +240,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
   
    When change feed sees a new change, it calls a delegate and passes the changes in a read-only collection.
 
-1. At line 609, you need to add some code that will be called when change feed has a new change that needs to be processed. To do so, copy the following code snippet and paste it below the line that starts with `//To-Do:`
+1. At line 603, you need to add some code that will be called when change feed has a new change that needs to be processed. To do so, copy the following code snippet and paste it below the line that starts with `//To-Do:`
 
     ```
     //Fetch each change to productCategory container
