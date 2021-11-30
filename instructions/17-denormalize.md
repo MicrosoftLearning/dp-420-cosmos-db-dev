@@ -261,7 +261,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
     This code snippet loops through all the changes in the delegate `input` and saves them as strings for `categoryId` and `categoryName`. It then adds a task to the task list with a call to another function that updates the product container with the new category name.
 
-1. Select Ctrl+G, and then enter **648** to find your `UpdateProductCategoryName()` function. Here you write some code that updates each product in the product container with the new category name captured by change feed.
+1. Select Ctrl+G, and then enter **647** to find your `UpdateProductCategoryName()` function. Here you write some code that updates each product in the product container with the new category name captured by change feed.
 
 1. Copy the following code snippet and paste it below the line that starts with **//To-Do:**. The function does two things. It first queries the product container for all the products for the passed in `categoryId`. It then updates each product with the new product category name.
 
