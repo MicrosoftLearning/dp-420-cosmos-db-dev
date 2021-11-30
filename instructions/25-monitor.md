@@ -163,7 +163,7 @@ We might need to spend some time fine-tuning our Azure Monitor Metrics diagnosti
 
 1. Select the Throughput Tab. These charts are good to pinpoint throughput issues.  Pay close attention to the **Normalized RU Consumption (%) By PartitionKeyRangeID** chart, which can be used to detect hot partitions.
 
-1. Select the Requests Tab. These charts are great to both analyze the number of limiting events the account has experience (429 vs. 200) or how the number of requests per operation type.  
+1. Select the Requests Tab. These charts are great to both analyze the number of limiting events the account has experience (429 vs. 200) or to review the number of requests per operation type.  
 
 1. Select the Storage Tab. These charts are show us both the growth of our collections, and the data and index usage.  
 
