@@ -230,11 +230,11 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
     ![Screenshot of Cloud Shell, displaying the function where change feed has been implemented.](media/16-change-feed-function.png)
 
-   At lines 593 and 594 are two container references. You need to update them with the correct container names. Change feed works by creating an instance of the change feed processor on the container reference. In this case, you're watching for changes to the productCategory container.
+   At lines 588 and 589 are two container references. You need to update them with the correct container names. Change feed works by creating an instance of the change feed processor on the container reference. In this case, you're watching for changes to the productCategory container.
 
-1. At line 593, replace **{container to watch}** with **productCategory**.
+1. At line 588, replace **{container to watch}** with **productCategory**.
 
-1. At line 594, replace **{container to update}** with **product**. When a product category name is updated, every product in that category needs to be updated with the new product category name.
+1. At line 589, replace **{container to update}** with **product**. When a product category name is updated, every product in that category needs to be updated with the new product category name.
 
 1. Below the *container to watch* and *container to update* lines, review the *leaseContainer* line. The leaseContainer works like a checkpoint on the container. It knows what has been updated since the last time it was checked by the change feed processor.
   
