@@ -18,4 +18,4 @@ This repository contains the hands-on lab exercises for Microsoft course [DP-420
 
 [azure]: https://azure.microsoft.com
 [course-description]: https://docs.microsoft.com/learn/certifications/courses/dp-420t00
-[learn-collection]: https://docs.microsoft.com/users/TODO/collections/TODO
+[learn-collection]: https://docs.microsoft.com/users/msftofficialcurriculum-4292/collections/1k8wcz8zooj2nx
