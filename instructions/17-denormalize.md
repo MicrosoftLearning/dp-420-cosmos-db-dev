@@ -484,7 +484,7 @@ You delete a sales order in exactly the same way that you create one. Both opera
 1. Type **x** to exit the application.
 1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
 
-1. Select Ctrl+G, and then enter **549**.
+1. Select Ctrl+G, and then enter **529**.
 
     This function deletes the new sales order and updates the customer record.
 
@@ -496,7 +496,7 @@ You delete a sales order in exactly the same way that you create one. Both opera
 
 Let's look at the query for your top 10 customers.
 
-1. Select Ctrl+G, and then enter **580**.
+1. Select Ctrl+G, and then enter **566**.
 
     Near the top is the definition for your query.
 
@@ -510,8 +510,7 @@ Let's look at the query for your top 10 customers.
 
     Also notice the discriminator property of `type` with a value of `customer`, so you return only back customers because your customer container has both customers and sales orders within it.
 
-1. Select CTRL+Q to close Visual Studio Code.
-1. To start the application again, run the following command:
+1. To start the application again if it's not already running, run the following command:
 
     ```
     dotnet run
