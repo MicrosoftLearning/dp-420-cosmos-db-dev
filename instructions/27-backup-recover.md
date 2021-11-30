@@ -27,7 +27,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
     | **Capacity mode** | *Provisioned throughput* |
-    | **Apply Free Tier Discount** | *`Do Not Apply`* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
 
     > &#128221; Note that you can enabled **Continuous** mode during the creation of the Azure Cosmos DB account, by selecting it under the **Backup Policy** tab. In this Lab you have the choice of enabling this feature during account creation or after the account is created in the optional section below. **Enabling the feature *after* the account is created *could take longer than 5 minutes*.**
 
@@ -43,8 +43,8 @@ Let's create a database and a couple of containers.
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Database id** | *Sales* |
-    | **Share throughput across containers** | *`unselected`* |
+    | **Database id** | *`Sales`* |
+    | **Share throughput across containers** | *unselected* |
 
 1. Under **Data Explorer**, add a new container with the following settings
 
@@ -52,7 +52,7 @@ Let's create a database and a couple of containers.
     | ---: | :--- |
     | **Database id** | *Use existing* name: *Sales* |
     | **Container id** | *`customer`* |
-    | **Partition key** | */id* |
+    | **Partition key** | *`/id`* |
     | **Container throughput (400 - unlimited RU/s)** | *Manual* throughput: *400*|
 
 1. Under **Data Explorer**, add a new container with the following settings
@@ -60,8 +60,8 @@ Let's create a database and a couple of containers.
     | **Setting** | **Value** |
     | ---: | :--- |
     | **Database id** | *Use existing* name: *Sales* |
-    | **Container id** | *salesOrder* |
-    | **Partition key** | */id* |
+    | **Container id** | *`salesOrder`* |
+    | **Partition key** | *`/id`* |
     | **Container throughput (400 - unlimited RU/s)** | *Manual* throughput: *400*|
 
 ## Add a database and two containers to the account
