@@ -216,7 +216,7 @@ For this exercise, you'll complete the following steps:
 
 To go to the code that you'll update for change feed, do the following:
 
-1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *16-measure-performance* folder.
+1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
 
 ### Complete the code for change feed
 
@@ -291,7 +291,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
 1. Select Ctrl+S to save your changes.
 
-1. If it is not opened already, open a Git Bash Integrated Terminal and make sure you are under the *16-measure-performance* folder.
+1. If it is not opened already, open a Git Bash Integrated Terminal and make sure you are under the *17-denormalize* folder.
 
 1. To compile and execute the project, run the following command:
 
@@ -350,7 +350,7 @@ For this exercise, you'll complete the following steps:
 
 To get to the code that you'll use in this unit, do the following:
 
-1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *16-measure-performance* folder.
+1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
 
 ## Complete the code to update total sales orders
 
@@ -414,7 +414,7 @@ To get to the code that you'll use in this unit, do the following:
 
 1. Select Ctrl+S to save your changes.
 
-1. If it is not opened already, open a Git Bash Integrated Terminal and make sure you are under the *16-measure-performance* folder.
+1. If it is not opened already, open a Git Bash Integrated Terminal and make sure you are under the *17-denormalize* folder.
 
 1. To compile and execute the project, run the following command:
 
@@ -482,7 +482,7 @@ As with any e-commerce application, customers also cancel orders. You can do the
 You delete a sales order in exactly the same way that you create one. Both operations are wrapped in a transaction and executed in the same logical partition. Let's look at the code that does that.
 
 1. Type **x** to exit the application.
-1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *16-measure-performance* folder.
+1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
 
 1. Select Ctrl+G, and then enter **549**.
 
