@@ -62,9 +62,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotnet-add-package] command to import packages from a pre-configured package feed. A .NET installation uses NuGet as its default package feed.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **04-sdk-connect** folder.
+1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **25-monitor** folder.
 
-1. Open the context menu for the **04-sdk-connect** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+1. Open the context menu for the **25-monitor** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
     > &#128221; This command will open the terminal with the starting directory already set to the **04-sdk-connect** folder.
 
