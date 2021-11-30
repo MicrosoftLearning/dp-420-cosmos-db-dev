@@ -218,7 +218,7 @@ Let's add some documents to those containers.
 SELECT GetCurrentDateTime ()
 ```
 
-1. Under **Data Explorer**, locate the **salesOrder** document with **id** `0019092E-BD25-48F5-8050-7051B2655BC5`. Delete the Document, verify the document no longer there.
+1. Under **Data Explorer**, locate the **salesOrder** document with **id** `0019092E-BD25-48F5-8050-7051B2655BC5`. Delete the Document, verify the document is no longer there.
 
 ## Restore the database to the point before you deleted the salesOrder document
 
