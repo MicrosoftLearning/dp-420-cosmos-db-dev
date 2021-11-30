@@ -282,7 +282,7 @@ The original goal of this lab was to prevent our Azure Cosmos DB Accounts from b
 
 1. **Save** the new policy.
 
-1. Let's try our web app again.  On your browser, go to  **https://\<yourwebappname\>.azurewebsites.net**.
+1. Let's try our web app again.  On your browser, go to  **`https://<yourwebappname>.azurewebsites.net`**.
 
 1. Success! Our web page should indicate that we inserted new items into the customer container. We can also see the actual Secret being displayed.
 
