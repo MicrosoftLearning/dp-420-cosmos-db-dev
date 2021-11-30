@@ -157,7 +157,7 @@ We might need to spend some time fine-tuning our Azure Monitor Metrics diagnosti
 
 1. Note on the top of the charts, we can home in on the **Time Range**, so select either *15* or *30* minutes to evaluate the workload in this exercise.
 
-1. On the upper right-hand corner of *each* chart, you'll notice an option to ***Open Metric Explorer***. Let's go ahead and select the  **Open Metric Explorer** option for the **Total Requests** chart. You'll notice that when you select this option will take you to the Metric's reports we reviewed earlier. The advantage of doing opening the Metric Explorer, is that a good portion of the chart has already been built for us.
+1. On the upper right-hand corner of *each* chart, you'll notice an option to ***Open Metric Explorer***. Let's go ahead and select the  **Open Metric Explorer** option for the **Total Requests** chart. You'll notice that when you select this option will take you to the Metric's reports we reviewed earlier. The advantage of opening the Metric Explorer, is that a good portion of the chart has already been built for us.
 
 1. Lets get back to the Insights page by selecting on the **X** on the upper right of the Metric chart.
 
