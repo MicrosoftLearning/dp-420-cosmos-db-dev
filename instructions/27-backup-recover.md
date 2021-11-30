@@ -232,7 +232,7 @@ SELECT GetCurrentDateTime ()
     | **Location** | *Selected an available location* |
     | **Select resources you would like to restore** | *Selected database/containers* |
     | **Restore Resource** | *salesOrder* |
-    | **Restore Target Account** | *`choose a* ***new*** *Azure Cosmos DB account name`* |
+    | **Restore Target Account** | *choose a* ***new*** *Azure Cosmos DB account name* |
 
     > &#128221; For Azure Cosmos DB restores, you ***never*** restore on top of and *existing* account, and will always have to create a new Azure Cosmos DB account.
 
@@ -262,7 +262,7 @@ SELECT GetCurrentDateTime ()
     | **Restore Point (UTC)** | Convert the date and time appropriately. The time will need to be in AM/PM format|
     | **Select resources you would like to restore** | *Selected database/containers* |
     | **Restore Resource** | *`customer`* |
-    | **Restore Target Account** | *`choose a* ***new*** *Azure Cosmos DB account name`* |
+    | **Restore Target Account** | *choose a* ***new*** *Azure Cosmos DB account name* |
 
     > &#128221; For Azure Cosmos DB restores, you ***never*** restore on top of and *existing* account, and will always have to create a new Azure Cosmos DB account.
 
