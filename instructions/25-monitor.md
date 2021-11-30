@@ -80,8 +80,6 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
     dotnet add package Newtonsoft.Json --version 13.0.1
     ```
 
-1. Close the integrated terminal.
-
 ## Run a script to create the containers and the workload
 
 We're now ready to run a workload to monitor its usage of the Azure Cosmos DB Account.  The script we'll be running, behind the scenes. This script will create three containers and load some data into those containers. The script will then run some SQL queries randomly to emulate multiple user applications hitting the Azure Cosmos DB account. 
