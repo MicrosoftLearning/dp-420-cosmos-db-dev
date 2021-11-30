@@ -60,7 +60,7 @@ public class Program
         //JArray database1_salesOrderDetail = (JArray) JArray.Parse(File.ReadAllText(@"..\data\fullset\database-v1\salesOrderDetail"));
         JArray database2_salesOrder = (JArray) JArray.Parse(File.ReadAllText(@"..\data\fullset\database-v2\salesOrder"));
         JArray database3_customer = (JArray) JArray.Parse(File.ReadAllText(@"..\data\fullset\database-v3\customer"));
-        JArray database3_salesOrder = (JArray) JArray.Parse(File.ReadAllText(@"..\data\fullset\database-v3\salesOrder"));
+        JArray database3_salesOrder = (JArray) JArray.Parse(File.ReadAllText(@"..\data\fullset\database-v2\salesOrder"));
         //JArray database4_customer = (JArray) JArray.Parse(File.ReadAllText(@"..\data\fullset\database-v4\customer"));
 
         Console.WriteLine("");
