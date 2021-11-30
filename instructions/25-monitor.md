@@ -141,7 +141,7 @@ In this part of the exercise, we'll go back to the browser and review some of th
 
 1. Like we did with the **Total Request Units**, experiment choosing different filters and splitting options. 
 
-1. The final metric we'll look at in this exercise is the **Normalied RU Consumption** metric. This metric helps us identify which partition key range usage is warmer. The metric gives us the skew of throughput towards a partition key range. Go ahead and choose that Metric from the *Metric* pulldown.
+1. The final metric we'll look at in this exercise is the **Normalied RU Consumption** metric. Change your split to **PartitionKeyRangeId**. This metric helps us identify which partition key range usage is warmer. The metric gives us the skew of throughput towards a partition key range. Go ahead and choose that Metric from the *Metric* pulldown. This chart should now show us a very unhealthy system, hitting a constant 100% **Normalied RU Consumption**.
 
 > &#128221; If you would like to look at more than one chart at a time, click on the **+ New Chart** option above the chart name. 
 
