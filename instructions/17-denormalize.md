@@ -366,7 +366,7 @@ To get to the code that you'll use in this unit, do the following:
 
     First, the customer record is retrieved by calling `ReadItemAsync()` and passing in the `customerId` as both the partition key and ID.
 
-1. At line 486, below the `//To-Do:` comment, increment the value of `salesOrderCount` by pasting the following code snippet:
+1. At line 483, below the `//To-Do:` comment, increment the value of `salesOrderCount` by pasting the following code snippet:
 
     ```
     //Increment the salesOrderTotal property
