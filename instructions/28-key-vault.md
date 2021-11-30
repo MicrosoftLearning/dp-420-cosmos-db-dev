@@ -240,7 +240,7 @@ The rest of the code is straight forward, get the connection string, connect to 
 
 1. Select **Yes** when prompted to always deploy to that workspace.
 
-1. Select Browse Website when prompted.  Alternatively, open a browser and go to **https://\<yourwebappname\>.azurewebsites.net**. In either case, we have a problem. We should have gotten a user-defined message on our web page. The message should be, **Key Vault was not accessible** with an extended error message. Let's fix that.
+1. Select Browse Website when prompted.  Alternatively, open a browser and go to **`https://<yourwebappname>.azurewebsites.net`**. In either case, we have a problem. We should have gotten a user-defined message on our web page. The message should be, **Key Vault was not accessible** with an extended error message. Let's fix that.
 
 ## Allow our app to use a managed identity
 
@@ -254,7 +254,7 @@ The first problem we need to fix is to allow our app use a managed identity. Usi
 
 1. Under Status, select **On** and **Save**.  Select **Yes** if prompted to enable the *Assigned Managed Identity*.
 
-1. Let's try our web app again.  On your browser, go to  **https://\<yourwebappname\>.azurewebsites.net**.
+1. Let's try our web app again.  On your browser, go to  **`https://<yourwebappname>.azurewebsites.net`**.
 
 1. There is still one problem. While the first message is a user-defined message our program is sending, the second one is a System generated one. What the second message means is that we have been granted access to the connect to the Key vault, but we have not been granted access to view the secret inside the vault.  Let's set one final setting to fix this issue.
 
