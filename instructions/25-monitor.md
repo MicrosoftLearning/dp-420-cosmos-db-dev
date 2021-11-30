@@ -167,7 +167,7 @@ We might need to spend some time fine-tuning our Azure Monitor Metrics diagnosti
 
 1. Select the Storage Tab. These charts are show us both the growth of our collections, and the data and index usage.  
 
-1. Select the System Tab. If your application was creating, deleting, or querying the accounts metadata frequently, it's possible to have 429 exceptions.  These charts help us determine if that frequent metadata access is the case. Additionally, we can determine the status of our metadata requests.  
+1. Select the System Tab. If your application was creating, deleting, or querying the accounts metadata frequently, it's possible to have 429 exceptions.  These charts help us determine if that frequent metadata access is the cause of our 429 exceptions. Additionally, we can determine the status of our metadata requests.  
 
 ### Azure Monitor Insights reports
 
