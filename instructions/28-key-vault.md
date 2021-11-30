@@ -110,7 +110,7 @@ We'll create a webapp that will connect to the Azure Cosmos DB account and creat
 
 1. That command created the shell of a web app, so it added several files and directories. We already have a couple of files with all the code we need. Replace the files `.\Controllers\HomeController.cs` and `.\Views\Home\Index.cshtml` for their respective files in the `.\KeyvaultFiles` directory.
 
-1. Once you replace the files ***DELETE** the `.\KeyvaultFiles` directory.
+1. Once you replace the files ***DELETE*** the `.\KeyvaultFiles` directory.
 
 ## Import the multiple missing libraries into the .NET script
 
