@@ -182,7 +182,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
     - In *line 104-105*, we prepare the *Key Vault Client* that will connect to the Azure Key Vault. Notice we send the webapp token as a parameter. 
     - In *lines 107-108*, we provide the Key Vault Client with the URL address of our **Secret Identifier** which would return the secret stored in that key vault. 
 
-1.  Before we can deploy our webapp, we still need to send the **Secret Identifier** URL.  On *line 107*, replace the string **\<Key Vault Secret Identifier\>** with the **Secret Identifier** URL we recorded in the *secret* section and save the file.
+1.  Before we can deploy our webapp, we still need to send the **Secret Identifier** URL.  On *line 107*, replace the string **`<Key Vault Secret Identifier>`** with the **Secret Identifier** URL we recorded in the *secret* section and save the file.
 
 ```
         var KeyVaultSecret = await KVClient.GetSecretAsync("<Key Vault Secret Identifier>")
