@@ -88,7 +88,7 @@ We're now ready to run a workload to monitor its usage of the Azure Cosmos DB Ac
 
 1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **25-monitor** folder.
 
-1. Open the empty **Program.cs** code file.
+1. Open the **Program.cs** code file.
 
 1. Update the existing variable named **endpoint** with its value set to the **endpoint** of the Azure Cosmos DB account you created earlier.
   
