@@ -355,12 +355,6 @@ For:
             
             Console.Clear();
 
-            // Replace the following with the correct try/catch logic
-//            ItemResponse<customerInfo> response = await Customer.DeleteItemAsync<customerInfo>(partitionKey: new PartitionKey(customerID), id: customerID);
-//            Console.WriteLine("Delete Successful.");
-//            Console.WriteLine("Document for customer with id = '" + customerID + "' Deleted.");
-            ///
-        
             try
             {
                ItemResponse<customerInfo> response = await Customer.DeleteItemAsync<customerInfo>(partitionKey: new PartitionKey(customerID), id: customerID);
