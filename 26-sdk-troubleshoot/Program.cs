@@ -6,10 +6,8 @@ using System.Threading;
 public class Program
 {
 
-//    private static readonly string endpoint = "<cosmos-endpoint>";
-    private static readonly string endpoint = "https://calopezstudent01lab1102.documents.azure.com:443/";
-//    private static readonly string key = "<cosmos-key>";
-    private static readonly string key = "2RdKwuVgFpHaTworkIy8DGH3etkXeSilXwsXdPl6TQk3EM7q13eTYk8yThAMBK5GyPzjpn0IX2klDtV4Tlr8iw==";
+    private static readonly string endpoint = "<cosmos-endpoint>";
+    private static readonly string key = "<cosmos-key>";
 
     private static readonly string connectionString = "AccountEndpoint=" + endpoint + ";AccountKey=" + key;
 
