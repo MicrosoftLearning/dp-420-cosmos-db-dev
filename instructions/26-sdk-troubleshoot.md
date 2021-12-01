@@ -156,7 +156,7 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
 
     > &#128221; Note that while we will code a task to do if we encounter a 403 exception, in this lab we will not generate that type of an error with exception.
 
-1. Let's replace the code from lines 98-102 with the following code. The first thing to notice in this new code, is that on the **catch** we're capturing an exception of type `CosmosException` class.  This class included the property `StatusCode`, which gets the request completion status code from the Azure Cosmos DB service. The `StatusCode` property is of type `System.Net.HttpStatusCode`, so if you notice we actually compare its value against the field names from the .NET [HTTP Status Code][dotnet/api/system.net.httpstatuscode].  
+1. Let's replace the code from lines 96-100 with the following code. The first thing to notice in this new code, is that on the **catch** we're capturing an exception of type `CosmosException` class.  This class included the property `StatusCode`, which gets the request completion status code from the Azure Cosmos DB service. The `StatusCode` property is of type `System.Net.HttpStatusCode`, so if you notice we actually compare its value against the field names from the .NET [HTTP Status Code][dotnet/api/system.net.httpstatuscode].  
 
 ```C#
             try
