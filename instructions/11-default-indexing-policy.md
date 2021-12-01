@@ -106,7 +106,13 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 
 1. Select **Execute Query**.
 
-1. Observe the single result of the query.
+1. Observe the results of the query.
+
+1. In the **Query** tab, select **Query Stats**.
+
+1. Still in the **Query** tab, observe the value of the **Request Charge** field within the **Query Statistics** section.
+
+    > &#128221; All paths are currently indexed, so this query should be relatively efficient.
 
 1. Within the **products** container node of the **SQL API** navigation tree, select **Scale & Settings**.
 
@@ -153,6 +159,24 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 1. Select **Save** to persist your changes.
 
 1. Select **New SQL Query**.
+
+1. Delete the contents of the editor area.
+
+1. Create a new SQL query that will return all documents where the **name** is equivalent to **HL Headset**:
+
+    ```
+    SELECT * FROM p WHERE p.name = 'HL Headset'
+    ```
+
+1. Select **Execute Query**.
+
+1. Observe the results of the query.
+
+1. In the **Query** tab, select **Query Stats**.
+
+1. Still in the **Query** tab, observe the value of the **Request Charge** field within the **Query Statistics** section.
+
+    > &#128221; Now that the **name** property is not indexed, the request charge has increased.
 
 1. Delete the contents of the editor area.
 

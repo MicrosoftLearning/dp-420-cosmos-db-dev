@@ -93,6 +93,7 @@ Before you can begin writing code, you will need to create the Azure Functions r
     | **Runtime stack** | *.NET* |
     | **Version** | *6* |
     | **Region** | *Choose any available region* |
+    | **Storage account** | *Create a new storage account* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 

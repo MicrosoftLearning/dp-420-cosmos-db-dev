@@ -40,7 +40,7 @@ Stored procedures are authored in language-integrated JavaScript and support exe
     | **Setting** | **Value** |
     | ---: | :--- |
     | **Database id** | *Create new* &vert; *cosmicworks* |
-    | **Share throughput across containers** | *selected* |
+    | **Share throughput across containers** | *Select this option* |
     | **Database throughput** | *Manual* &vert; *400* |
     | **Container id** | *products* |
     | **Indexing** | *Automatic* |

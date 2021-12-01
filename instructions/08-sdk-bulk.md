@@ -60,10 +60,10 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     | **Setting** | **Value** |
     | ---: | :--- |
     | **Database id** | *Create new* &vert; *cosmicworks* |
-    | **Share throughput across containers** | *selected* |
-    | **Database throughput** | *Autoscale* &vert; *4000* |
+    | **Share throughput across containers** | *Do not select* |
     | **Container id** | *products* |
     | **Partition key** | */categoryId* |
+    | **Container throughput** | *Autoscale* &vert; *4000* |
 
 1. Close your web browser window or tab.
 
@@ -172,6 +172,12 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
     await Task.WhenAll(concurrentTasks);
     ```
 
+1. Use the built-in **Console.WriteLine** static method to print a static message of **Bulk tasks complete** to the console:
+
+    ```
+    Console.WriteLine("Bulk tasks complete");
+    ```
+
 1. Once you are done, your code file should now include:
   
     ```
@@ -211,6 +217,8 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
     }
     
     await Task.WhenAll(concurrentTasks);   
+
+    Console.WriteLine("Bulk tasks complete");
     ```
 
 1. **Save** the **script.cs** code file.

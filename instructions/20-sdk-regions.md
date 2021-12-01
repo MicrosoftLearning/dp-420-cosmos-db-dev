@@ -75,6 +75,25 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
+1. In the **Data Explorer** pane, expand the **cosmicworks** database node, expand the **products** container node, and then select **Items**.
+
+1. Still in the **Data Explorer** pane, select **New Item** from the command bar. In the editor, replace the placeholder JSON item with the following content:
+
+    ```
+    {
+      "id": "7d9273d9-5d91-404c-bb2d-126abb6e4833",
+      "categoryId": "78d204a2-7d64-4f4a-ac29-9bfc437ae959",
+      "categoryName": "Components, Pedals",
+      "sku": "PD-R563",
+      "name": "ML Road Pedal",
+      "price": 62.09
+    }
+    ```
+
+1. Select **Save** from the command bar to add the JSON item:
+
+1. In the **Items** tab, observe the new item in the **Items** pane.
+
 1. In the resource blade, navigate to the **Keys** pane.
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
@@ -165,16 +184,19 @@ The **CosmosClientOptions** class includes a property to configure the list of r
     Container container = client.GetContainer("cosmicworks", "products");
     ```
 
-1. Use the [ReadContainerAsync][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readcontainerasync] method of the **container** variable to retrieve the container's metadata from the server and store the result in a variable named **response** of the nullable [ContainerResponse][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerresponse] type:
+1. Use the [ReadItemAsync][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readitemasync] method of the **container** variable to retrieve the a specific item from the server and store the result in a variable named **response** of the nullable [ItemResponse][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.itemresponse] type:
 
     ```
-    ContainerResponse response = await container.ReadContainerAsync();
+    ItemResponse<dynamic> response = await container.ReadItemAsync<dynamic>(
+        "7d9273d9-5d91-404c-bb2d-126abb6e4833",
+        new PartitionKey("78d204a2-7d64-4f4a-ac29-9bfc437ae959")
+    );
     ```
 
-1. Invoke the static **Console.WriteLine** method to print the current container identifier and the JSON diagnostic data:
+1. Invoke the static **Console.WriteLine** method to print the current item identifier and the JSON diagnostic data:
 
     ```
-    Console.WriteLine($"Container:\t{container.Id}");
+    Console.WriteLine($"Item Id:\t{response.Resource.Id}");
     Console.WriteLine($"Response Diagnostics JSON");
     Console.WriteLine($"{response.Diagnostics}");
     ```
@@ -203,10 +225,13 @@ The **CosmosClientOptions** class includes a property to configure the list of r
     
     Container container = client.GetContainer("cosmicworks", "products");
     
-    ContainerResponse response = await container.ReadContainerAsync();
+    ItemResponse<dynamic> response = await container.ReadItemAsync<dynamic>(
+        "7d9273d9-5d91-404c-bb2d-126abb6e4833",
+        new PartitionKey("78d204a2-7d64-4f4a-ac29-9bfc437ae959")
+    );
     
-    Console.WriteLine($"Container:\t{container.Id}");
-    Console.WriteLine($"Response Diagnostics JSON");
+    Console.WriteLine($"Item Id:\t{response.Resource.Id}");
+    Console.WriteLine("Response Diagnostics JSON");
     Console.WriteLine($"{response.Diagnostics}");
     ```
 
@@ -231,8 +256,8 @@ The **CosmosClientOptions** class includes a property to configure the list of r
 1. Close **Visual Studio Code**.
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
-[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readcontainerasync]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readcontainerasync
-[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerresponse]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerresponse
+[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readitemasync]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.readitemasync
+[docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.itemresponse]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.itemresponse
 [docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclientoptions.applicationpreferredregions]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclientoptions.applicationpreferredregions
 [docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.regions]: https://docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.regions
 [docs.microsoft.com/dotnet/core/tools/dotnet-build]: https://docs.microsoft.com/dotnet/core/tools/dotnet-build

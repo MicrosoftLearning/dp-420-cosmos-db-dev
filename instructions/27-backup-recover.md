@@ -44,7 +44,7 @@ Let's create a database and a couple of containers.
     | **Setting** | **Value** |
     | ---: | :--- |
     | **Database id** | *`Sales`* |
-    | **Share throughput across containers** | *unselected* |
+    | **Share throughput across containers** | *Do not select* |
 
 1. Under **Data Explorer**, add a new container with the following settings
 
