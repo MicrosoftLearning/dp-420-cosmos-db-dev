@@ -346,7 +346,7 @@ For:
     ```
 
 
-1. Don't peek, but once you're done your delete codes should look something like this.
+1. Don't peek, but once you're done, your delete codes should look something like this.
 
 ```C#
     static async Task DeleteDocument1(Container Customer)
