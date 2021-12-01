@@ -135,16 +135,16 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
 1. Digging further into the stack, we can see that this exception was called from line 99, and that in turn was called from line 52.
 
     ```
-    at Program.CreateDocument1(Container Customer) in C:\WWL\Git\DP-420\Git\dp-420-cosmos-db-dev\26-sdk-troubleshoot\Program.cs:line 99   at Program.Main(String[] args) in C:\WWL\Git\DP-420\Git\dp-420-cosmos-db-dev\26-sdk-troubleshoot\Program.cs:line 52
+    at Program.CreateDocument1(Container Customer) in C:\WWL\Git\DP-420\Git\dp-420-cosmos-db-dev\26-sdk-troubleshoot\Program.cs:line 97   at Program.Main(String[] args) in C:\WWL\Git\DP-420\Git\dp-420-cosmos-db-dev\26-sdk-troubleshoot\Program.cs:line 50
     ```
 
-1. Reviewing line 99, as expected, the error was caused by the CreateItemAsync operation. 
+1. Reviewing line 97, as expected, the error was caused by the CreateItemAsync operation. 
 
 ```C#
             ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
 ```
 
-1. Furthermore, by reviewing lines 99 to 101, it's obvious that this code has no error handling. We'll need to fix that.
+1. Furthermore, by reviewing lines 97 to 99, it's obvious that this code has no error handling. We'll need to fix that.
 
 ```C#
             ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
