@@ -205,7 +205,7 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
     Press [ENTER] to continue
     ```
 
-1. While it's good that we're taking care of two specific exceptions for our document creation, 403 and 409, there are three other communication type of exceptions that any type of operation could experience.  These exceptions are 429, 503, and 408 or too many request, service unavailable, and request time out respectively. We'll add some code that if we find any of these exceptions, to wait 10 minutes and try one more time to insert the document.  Lets' replace the code:
+1. While it's good that we're taking care of two specific exceptions for our document creation, 403 and 409, there are three other communication type of exceptions that any type of operation could experience.  These exceptions are 429, 503, and 408 or too many request, service unavailable, and request time out respectively. We'll add some code that will do the following, if we find any of these exceptions, wait 10 minutes, and then try to insert the document one more time.  Lets' replace the code:
 
 ```C#
                     default:
