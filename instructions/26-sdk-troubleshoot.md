@@ -339,7 +339,7 @@ For:
             Console.WriteLine("Document for customer with id = '" + customerID + "' Deleted.");
 ```
 
-1. Once you're done fixing all functions, test the menu options to make sure you get the right results.  If your app crashes just rerun the command:
+1. Once you're done fixing all functions, test all the menu options several times to make sure you that your app is returning a message when encountering an exception and not crashing.  If your app crashes, fix the errors and just rerun the command:
 
     ```
     dotnet run
