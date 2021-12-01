@@ -405,7 +405,7 @@ For:
 
 ## Conclusion
 
-Even the most junior developers know that proper error handling must be added to all code. While the error handling in this code is simple, it should have given you the basics about the Azure Cosmos DB exception components that you'll need to use to create robust error-handling solutions in your code.
+Even the most junior developers knows that proper error handling must be added to all code. While the error handling in this code is simple, it should have given you the basics about the Azure Cosmos DB exception components that will let you create robust error-handling solutions in your code.
 
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
