@@ -243,7 +243,7 @@ For:
                         break;
 ```
 
-> &#128221; Note that while we will code a task to do if we encounter a 429, 503 or 408 exception, in this lab we will not generate an error with that type of exception.
+> &#128221; Note that while we will code a task of what to do if we encounter a 429, 503 or 408 exception, in this lab we will not generate an error with that type of exception.
 
 1. Our `CreateDocument1` function should now look something like this:
 
