@@ -214,7 +214,7 @@ public class Program
                 while(resultSetIterator1.HasMoreResults)
                {
                     customerCounter++;
-                    resultSetIterator1.ReadNextAsync();
+                    await resultSetIterator1.ReadNextAsync();
                 }
                 //Console.WriteLine(customerCounter.ToString());
             }
@@ -228,7 +228,7 @@ public class Program
                 while(resultSetIterator.HasMoreResults)
                {
                 salesOrderCounter++;
-                resultSetIterator.ReadNextAsync();
+                await resultSetIterator.ReadNextAsync();
                }
             //Console.WriteLine(salesOrderCounter.ToString());
             }
