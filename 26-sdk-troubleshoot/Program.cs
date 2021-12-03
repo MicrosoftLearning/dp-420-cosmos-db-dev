@@ -4,7 +4,7 @@ using Microsoft.Azure.Cosmos;
 using System.Threading;
 
 public class Program
-{
+{    
 
     private static readonly string endpoint = "<cosmos-endpoint>";
     private static readonly string key = "<cosmos-key>";
@@ -27,7 +27,7 @@ public class Program
 
         CosmosClient client = new CosmosClient(connectionString,new CosmosClientOptions() { AllowBulkExecution = true, MaxRetryAttemptsOnRateLimitedRequests = 50, MaxRetryWaitTimeOnRateLimitedRequests = new TimeSpan(0,1,30)});
 
-        Console.WriteLine("Creating Azure Cosmos DB Databases and containters");
+        Console.WriteLine("Creating Azure Cosmos DB Databases and containers");
 
         Database CustomersDB = await client.CreateDatabaseIfNotExistsAsync("CustomersDB");
         Container CustomersDB_Customer_container = await CustomersDB.CreateContainerIfNotExistsAsync(id: "Customer", partitionKeyPath: "/id", throughput: 400);
@@ -44,28 +44,8 @@ public class Program
     
         while((consoleinputcharacter = Console.ReadLine()) != "5") 
         {
-            switch (consoleinputcharacter)
-            {
-                case "1":
-                    await CreateDocument1(CustomersDB_Customer_container);
-                    break;
-                case "2":
-                    await CreateDocument2(CustomersDB_Customer_container);
-                    break;
-                case "3":
-                    await DeleteDocument1(CustomersDB_Customer_container);
-                    break;
-                case "4":
-                    await DeleteDocument2(CustomersDB_Customer_container);
-                    break;
-                case "5":
-                    break;
-                default:
-                Console.WriteLine("Default");
-                    break;
-            }
+            await CompeteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
 
-            Console.Clear();
             Console.WriteLine("Choose an action:");
             Console.WriteLine("1) Add Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
             Console.WriteLine("2) Add Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
@@ -76,6 +56,30 @@ public class Program
         }
     }
 
+    public static async Task CompeteTaskOnCosmosDB(string consoleinputcharacter, Container container)
+    {
+        switch (consoleinputcharacter)
+        {
+            case "1":
+                await CreateDocument1(container);
+                break;
+            case "2":
+                await CreateDocument2(container);
+                break;
+            case "3":
+                await DeleteDocument1(container);
+                break;
+            case "4":
+                await DeleteDocument2(container);
+                break;
+            case "5":
+                break;
+            default:
+                Console.WriteLine("Default");
+                break;
+        }
+        Console.Clear();
+    }
     static async Task CreateDocument1(Container Customer)
     {
             string customerID = "0C297972-BE1B-4A34-8AE1-F39E6AA3D828";
@@ -93,11 +97,9 @@ public class Program
 
             Console.Clear();
 
-            /// Replace the following code with the correct error handling logic
             ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
             Console.WriteLine("Insert Successful.");
             Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
-            ///
 
             Console.WriteLine("Press [ENTER] to continue");
             Console.ReadLine();
@@ -119,11 +121,9 @@ public class Program
 
             Console.Clear();
 
-            /// Replace the following code with the correct error handling logic
             ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
             Console.WriteLine("Insert Successful.");
             Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
-            ///
         
             Console.WriteLine("Press [ENTER] to continue");
             Console.ReadLine();
@@ -135,11 +135,10 @@ public class Program
             
             Console.Clear();
 
-            // Replace the following code with the correct error handling logic
             ItemResponse<customerInfo> response = await Customer.DeleteItemAsync<customerInfo>(partitionKey: new PartitionKey(customerID), id: customerID);
             Console.WriteLine("Delete Successful.");
             Console.WriteLine("Document for customer with id = '" + customerID + "' Deleted.");
-            ///
+
         
             Console.WriteLine("Press [ENTER] to continue");
             Console.ReadLine();
@@ -150,11 +149,9 @@ public class Program
             
             Console.Clear();
 
-            // Replace the following code with the correct error handling logic
             ItemResponse<customerInfo> response = await Customer.DeleteItemAsync<customerInfo>(partitionKey: new PartitionKey(customerID), id: customerID);
             Console.WriteLine("Delete Successful.");
             Console.WriteLine("Document for customer with id = '" + customerID + "' Deleted.");
-            ///
         
             Console.WriteLine("Press [ENTER] to continue");
             Console.ReadLine();
