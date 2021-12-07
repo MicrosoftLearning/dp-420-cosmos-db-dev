@@ -71,7 +71,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Share throughput across containers** | *Do not select* |
     | **Container id** | *products* |
     | **Partition key** | */categoryId* |
-    | **Container throughput** | *Manual* &vert; *800* |
+    | **Container throughput** | *Manual* &vert; *400* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
