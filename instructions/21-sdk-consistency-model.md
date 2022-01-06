@@ -78,6 +78,25 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
+1. In the **Data Explorer** pane, expand the **cosmicworks** database node, expand the **products** container node, and then select **Items**.
+
+1. Still in the **Data Explorer** pane, select **New Item** from the command bar. In the editor, replace the placeholder JSON item with the following content:
+
+    ```
+    {
+      "id": "7d9273d9-5d91-404c-bb2d-126abb6e4833",
+      "categoryId": "78d204a2-7d64-4f4a-ac29-9bfc437ae959",
+      "categoryName": "Components, Pedals",
+      "sku": "PD-R563",
+      "name": "ML Road Pedal",
+      "price": 62.09
+    }
+    ```
+
+1. Select **Save** from the command bar to add the JSON item:
+
+1. In the **Items** tab, observe the new item in the **Items** pane.
+
 1. In the resource blade, navigate to the **Keys** pane.
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
@@ -138,26 +157,16 @@ Using the credentials from the newly created account, you will connect with the 
 
 The **ItemRequestOptions** class contains configuration properties on a per-request basis. Using this class, you will relax the consistency level from the current default of strong to eventual consistency.
 
-1. Create two **string** variables named **id** and **categoryId** by generating a new **Guid** value and then storing the result as a string:
+1. Create a string variable named **id** with a value of **7d9273d9-5d91-404c-bb2d-126abb6e4833**:
 
     ```
-    string id = $"{Guid.NewGuid()}";
-    string categoryId = $"{Guid.NewGuid()}";
+    string id = "7d9273d9-5d91-404c-bb2d-126abb6e4833";
     ```
 
-1. Create a new variable named **item** of type **Product** passing in the **id** variable, a string value of **Reflective Handlebar**, and the **categoryId** variable as constructor parameters:
+1. Create a string variable named **categoryId** with a value of **78d204a2-7d64-4f4a-ac29-9bfc437ae959**:
 
     ```
-    Product item = new (id, "Reflective Handlebar", categoryId);
-    ```
-
-1. Create a new variable named **options** of type [ItemRequestOptions][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.itemrequestoptions] setting the [ConsistencyLevel][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.itemrequestoptions.consistencylevel] property to the [ConsistencyLevel.Eventual][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.consistencylevel] enum value:
-
-    ```
-    ItemRequestOptions options = new()
-    { 
-        ConsistencyLevel = ConsistencyLevel.Eventual 
-    };
+    string categoryId = "78d204a2-7d64-4f4a-ac29-9bfc437ae959";
     ```
 
 1. Create a variable of type **PartitionKey** named **partitionKey** passing in the **categoryId** variable as a constructor parameter:
@@ -166,16 +175,16 @@ The **ItemRequestOptions** class contains configuration properties on a per-requ
     PartitionKey partitionKey = new (categoryId);
     ```
 
-1. Asynchronously invoke the **CreateItemAsync\<\>** method of the **container** variable passing in the **item**, **partitionKey**, and **options** variables as parameters and storing the result in a variable named **response**:
+1. Asynchronously invoke the generic **ReadItemAsync\<\>** method of the **container** variable passing in the **id** and **partitionkey** variables as method parameters, using **Product** as the generic type, and storing the result in a variable named **response** of type **ItemResponse\<Product\>**:
 
     ```
-    var response = await container.CreateItemAsync<Product>(item, partitionKey, requestOptions: options);
+    ItemResponse<Product> response = await container.ReadItemAsync<Product>(id, partitionKey);
     ```
 
-1. Invoke the static **Console.WriteLine** method to print the response's request charge (in request units):
+1. Invoke the static **Console.WriteLine** method to print the request charge using a formatted output string:
 
     ```
-    Console.WriteLine($"Charge (RU):\t{response.RequestCharge:0.00}");
+    Console.WriteLine($"STRONG Request Charge:\t{response.RequestCharge:0.00} RUs");
     ```
 
 1. Once you are done, your code file should now include:
@@ -190,19 +199,14 @@ The **ItemRequestOptions** class contains configuration properties on a per-requ
     
     Container container = client.GetContainer("cosmicworks", "products");
     
-    string id = $"{Guid.NewGuid()}";
-    string categoryId = $"{Guid.NewGuid()}";
-    Product item = new (id, "Reflective Handlebar", categoryId);
+    string id = "7d9273d9-5d91-404c-bb2d-126abb6e4833";
     
-    ItemRequestOptions options = new()
-    { 
-        ConsistencyLevel = ConsistencyLevel.Eventual 
-    };
-    
+    string categoryId = "78d204a2-7d64-4f4a-ac29-9bfc437ae959";
     PartitionKey partitionKey = new (categoryId);
-    var response = await container.CreateItemAsync<Product>(item, partitionKey, requestOptions: options);
-
-    Console.WriteLine($"Charge (RU):\t{response.RequestCharge:0.00}");
+    
+    ItemResponse<Product> response = await container.ReadItemAsync<Product>(id, partitionKey);
+    
+    Console.WriteLine($"STRONG Request Charge:\t{response.RequestCharge:0.00} RUs");
     ```
 
 1. **Save** the **script.cs** code file.
@@ -216,6 +220,82 @@ The **ItemRequestOptions** class contains configuration properties on a per-requ
     ```
 
 1. Observe the output from the terminal. The request charge (in RUs) should be printed to the console.
+
+    > &#128221; The current request charge should be **2 RUs**. This is due to the strong consistency requiring a read from at least two replicas to ensure that it has the latest write.
+
+1. Close the integrated terminal.
+
+1. Return to the editor tab for the **script.cs** code file.
+
+1. Delete the following lines of code:
+
+    ```
+    ItemResponse<Product> response = await container.ReadItemAsync<Product>(id, partitionKey);
+    
+    Console.WriteLine($"Request Charge:\t{response.RequestCharge:0.00} RUs");
+    ```
+
+1. Create a new variable named **options** of type [ItemRequestOptions][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.itemrequestoptions] setting the [ConsistencyLevel][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.itemrequestoptions.consistencylevel] property to the [ConsistencyLevel.Eventual][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.consistencylevel] enum value:
+
+    ```
+    ItemRequestOptions options = new()
+    { 
+        ConsistencyLevel = ConsistencyLevel.Eventual 
+    };
+    ```
+
+1. Asynchronously invoke the generic **ReadItemAsync\<\>** method of the **container** variable passing in the **id**, **partitionKey**, and **options** variables as  method parameters, using **Product** as the generic type, and storing the result in a variable named **response** of type **ItemResponse\<Product\>**:
+
+    ```
+    ItemResponse<Product> response = await container.ReadItemAsync<Product>(id, partitionKey, requestOptions: options);
+    ```
+
+1. Invoke the static **Console.WriteLine** method to print the request charge using a formatted output string:
+
+    ```
+    Console.WriteLine($"EVENTUAL Request Charge:\t{response.RequestCharge:0.00} RUs");
+    ```
+
+1. Once you are done, your code file should now include:
+
+    ```
+    using Microsoft.Azure.Cosmos;
+
+    string endpoint = "<cosmos-endpoint>";
+    string key = "<cosmos-key>";
+
+    using CosmosClient client = new CosmosClient(endpoint, key);
+    
+    Container container = client.GetContainer("cosmicworks", "products");
+    
+    string id = "7d9273d9-5d91-404c-bb2d-126abb6e4833";
+    
+    string categoryId = "78d204a2-7d64-4f4a-ac29-9bfc437ae959";
+    PartitionKey partitionKey = new (categoryId);
+
+    ItemRequestOptions options = new()
+    { 
+        ConsistencyLevel = ConsistencyLevel.Eventual 
+    };
+    
+    ItemResponse<Product> response = await container.ReadItemAsync<Product>(id, partitionKey, requestOptions: options);
+    
+    Console.WriteLine($"EVENTUAL Request Charge:\t{response.RequestCharge:0.00} RUs");
+    ```
+
+1. **Save** the **script.cs** code file.
+
+1. In **Visual Studio Code**, open the context menu for the **21-sdk-consistency-model** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+
+1. Build and run the project using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command:
+
+    ```
+    dotnet run
+    ```
+
+1. Observe the output from the terminal. The request charge (in RUs) should be printed to the console.
+
+    > &#128221; The current request charge should be **1 RUs**. This is due to the eventual consistency only requiring a read from a single replica.
 
 1. Close the integrated terminal.
 
