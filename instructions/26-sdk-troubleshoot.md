@@ -26,7 +26,7 @@ If you haven't already cloned the lab code repository for **DP-420** to the envi
 
 ## Create an Azure Cosmos DB SQL API account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB SQL API account programatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB SQL API account programmatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
@@ -103,7 +103,7 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
     ```
     dotnet run
     ```
-    > &#128221; This is a very simple program.  It will display a menu with five options as show below. Two options to insert a predifined document, two to delete a predifined document, and an option to exit the program.
+    > &#128221; This is a very simple program.  It will display a menu with five options as show below. Two options to insert a predefined document, two to delete a predefined document, and an option to exit the program.
 
     >```
     >1) Add Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'
@@ -124,7 +124,7 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
     Press [ENTER] to continue
     ```
 
-1. Again, select **1** and **ENTER** to insert the first document. This time the program will crash with an exception. Looking through the error stack, we can find the reason for the program failure. As we can tell from the message extracted from the error stack, we come across an unhandle exception "Conflict (409)"
+1. Again, select **1** and **ENTER** to insert the first document. This time the program will crash with an exception. Looking through the error stack, we can find the reason for the program failure. As we can tell from the message extracted from the error stack, we come across an unhandled exception "Conflict (409)"
 
     ```
     Unhandled exception. Microsoft.Azure.Cosmos.CosmosException : Response status code does not indicate success: Conflict (409);
@@ -135,60 +135,57 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
 1. Digging further into the stack, we can see that this exception was called from line 99, and that in turn was called from line 52.
 
     ```
-    at Program.CreateDocument1(Container Customer) in C:\WWL\Git\DP-420\Git\dp-420-cosmos-db-dev\26-sdk-troubleshoot\Program.cs:line 97   at Program.Main(String[] args) in C:\WWL\Git\DP-420\Git\dp-420-cosmos-db-dev\26-sdk-troubleshoot\Program.cs:line 50
+    at Program.CreateDocument1(Container Customer) in C:\WWL\Git\DP-420\Git\dp-420-cosmos-db-dev\26-sdk-troubleshoot\Program.cs:line 101   at Program.Main(String[] args) in C:\WWL\Git\DP-420\Git\dp-420-cosmos-db-dev\26-sdk-troubleshoot\Program.cs:line 47
     ```
 
-1. Reviewing line 97, as expected, the error was caused by the CreateItemAsync operation. 
+1. Reviewing line 101, as expected, the error was caused by the CreateItemAsync operation. 
 
-```C#
-            ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
-```
+    ```C#
+        ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
+    ```
 
-1. Furthermore, by reviewing lines 97 to 99, it's obvious that this code has no error handling. We'll need to fix that.
+1. Furthermore, by reviewing lines 101 to 104, it's obvious that this code has no error handling. We'll need to fix that. 
 
-```C#
-            ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
-            Console.WriteLine("Insert Successful.");
-            Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
-```
+    ```C#
+        ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
+        Console.WriteLine("Insert Successful.");
+        Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
+    ```
 
-1. We'll need to decide what our error-handling code should do. Reviewing the [create document status codes][/rest/api/cosmos-db/create-a-document#status-codes], we could choose to create error-handling code for every possible status code for this operation.  In this lab, we will only consider from this list, status Code 403 a 409.  All other status codes retuned will just display the system error message.
+1. We'll need to decide what our error-handling code should do. Reviewing the [create document status codes][/rest/api/cosmos-db/create-a-document#status-codes], we could choose to create error-handling code for every possible status code for this operation.  In this lab, we will only consider from this list, status Code 403 a 409.  All other status codes returned will just display the system error message.
 
     > &#128221; Note that while we will code a task to do if we encounter a 403 exception, in this lab we will not generate that type of an error with exception.
 
-1. Let's replace the code from lines 96-100 with the following code. The first thing to notice in this new code, is that on the **catch** we're capturing an exception of type `CosmosException` class.  This class included the property `StatusCode`, which gets the request completion status code from the Azure Cosmos DB service. The `StatusCode` property is of type `System.Net.HttpStatusCode`, so if you notice we actually compare its value against the field names from the .NET [HTTP Status Code][dotnet/api/system.net.httpstatuscode].  
+1. Let's add error handling for top function named `CompeteTaskOnCosmosDB`. Locate `while` cycle in the function `Main` about lines 45 and wrap up call of `CompeteTaskOnCosmosDB` with error handling. The first thing to notice in this new code, is that on the **catch** we're capturing an exception of type `CosmosException` class.  This class included the property `StatusCode`, which gets the request completion status code from the Azure Cosmos DB service. The `StatusCode` property is of type `System.Net.HttpStatusCode`, so if you notice we actually compare its value against the field names from the .NET [HTTP Status Code][dotnet/api/system.net.httpstatuscode].  
 
-```C#
-            try
-            {
-               ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
-               Console.WriteLine("Insert Successful.");
-               Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
+    ```C#
+        try
+        {
+            await CompeteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
+        }
+        catch (CosmosException e)
+        {
+                    switch (e.StatusCode.ToString())
+                    {
+                        case ("Conflict"):
+                            Console.WriteLine("Insert Failed. Response Code (409).");
+                            Console.WriteLine("Can not insert a duplicate partition key, customer with the same ID already exists."); 
+                            break;
+                        case ("Forbidden"):
+                            Console.WriteLine("Response Code (403).");
+                            Console.WriteLine("The request was forbidden to complete. Some possible reasons for this exception are:");
+                            Console.WriteLine("Firewall blocking requests.");
+                            Console.WriteLine("Partition key exceeding storage.");
+                            Console.WriteLine("Non-data operations are not allowed.");
+                            break;
+                        default:
+                            Console.WriteLine(e.Message);
+                            break;
+                    }
 
-            }
-            catch (CosmosException e)
-            {
-                switch (e.StatusCode.ToString())
-                {
-                    case ("Conflict"):
-                        Console.WriteLine("Insert Failed. Response Code (409).");
-                        Console.WriteLine("Can not insert a duplicate partition key, customer with id = '" + customerID + "' already exists.");
-                        break;
-                    case ("Forbidden"):
-                        Console.WriteLine("Response Code (403).");
-                        Console.WriteLine("The request was forbidden to complete. Some possible reasons for this exception are:");
-                        Console.WriteLine("Firewall blocking requests.");
-                        Console.WriteLine("Partition key exceeding storage.");
-                        Console.WriteLine("Non-data operations are not allowed.");
-                        break;
-                    default:
-                        Console.WriteLine(e.Message);
-                        break;
-                }
+        }
 
-            }
-
-```
+    ```
 
 1. Save the file and since we crashed, we need to run our Menu program again, so run the command:
 
@@ -201,143 +198,139 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
     ```
     Insert Failed. 
     Response Code (409).
-    Can not insert a duplicate partition key, customer with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828' already exists.
+    Can not insert a duplicate partition key, customer with the same ID already exists.
     Press [ENTER] to continue
     ```
 
-1. While it's good that we're taking care of two specific exceptions for our document creation, 403 and 409, there are three other communication type of exceptions that any type of operation could experience.  These exceptions are 429, 503, and 408 or too many request, service unavailable, and request time out respectively. We'll add some code that will do the following, if we find any of these exceptions, wait 10 minutes, and then try to insert the document one more time.  Lets' replace the code:
+1. While it's good that we're taking care of two specific exceptions for our document creation, 403 and 409, there are three other communication type of exceptions that any type of operation could experience.  These exceptions are 429, 503, and 408 or too many request, service unavailable, and request time out respectively. We'll add some code that will do the following, if we find any of these exceptions, wait 10 minutes, and then try to insert the document one more time.  Lets' add beyond the code:
 
-```C#
+    ```C#
                     default:
                         Console.WriteLine(e.Message);
                         break;
-```
+    ```
 
-For:
 
-```C#
-                    default:
-                        // Check if the issues are related to connectivity and if so, wait 10 seconds to retry.
-                        if (e.StatusCode.ToString() == "TooManyRequests" // 429
-                                || e.StatusCode.ToString() == "ServiceUnavailable" // 503
-                                || e.StatusCode.ToString() == "RequestTimeout") // 408
-                        {
-                            Thread.Sleep(10000); // Wait 10 seconds
+    Code for handling exceptions:
+
+
+    ```C#
+                        case ("TooManyRequests"):
+                        case ("ServiceUnavailable"):
+                        case ("RequestTimeout"):
+                            // Check if the issues are related to connectivity and if so, wait 10 seconds to retry.
+                            await Task.Delay(10000); // Wait 10 seconds
                             try
                             {
-                                ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
-                                Console.WriteLine("Insert Successful.");
-                                Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
-
+                                Console.WriteLine("Try one more time...");
+                                await CompeteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
                             }
                             catch (CosmosException e2)
                             {
                                 Console.WriteLine("Insert Failed. " + e2.Message);
-                                Console.WriteLine("Can not insert a duplicate partition key, customer with id = '" + customerID + "', Connectivity issues encountered.");
+                                Console.WriteLine("Can not insert a duplicate partition key, Connectivity issues encountered.");
                                 break;
                             }
+                            break;
+    ```
 
-                        }
-                        else
-                            Console.WriteLine(e.Message);
-                        break;
-```
+    > &#128221; Note that while we will code a task of what to do if we encounter a 429, 503 or 408 exception, in this lab we will not generate an error with that type of exception.
 
-> &#128221; Note that while we will code a task of what to do if we encounter a 429, 503 or 408 exception, in this lab we will not generate an error with that type of exception.
+1. Our `Main` function should now look something like this:
 
-1. Our `CreateDocument1` function should now look something like this:
+    ```C#
+        public static async Task Main(string[] args)
+        {
 
-```C#
-    static async Task CreateDocument1(Container Customer)
-    {
-            string customerID = "0C297972-BE1B-4A34-8AE1-F39E6AA3D828";
-            PartitionKey pKey = new PartitionKey(customerID);
-            
-            customerInfo customer = new customerInfo();
+            CosmosClient client = new CosmosClient(connectionString,new CosmosClientOptions() { AllowBulkExecution = true, MaxRetryAttemptsOnRateLimitedRequests = 50, MaxRetryWaitTimeOnRateLimitedRequests = new TimeSpan(0,1,30)});
 
-            customer.id = customerID;
-            customer.title = "";
-            customer.firstName="Franklin";
-            customer.lastName="Ye";
-            customer.emailAddress="franklin9@adventure-works.com";
-            customer.phoneNumber= "1 (11) 500 555-0139";
-            customer.creationDate = "2014-02-05T00:00:00";
+            Console.WriteLine("Creating Azure Cosmos DB Databases and containers");
+
+            Database CustomersDB = await client.CreateDatabaseIfNotExistsAsync("CustomersDB");
+            Container CustomersDB_Customer_container = await CustomersDB.CreateContainerIfNotExistsAsync(id: "Customer", partitionKeyPath: "/id", throughput: 400);
 
             Console.Clear();
-
-            try
+            Console.WriteLine("1) Add Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
+            Console.WriteLine("2) Add Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
+            Console.WriteLine("3) Delete Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
+            Console.WriteLine("4) Delete Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
+            Console.WriteLine("5) Exit");
+            Console.Write("\r\nSelect an option: ");
+    
+            string consoleinputcharacter;
+        
+            while((consoleinputcharacter = Console.ReadLine()) != "5") 
             {
-               ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
-               Console.WriteLine("Insert Successful.");
-               Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
-
-            }
-            catch (CosmosException e)
-            {
-                switch (e.StatusCode.ToString())
-                {
-                    case ("Conflict"):
-                        Console.WriteLine("Insert Failed. Response Code (409).");
-                        Console.WriteLine("Can not insert a duplicate partition key, customer with id = '" + customerID + "' already exists.");
-                        break;
-                    case ("Forbidden"):
-                        Console.WriteLine("Response Code (403).");
-                        Console.WriteLine("The request was forbidden to complete. Some possible reasons for this exception are:");
-                        Console.WriteLine("Firewall blocking requests.");
-                        Console.WriteLine("Partition key exceeding storage.");
-                        Console.WriteLine("Non-data operations are not allowed.");
-                        break;
-                    default:
-                        // Check if the issues are related to connectivity and if so, wait 10 seconds to retry.
-                        if (e.StatusCode.ToString() == "TooManyRequests" // 429
-                                || e.StatusCode.ToString() == "ServiceUnavailable" // 503
-                                || e.StatusCode.ToString() == "RequestTimeout") // 408
+                    try
+                    {
+                        await CompeteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
+                    }
+                    catch (CosmosException e)
+                    {
+                        switch (e.StatusCode.ToString())
                         {
-                            Thread.Sleep(10000); // Wait 10 seconds
+                            case ("Conflict"):
+                                Console.WriteLine("Insert Failed. Response Code (409).");
+                                Console.WriteLine("Can not insert a duplicate partition key, customer with the same ID already exists."); 
+                                break;
+                            case ("Forbidden"):
+                                Console.WriteLine("Response Code (403).");
+                                Console.WriteLine("The request was forbidden to complete. Some possible reasons for this exception are:");
+                                Console.WriteLine("Firewall blocking requests.");
+                                Console.WriteLine("Partition key exceeding storage.");
+                                Console.WriteLine("Non-data operations are not allowed.");
+                                break;
+                            default:
+                                Console.WriteLine(e.Message);
+                                break;
+                        }
+
+                    }
+
+                Console.WriteLine("Choose an action:");
+                Console.WriteLine("1) Add Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
+                Console.WriteLine("2) Add Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
+                Console.WriteLine("3) Delete Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
+                Console.WriteLine("4) Delete Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
+                Console.WriteLine("5) Exit");
+                Console.Write("\r\nSelect an option: ");
+            }
+        }
+    ```
+
+1. Note that `CreateDocument2` function will also be fixed by changes above.
+
+1. Finally the functions `DeleteDocument1` and `DeleteDocument2` also need the following code to be replaced for the proper error-handling code similar to the `CreateDocument1` function. The only difference with these functions besides using **DeleteItemAsync** instead of **CreateItemAsync** is that [deletes status codes][/rest/api/cosmos-db/delete-a-document] are different than the insert status codes. For the deletes, we only care about a **404** status code. Lets update error handling of `CompeteTaskOnCosmosDB` function with additional case:
+
+
+    ```C#
+                    case ("NotFound"):
+                        Console.WriteLine("Delete Failed. Response Code (404).");
+                        Console.WriteLine("Can not delete customer, customer not found.");
+                        break;         
+    ```
+
+1.  Go ahead and add following code on handling deletion functions with code that does some error handling. Also include the retry logic for status code **429**, **503** and **508**. The follwing cod need to be added above `default` case:
+
+    ```C#
+                        case ("TooManyRequests"):
+                        case ("ServiceUnavailable"):
+                        case ("RequestTimeout"):
+                            // Check if the issues are related to connectivity and if so, wait 10 seconds to retry.
+                            await Task.Delay(10000); // Wait 10 seconds
                             try
                             {
-                                ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
-                                Console.WriteLine("Insert Successful.");
-                                Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
-
+                                Console.WriteLine("Try one more time...");
+                                await CompeteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
                             }
                             catch (CosmosException e2)
                             {
                                 Console.WriteLine("Insert Failed. " + e2.Message);
-                                Console.WriteLine("Can not insert a duplicate partition key, customer with id = '" + customerID + "', Connectivity issues encountered.");
+                                Console.WriteLine("Can not insert a duplicate partition key, Connectivity issues encountered.");
                                 break;
                             }
-
-                        }
-                        else
-                            Console.WriteLine(e.Message);
-                        break;
-                }
-
-            }
-
-            Console.WriteLine("Press [ENTER] to continue");
-            Console.ReadLine();
-
-        
-    }
-```
-
-1. The `CreateDocument2` function will also need to be fixed. Replace the following code for the proper error-handling code we included in the `CreateDocument1` function.
-
-```C#
-               ItemResponse<customerInfo> response = await Customer.CreateItemAsync<customerInfo>(customer, new PartitionKey(customerID));
-               Console.WriteLine("Insert Successful.");
-               Console.WriteLine("Document for customer with id = '" + customerID + "' Inserted.");
-```
-
-1. Finally the functions DeleteDocument1 and DeleteDocument2 also need the following code to be replaced for the proper error-handling code similar to the `CreateDocument1` function. The only difference with these functions besides using **DeleteItemAsync** instead of **CreateItemAsync** is that [deletes status codes][/rest/api/cosmos-db/delete-a-document] are different than the insert status codes. For the deletes, we only care about a **404** status code. Go ahead and replace this code on both delete functions with code that does some error handling. Also include the retry logic for status code **429**, **503** and **508**.
-
-```C#
-            ItemResponse<customerInfo> response = await Customer.DeleteItemAsync<customerInfo>(partitionKey: new PartitionKey(customerID), id: customerID);
-            Console.WriteLine("Delete Successful.");
-            Console.WriteLine("Document for customer with id = '" + customerID + "' Deleted.");
-```
+                            break;       
+    ```
 
 1. Once you're done fixing all functions, test all the menu options several times to make sure you that your app is returning a message when encountering an exception and not crashing.  If your app crashes, fix the errors and just rerun the command:
 
@@ -346,62 +339,87 @@ For:
     ```
 
 
-1. Don't peek, but once you're done, your delete codes should look something like this.
+1. Don't peek, but once you're done, your `Main` codes should look something like this.
 
-```C#
-    static async Task DeleteDocument1(Container Customer)
-    {
-            string customerID = "0C297972-BE1B-4A34-8AE1-F39E6AA3D828";
-            
+    ```C#
+        public static async Task Main(string[] args)
+        {
+            CosmosClient client = new CosmosClient(connectionString,new CosmosClientOptions() { AllowBulkExecution = true, MaxRetryAttemptsOnRateLimitedRequests = 50, MaxRetryWaitTimeOnRateLimitedRequests = new TimeSpan(0,1,30)});
+
+            Console.WriteLine("Creating Azure Cosmos DB Databases and containers");
+
+            Database CustomersDB = await client.CreateDatabaseIfNotExistsAsync("CustomersDB");
+            Container CustomersDB_Customer_container = await CustomersDB.CreateContainerIfNotExistsAsync(id: "Customer", partitionKeyPath: "/id", throughput: 400);
+
             Console.Clear();
-
-            try
+            Console.WriteLine("1) Add Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
+            Console.WriteLine("2) Add Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
+            Console.WriteLine("3) Delete Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
+            Console.WriteLine("4) Delete Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
+            Console.WriteLine("5) Exit");
+            Console.Write("\r\nSelect an option: ");
+    
+            string consoleinputcharacter;
+        
+            while((consoleinputcharacter = Console.ReadLine()) != "5") 
             {
-               ItemResponse<customerInfo> response = await Customer.DeleteItemAsync<customerInfo>(partitionKey: new PartitionKey(customerID), id: customerID);
-               Console.WriteLine("Delete Successful.");
-               Console.WriteLine("Document for customer with id = '" + customerID + "' Deleted.");
-
-            }
-            catch (CosmosException e)
-            {
-                switch (e.StatusCode.ToString())
-                {
-                    case ("NotFound"):
-                        Console.WriteLine("Delete Failed. Response Code (404).");
-                        Console.WriteLine("Can not delete customer with id = '" + customerID + "', customer not found.");
-                        break;
-                    default:
-                        // Check if the issues are related to connectivity and if so, wait 10 seconds to retry.
-                        if (e.StatusCode.ToString() == "TooManyRequests" // 429
-                                || e.StatusCode.ToString() == "ServiceUnavailable" // 503
-                                || e.StatusCode.ToString() == "RequestTimeout") // 408
+                    try
+                    {
+                        await CompeteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
+                    }
+                    catch (CosmosException e)
+                    {
+                        switch (e.StatusCode.ToString())
                         {
-                            Thread.Sleep(10000); // Wait 10 seconds
-                            try
-                            {
-                                ItemResponse<customerInfo> response = await Customer.DeleteItemAsync<customerInfo>(partitionKey: new PartitionKey(customerID), id: customerID);
-                                Console.WriteLine("Delete Successful.");
-                                Console.WriteLine("Document for customer with id = '" + customerID + "' Deleted.");
-                            }
-                            catch (CosmosException e2)
-                            {
-                                Console.WriteLine("Delete Failed. " + e2.Message);
-                                Console.WriteLine("Can not delete customer with id = '" + customerID + "', customer not found.");
+                            case ("Conflict"):
+                                Console.WriteLine("Insert Failed. Response Code (409).");
+                                Console.WriteLine("Can not insert a duplicate partition key, customer with the same ID already exists."); 
                                 break;
-                            }
-
+                            case ("Forbidden"):
+                                Console.WriteLine("Response Code (403).");
+                                Console.WriteLine("The request was forbidden to complete. Some possible reasons for this exception are:");
+                                Console.WriteLine("Firewall blocking requests.");
+                                Console.WriteLine("Partition key exceeding storage.");
+                                Console.WriteLine("Non-data operations are not allowed.");
+                                break;
+                            case ("NotFound"):
+                                Console.WriteLine("Delete Failed. Response Code (404).");
+                                Console.WriteLine("Can not delete customer, customer not found.");
+                                break; 
+                            case ("TooManyRequests"):
+                            case ("ServiceUnavailable"):
+                            case ("RequestTimeout"):
+                                // Check if the issues are related to connectivity and if so, wait 10 seconds to retry.
+                                await Task.Delay(10000); // Wait 10 seconds
+                                try
+                                {
+                                    Console.WriteLine("Try one more time...");
+                                    await CompeteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
+                                }
+                                catch (CosmosException e2)
+                                {
+                                    Console.WriteLine("Insert Failed. " + e2.Message);
+                                    Console.WriteLine("Can not insert a duplicate partition key, Connectivity issues encountered.");
+                                    break;
+                                }
+                                break;    
+                            default:
+                                Console.WriteLine(e.Message);
+                                break;
                         }
-                        else
-                            Console.WriteLine(e.Message);
-                        break;
-                }
 
+                    }
+
+                Console.WriteLine("Choose an action:");
+                Console.WriteLine("1) Add Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
+                Console.WriteLine("2) Add Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
+                Console.WriteLine("3) Delete Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
+                Console.WriteLine("4) Delete Document 2 with id = 'AAFF2225-A5DD-4318-A6EC-B056F96B94B7'");
+                Console.WriteLine("5) Exit");
+                Console.Write("\r\nSelect an option: ");
             }
-
-            Console.WriteLine("Press [ENTER] to continue");
-            Console.ReadLine();
-    }
-```
+        }
+    ```
 
 ## Conclusion
 
