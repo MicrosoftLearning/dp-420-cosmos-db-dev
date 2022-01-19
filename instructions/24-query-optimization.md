@@ -173,7 +173,7 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Select **Execute Query**.
 
-1. Observe the results and stats of the query. The request unit charge should be pretty high since we do not have a composite index for the multiple order-by expressions.
+1. The query should fail with the error **The order by query does not have a corresponding composite index that it can be served from.**.
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Settings**.
 
