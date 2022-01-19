@@ -173,7 +173,7 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Select **Execute Query**.
 
-1. The query should fail with the error **The order by query does not have a corresponding composite index that it can be served from.**.
+1. The query should fail with the error **The order by query does not have a corresponding composite index that it can be served from**.
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Settings**.
 
