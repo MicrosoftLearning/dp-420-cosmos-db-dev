@@ -156,8 +156,7 @@ Once the Azure Cosmos DB library from the Azure SDK for .NET has been imported, 
   
     ```
     using System;
-    using System.Linq;
-    
+    using System.Linq;    
     using Microsoft.Azure.Cosmos;
 
     string endpoint = "<cosmos-endpoint>";
