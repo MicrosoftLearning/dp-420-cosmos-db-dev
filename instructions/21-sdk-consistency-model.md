@@ -195,7 +195,13 @@ The **ItemRequestOptions** class contains configuration properties on a per-requ
     string endpoint = "<cosmos-endpoint>";
     string key = "<cosmos-key>";
 
-    using CosmosClient client = new CosmosClient(endpoint, key);
+    CosmosClientOptions clientoptions = new CosmosClientOptions()
+    {
+        RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+    };
+
+    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
     
     Container container = client.GetContainer("cosmicworks", "products");
     
@@ -264,7 +270,13 @@ The **ItemRequestOptions** class contains configuration properties on a per-requ
     string endpoint = "<cosmos-endpoint>";
     string key = "<cosmos-key>";
 
-    using CosmosClient client = new CosmosClient(endpoint, key);
+    CosmosClientOptions clientoptions = new CosmosClientOptions()
+    {
+        RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+    };
+
+    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
     
     Container container = client.GetContainer("cosmicworks", "products");
     
