@@ -117,7 +117,7 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
         AllowBulkExecution = true 
         , RequestTimeout = new TimeSpan(0,0,90)
         , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
-   };
+    };
     ```
 
 1. Create a new instance of the **CosmosClient** class named **client** passing in the **endpoint**, **key**, and **options** variables as constructor parameters:
