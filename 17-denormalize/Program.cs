@@ -22,7 +22,13 @@ public class Program
     private static readonly string uri = config["uri"];
     private static readonly string key = config["key"];
     private static readonly string gitdatapath = config["gitdatapath"];
-    private static readonly CosmosClient client = new CosmosClient(uri, key);
+    private static readonly CosmosClient client = new CosmosClient(uri, key
+            , new CosmosClientOptions()
+                {
+                    RequestTimeout = new TimeSpan(0,0,90)
+                    , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+                }
+        );
 
     public static async Task Main(string[] args)
     {
