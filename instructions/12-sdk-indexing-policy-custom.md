@@ -143,7 +143,13 @@ The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.
 
     string key = "<cosmos-key>";
 
-    CosmosClient client = new (endpoint, key);
+    CosmosClientOptions clientoptions = new CosmosClientOptions()
+    {
+        RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+    };
+
+    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
 
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
     
