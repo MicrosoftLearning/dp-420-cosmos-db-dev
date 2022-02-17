@@ -67,7 +67,13 @@ namespace _28_key_vault.Controllers
         {
             string connectionString = secret;
 
-            CosmosClient client = new CosmosClient(connectionString);
+            CosmosClientOptions clientoptions = new CosmosClientOptions()
+            {
+                RequestTimeout = new TimeSpan(0,0,90)
+                , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+            };
+
+            CosmosClient client = new CosmosClient(connectionString, clientoptions);
 
             Database GlobalCustomers = await client.CreateDatabaseIfNotExistsAsync("GlobalCustomers");
             Container customers =await GlobalCustomers.CreateContainerIfNotExistsAsync(id: "customers", partitionKeyPath: "/id", throughput: 400);
