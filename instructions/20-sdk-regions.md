@@ -169,6 +169,8 @@ The **CosmosClientOptions** class includes a property to configure the list of r
     CosmosClientOptions options = new () 
     { 
         ApplicationPreferredRegions = regions
+        , RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
     };
     ```
 
@@ -219,6 +221,8 @@ The **CosmosClientOptions** class includes a property to configure the list of r
     CosmosClientOptions options = new () 
     { 
         ApplicationPreferredRegions = regions
+        , RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
     };
     
     using CosmosClient client = new(endpoint, key, options);
