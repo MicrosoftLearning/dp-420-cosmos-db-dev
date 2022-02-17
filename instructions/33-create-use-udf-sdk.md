@@ -161,7 +161,13 @@ The [Container][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container] 
 
     string key = "<cosmos-key>";
 
-    CosmosClient client = new (endpoint, key);
+    CosmosClientOptions clientoptions = new CosmosClientOptions()
+    {
+        RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+    };
+
+    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
 
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
 
