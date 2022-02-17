@@ -116,7 +116,13 @@ Using the credentials from the newly created account, you will connect with the 
     string endpoint = "<cosmos-endpoint>";
     string key = "<cosmos-key>";
 
-    CosmosClient client = new (endpoint, key);  
+    CosmosClientOptions clientoptions = new CosmosClientOptions()
+    {
+        RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+    };
+
+    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
     
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
     
@@ -200,7 +206,13 @@ You will now use the set of asynchronous methods in the Microsoft.Azure.Cosmos.C
     string endpoint = "<cosmos-endpoint>";
     string key = "<cosmos-key>";
 
-    CosmosClient client = new (endpoint, key);  
+    CosmosClientOptions clientoptions = new CosmosClientOptions()
+    {
+        RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+    };
+
+    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
     
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
     
@@ -296,7 +308,13 @@ You will now use the set of asynchronous methods in the Microsoft.Azure.Cosmos.C
     string endpoint = "<cosmos-endpoint>";
     string key = "<cosmos-key>";
 
-    CosmosClient client = new (endpoint, key);  
+    CosmosClientOptions clientoptions = new CosmosClientOptions()
+    {
+        RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+    };
+
+    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
     
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
     
@@ -386,7 +404,13 @@ While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK a
     string endpoint = "<cosmos-endpoint>";
     string key = "<cosmos-key>";
 
-    CosmosClient client = new (endpoint, key);  
+    CosmosClientOptions clientoptions = new CosmosClientOptions()
+    {
+        RequestTimeout = new TimeSpan(0,0,90)
+        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
+    };
+
+    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
     
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
     
