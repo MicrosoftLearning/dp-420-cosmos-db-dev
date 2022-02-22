@@ -10,4 +10,4 @@ CosmosClientOptions clientoptions = new CosmosClientOptions()
     , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
 };
 
-using CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
+CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
