@@ -135,7 +135,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *manualthroughputdb* |
-    | **Share throughput across containers** | *Select this option* |
+    | **Provision throughput** | *Select this option* |
     | **Database throughput** | *Manual* |
     | **RU/s** | *400* |
 
