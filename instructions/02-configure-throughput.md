@@ -110,7 +110,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *nothroughputdb* |
-    | **Share throughput across containers** | *Do not select* |
+    | **Provision throughput** | *Do not select* |
 
 1. Back in the **Data Explorer** pane, observe the **nothroughputdb** database node within the hierarchy.
 
