@@ -127,6 +127,8 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
+1. On the Git Configuration tab, select **Configure Git later**.
+
 1. Wait for the deployment task to complete before continuing with this task.
 
 1. Go to the newly created **Azure Data Factory** resource and select **Open Azure Data Factory Studio**.
