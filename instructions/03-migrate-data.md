@@ -123,7 +123,6 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
     | **Name** | *Enter a globally unique name* |
     | **Region** | *Choose any available region* |
     | **Version** | *V2* |
-    | **Git configuration** | *Configure Git later* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
