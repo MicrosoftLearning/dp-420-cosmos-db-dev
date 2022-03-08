@@ -110,7 +110,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *nothroughputdb* |
-    | **Share throughput across containers** | *Do not select* |
+    | **Provision throughput** | *Do not select* |
 
 1. Back in the **Data Explorer** pane, observe the **nothroughputdb** database node within the hierarchy.
 
@@ -135,7 +135,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *manualthroughputdb* |
-    | **Share throughput across containers** | *Select this option* |
+    | **Provision throughput** | *Select this option* |
     | **Database throughput** | *Manual* |
     | **RU/s** | *400* |
 
@@ -147,11 +147,11 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *manualthroughputdb* |
-    | **Share throughput across containers** | *Select this option* |
-    | **Database throughput** | *Manual* |
-    | **RU/s** | *1000* |
+    | **Database id** | *Use existing* &vert; *manualthroughputdb* |
     | **Container id** | *childcontainer* |
     | **Partition key** | */primarykey* |
+    | **Provision dedicated throughput for this container** | *Select this option* |
+    | **Container throughput** | *Manual* |
+    | **RU/s** | *1000* |
 
 1. Back in the **Data Explorer** pane, expand the **manualthroughputdb** database node and then observe the **childcontainer** container node within the hierarchy.
