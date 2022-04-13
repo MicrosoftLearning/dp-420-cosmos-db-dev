@@ -20,7 +20,7 @@ If you haven't already prepared the Azure Cosmos DB database where you're workin
 
     1. Select the option to **Create a resource**.
 
-    1. Search for **Azure Storage**.
+    1. Search for **storage account**.
 
     1. Select **Storage account** from the list and select **Create**.
 
