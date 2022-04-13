@@ -10,7 +10,7 @@ Using the Relational model could allow us to place different entities in their o
 
 In this lab, you'll look at the benefits of how denormalizing data and aggregates can help us reduce cost and how we can use the change feed to maintain referential integrity on the denormalized data.
 
-## Prepare your development environment
+## Prepare your Azure Cosmos DB database environment
 
 If you haven't already prepared the Azure Cosmos DB database where you're working on this lab, follow these steps to do so. Otherwise, go to the **Measure performance cost when denormalizing data** section.
 
@@ -64,7 +64,31 @@ If you haven't already prepared the Azure Cosmos DB database where you're workin
 
     ```
 
-1. Close the Cloud Shell terminal.
+1. Close the Cloud Shell terminal. **Don't close the Azure Portal**.
+
+1. In the Azure Portal, navigage to the new Azure Cosmos DB Account created by the steps above.
+
+1. Record the **URI** and **Primary Key** under the ***Keys*** section.  We will update the *appSettings.json* file with these values below.
+
+## Prepare your development environment
+
+If you have not already cloned the lab code repository for **DP-420** to the environment where you're working on this lab, follow these steps to do so. Otherwise, open the previously cloned folder in **Visual Studio Code**.
+
+1. Start **Visual Studio Code**.
+
+    > &#128221; If you are not already familiar with the Visual Studio Code interface, review the [Get Started guide for Visual Studio Code][code.visualstudio.com/docs/getstarted]
+
+1. Open the command palette and run **Git: Clone** to clone the ``https://github.com/microsoftlearning/dp-420-cosmos-db-dev`` GitHub repository in a local folder of your choice.
+
+    > &#128161; You can use the **CTRL+SHIFT+P** keyboard shortcut to open the command palette.
+
+1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
+
+1. In **Visual Studio Code**, open the *appSettings.json* file in the *17-denormalize* folder.
+
+1. Replace *CosmosDBAccountURI* and *CosmosDBAccountKey* with the respective values recorded earlier.
+
+1. Select Ctrl+S to save your changes.
 
 ## Exercise 1: Measure performance cost when denormalizing data
 
@@ -249,7 +273,7 @@ For this exercise, you'll complete the following steps:
 - Query the new product container with the new category name, and count the number of products to ensure that they're all updated.
 - Change the name back to the original, and watch change feed propagate the changes back.
 
-### Start Azure Cloud Shell and open Visual Studio Code
+### Open Visual Studio Code
 
 To go to the code that you'll update for change feed, do the following:
 
@@ -365,8 +389,6 @@ Now that you've completed the code for change feed, let's see it in action.
 
 1. If you clicked too far and went back to the main menu, select **b** again to observe the changes.
 
-1. When you're done, type **x** to exit and return to Cloud Shell.
-
 ---
 
 ## Exercise 3: Denormalizing Aggregates
@@ -383,7 +405,7 @@ For this exercise, you'll complete the following steps:
 - Run your top 10 customers query to see what the results currently are.
 - Show how you can use transactional batch when a customer cancels an order.
 
-## Start Azure Cloud Shell and open Visual Studio Code
+## Open Visual Studio Code
 
 To get to the code that you'll use in this unit, do the following:
 
@@ -565,3 +587,5 @@ Let's look at the query for your top 10 customers.
     Something you might not realize is that the top 10 customers query is a cross-partition query that fans out across all the partitions in your container.
 
     The companion lab to this one pointed out that you should strive to avoid cross-partition queries. However, in reality, such queries can be OK in situations where the container is still small or the query is run infrequently. If the query is run frequently or the container is exceptionally large, it would be worth exploring the cost of materializing this data into another container and using it to serve this query.
+
+[code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
