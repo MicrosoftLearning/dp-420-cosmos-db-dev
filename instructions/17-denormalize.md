@@ -6,37 +6,57 @@ lab:
 
 # Cost of denormalizing data and aggregates and using the change feed for referential integrity
 
-Using the Relational model could allow us to place different entities in their own containers.  However in NoSQL databases there are no *joins* between containers so we need to start denormalizing our data to eliminate the use of *joins*. Additionally, NoSQL reduces the number of request by modeling the data so the applications can fetch their data in as fewer requests as possible. One problem that rises when denormalizing our data could be the referential integrity between our entities, for this we can use the change feed to keep the data in sync. Denormalizing your aggregates like group by counts can also help us reduce requests.  
+Using the Relational model could allow us to place different entities in their own containers.  However in NoSQL databases, there are no *joins* between containers so we need to start denormalizing our data to eliminate the use of *joins*. Additionally, NoSQL reduces the number of request by modeling the data so the applications can fetch their data in as fewer requests as possible. One problem that rises when denormalizing our data could be the referential integrity between our entities, for this we can use the change feed to keep the data in sync. Denormalizing your aggregates like group by counts can also help us reduce requests.  
 
-In this lab, you'll look at the benefits of how denormalizing data and aggregates can help us reduce cost and how we can use the change feed to mantain referential integrity on the denormalized data.
+In this lab, you'll look at the benefits of how denormalizing data and aggregates can help us reduce cost and how we can use the change feed to maintain referential integrity on the denormalized data.
 
 ## Prepare your development environment
 
-If you have not already cloned the lab code repository for **DP-420** to the environment where you're working on this lab, follow these steps to do so. Otherwise, open the previously cloned folder in **Visual Studio Code**.
+If you haven't already prepared the Azure Cosmos DB database where you're working on this lab, follow these steps to do so. Otherwise, go to the **Measure performance cost when denormalizing data** section.
 
-1. Start **Visual Studio Code**.
+1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
-    > &#128221; If you are not already familiar with the Visual Studio Code interface, review the [Get Started guide for Visual Studio Code][code.visualstudio.com/docs/getstarted]
+1. Sign in using your supplied Azure credentials.
 
-1. Open the command palette and run **Git: Clone** to clone the ``https://github.com/microsoftlearning/dp-420-cosmos-db-dev`` GitHub repository in a local folder of your choice.
+1. In this lab, we'll load the sample data using the Azure Cloud Shell terminal, but before we can do that, the Azure Cloud Shell will need an Azure Storage Account added to it to work. If you don't have a storage account already available, we'll need to create one.  If you already have access to your Azure Cloud Shell, you can skip this step.
 
-    > &#128161; You can use the **CTRL+SHIFT+P** keyboard shortcut to open the command palette.
+    1. Select the option to **Create a resource**.
 
-1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
+    1. Search for **Azure Storage**.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **17-denormalize** folder.
+    1. Select **Storage account** from the list and select **Create**.
 
-1. Open the context menu for the **17-denormalize** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+    1. Select the correct *subscription* and *resource group* if not already selected.
 
-1. If the terminal opens as a **Windows Powershell** terminal, open a new **Git Bash** terminal.
+    1. Using lower case letters and numbers, choose a unique name for your *storage account name*.  If your resource group name is unique enough, you could use that as your *storage account name* too.  Leave all other options to their default values.
 
-    > &#128161; To open a **Git Bash** terminal, on the right hand side of the the terminal menu,click on the pulldown besides the **+** sign and choose *Git Bash*.
+        > &#128221; Take note of the ***Region*** you create this storage account in, you will need to choose the same region if setting up the Azure Cloud Shell for the first time below.
 
-1. In the **Git Bash terminal**, run the following commands. The commands open a browser window to connect to the azure portal where you will use the provided lab credentials, run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *Once the script ask you for the provided credential for the azure account, the build can take 15-20 minutes to finish, so it might be a good time to get some coffee or tea*.
+   1. Select **Review + Create**, and once the validation passes, choose **Create**.
+
+1. If your Azure Cloud Shell has already been set up, open it up in **Bash** mode, otherwise, use the following instructions to set it up for the first time.
+
+    ![Screenshot that shows the Azure Cloud Shell option.](media/17-open-azure-cloud-shell.png)
+
+    1. Select the **Azure Cloud Shell** button to open it.
+
+    1. Select **Bash** mode.
+
+        ![Screenshot that shows the Azure Cloud Shell Bash/PS options.](media/17-open-azure-cloud-shell-bash.png)
+ 
+    1. Assuming this is the first time you run the Azure Cloud Shell under this Azure account, you'll need to connect an Azure storage account to this Cloud Shell.  Choose **Show advanced settings** to link the storage account. 
+
+        ![Screenshot that shows the cloud shell advanced settings.](media/17-azure-cloud-shell-choose-storage-account.png)
+ 
+    1. Choose the correct *subscription* and *region*. Under **Resource Group** and **Storage account**, choose **Use existing** and select the correct resource group and storage account.  Under **File share**, give the share a unique name under that storage account. Select **Create storage** to finish setting up the Cloud Shell.
+
+        ![Screenshot that shows the cloud shell advanced settings.](media/17-azure-cloud-shell-choose-storage-account-details.png)
+ 
+ 1. In the **Azure Cloud Shell Bash terminal**, run the following commands. The commands run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *The build can take 15-20 minutes to finish, so it might be a good time to get some coffee or tea*.
 
     ```
-    az login
-    cd 17-denormalize
+    git clone https://github.com/microsoftlearning/dp-420-cosmos-db-dev
+    cd dp-420-cosmos-db-dev/17-denormalize
     bash init.sh
     dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
     dotnet build
@@ -44,7 +64,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
     ```
 
-1. Close the integrated terminal.
+1. Close the Cloud Shell terminal.
 
 ## Exercise 1: Measure performance cost when denormalizing data
 
@@ -52,16 +72,22 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 In the **database-v2** container, where data is stored in individual containers, run a query to get the product category name, and then view the request charge for that query.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
+1. If not already opened, in a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
 1. On the left pane, select **Azure Cosmos DB**.
+
 1. Select the Azure Cosmos DB account with the name that starts with **cosmicworks**.
+
 1. On the left pane, select **Data Explorer**.
+
 1. Expand **database-v2**.
+
 1. Select the **productCategory** container.
+
 1. At the top of the page, select **New SQL Query**.
+
 1. On the **Query 1** pane, paste the following SQL code, and then select **Execute Query**.
 
     ```
@@ -81,7 +107,9 @@ In the **database-v2** container, where data is stored in individual containers,
 Next, query the product container to get all the products in the "Components, Headsets" category.
 
 1. Select the **product** container.
+
 1. At the top of the page, select **New SQL Query**.
+
 1. On the **Query 2** pane, paste the following SQL code, and then select **Execute Query**.
 
     ```
@@ -103,7 +131,9 @@ Next, query the productTag container three times, once for each of the three pro
 First, run a query to return the tags for HL Headset.
 
 1. Select the **productTag** container.
+
 1. At the top of the page, select **New SQL Query**.
+
 1. On the **Query 3** pane, paste the following SQL code, and then select **Execute Query**.
 
     ```
@@ -121,7 +151,9 @@ First, run a query to return the tags for HL Headset.
 Next, run a query to return the tags for LL Headset.
 
 1. Select the **productTag** container.
+
 1. At the top of the page, select **New SQL Query**.
+
 1. On the **Query 4** pane, paste the following SQL code, and then select **Execute Query**.
 
     ```
@@ -139,7 +171,9 @@ Next, run a query to return the tags for LL Headset.
 Last, run a query to return the tags for ML Headset.
 
 1. Select the **productTag** container.
+
 1. At the top of the page, select **New SQL Query**.
+
 1. On the **Query 5** pane, paste the following SQL code, and then select **Execute Query**.
 
     ```
@@ -171,8 +205,11 @@ Now, let's add up all the RU costs from each of the queries you ran.
 Let's query for the same information but in the denormalized database.
 
 1. In Data Explorer, select **database-v3**.
+
 1. Select the **product** container.
+
 1. At the top of the page, select **New SQL Query**.
+
 1. On the **Query 6** pane, paste the following SQL code, and then select **Execute Query**.
 
     ```
@@ -193,7 +230,7 @@ In the relational model, where data is stored in individual containers, you ran 
 
 To get the same information in the NoSQL model, you ran one query, and its request charge was 2.9 RUs.
 
-The benefit is not just the lower cost of a NoSQL design like this model. This type of design is also faster, because it requires only a single request. Further, the data itself is served in the way that it's likely to be rendered on a webpage. This means less code to write and maintain downstream in your e-commerce application.
+The benefit isn't just the lower cost of a NoSQL design like this model. This type of design is also faster, because it requires only a single request. Further, the data itself is served in the way that it's likely to be rendered on a webpage. This means less code to write and maintain downstream in your e-commerce application.
 
 When you denormalize data, you produce simpler, more efficient queries for your e-commerce application. You can store all the data that's needed by your application in a single container, and you can fetch it with a single query. When you're dealing with high-concurrency queries, this type of data modeling can provide huge benefits in simplicity, speed, and cost.
 
@@ -216,7 +253,7 @@ For this exercise, you'll complete the following steps:
 
 To go to the code that you'll update for change feed, do the following:
 
-1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
+1. If it isn't opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
 
 ### Complete the code for change feed
 
@@ -291,7 +328,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
 1. Select Ctrl+S to save your changes.
 
-1. If it is not opened already, open a Git Bash Integrated Terminal and make sure you are under the *17-denormalize* folder.
+1. If it isn't opened already, open a Git Bash Integrated Terminal and make sure you are under the *17-denormalize* folder.
 
 1. To compile and execute the project, run the following command:
 
@@ -350,7 +387,7 @@ For this exercise, you'll complete the following steps:
 
 To get to the code that you'll use in this unit, do the following:
 
-1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
+1. If it isn't opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
 
 ## Complete the code to update total sales orders
 
@@ -414,7 +451,7 @@ To get to the code that you'll use in this unit, do the following:
 
 1. Select Ctrl+S to save your changes.
 
-1. If it is not opened already, open a Git Bash Integrated Terminal and make sure you are under the *17-denormalize* folder.
+1. If it isn't opened already, open a Git Bash Integrated Terminal and make sure you are under the *17-denormalize* folder.
 
 1. To compile and execute the project, run the following command:
 
@@ -448,8 +485,11 @@ Because you designed your database to store both the customer and all their sale
 Create a new sales order for the same customer, and update the total sales orders saved in their customer record.
 
 1. Press any key in the window to return to the main menu.
+
 1. Select **d** to run the menu item for **Create new order and update order total**.
+
 1. Press any key to return to the main menu.
+
 1. Select **c** to run the same query again.
 
    Note that the new sales order shows **HL Mountain Frame - Black, 38** and **Racing Socks, M**.
@@ -471,6 +511,7 @@ As with any e-commerce application, customers also cancel orders. You can do the
 1. Select **f** to run the menu item for **Delete order and update order total**.
 
 1. Press any key to return to the main menu.
+
 1. Select **c** to run the same query again to confirm that the customer record is updated.
 
    Note that the new order is no longer returned. If you scroll up, you can see that `salesOrderCount` value has returned to `2`.
@@ -482,7 +523,8 @@ As with any e-commerce application, customers also cancel orders. You can do the
 You delete a sales order in exactly the same way that you create one. Both operations are wrapped in a transaction and executed in the same logical partition. Let's look at the code that does that.
 
 1. Type **x** to exit the application.
-1. If it is not opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
+
+1. If it isn't opened already, open Visual Studio Code, and open the *Program.cs* file in the *17-denormalize* folder.
 
 1. Select Ctrl+G, and then enter **529**.
 
@@ -523,5 +565,3 @@ Let's look at the query for your top 10 customers.
     Something you might not realize is that the top 10 customers query is a cross-partition query that fans out across all the partitions in your container.
 
     The companion lab to this one pointed out that you should strive to avoid cross-partition queries. However, in reality, such queries can be OK in situations where the container is still small or the query is run infrequently. If the query is run frequently or the container is exceptionally large, it would be worth exploring the cost of materializing this data into another container and using it to serve this query.
-
-[code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
