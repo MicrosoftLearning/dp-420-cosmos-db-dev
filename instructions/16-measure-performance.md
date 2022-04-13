@@ -1,40 +1,58 @@
 ---
 lab:
-    title: 'Measure performance of entities in separate and embeded containers'
+    title: 'Measure performance of entities in separate and embedded containers'
     module: 'Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB SQL API'
 ---
 
-# Measure performance of entities in separate and embeded containers
+# Measure performance of entities in separate and embedded containers
 
 In this exercise, you'll measure the difference for customer entities when you model entities as separate containers versus when you model for a NoSQL database by embedding entities in a single document.
 
 ## Prepare your development environment
 
-If you have not already cloned the lab code repository for **DP-420** to the environment where you're working on this lab, follow these steps to do so. Otherwise, open the previously cloned folder in **Visual Studio Code**.
+If you haven't already prepared the Azure Cosmos DB database where you're working on this lab, follow these steps to do so. Otherwise, go to the **Measure performance of entities in separate containers** section.
 
-1. Start **Visual Studio Code**.
+1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
-    > &#128221; If you are not already familiar with the Visual Studio Code interface, review the [Get Started guide for Visual Studio Code][code.visualstudio.com/docs/getstarted]
+1. Sign in using your supplied Azure credentials.
 
-1. Open the command palette and run **Git: Clone** to clone the ``https://github.com/microsoftlearning/dp-420-cosmos-db-dev`` GitHub repository in a local folder of your choice.
+1. In this lab, we'll load the sample data using the Azure Cloud Shell terminal, but before we can do that, the Azure Cloud Shell will need an Azure Storage Account added to it to work. If you don't have a storage account already available, we'll need to create one.  If you already have access to your Azure Cloud Shell, you can skip this step.
 
-    > &#128161; You can use the **CTRL+SHIFT+P** keyboard shortcut to open the command palette.
+    1. Select the option to **Create a resource**.
 
-1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
+    1. Search for **Azure Storage**.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **16-measure-performance** folder.
+    1. Select **Storage account** from the list and select **Create**.
 
-1. Open the context menu for the **16-measure-performance** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+    1. Select the correct *subscription* and *resource group* if not already selected.
 
-1. If the terminal opens as a **Windows Powershell** terminal, open a new **Git Bash** terminal.
+    1. Using lower case letters and numbers, choose a unique name for your *storage account name*.  If your resource group name is unique enough, you could use that as your *storage account name* too.  Leave all other options to their default values.
 
-    > &#128161; To open a **Git Bash** terminal, on the right hand side of the the terminal menu,click on the pulldown besides the **+** sign and choose *Git Bash*.
+    1. Select **Review + Create**, and once the validation passes, choose **Create**.
 
-1. In the **Git Bash terminal**, run the following commands. The commands open a browser window to connect to the azure portal where you will use the provided lab credentials, run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *Once the script ask you for the provided credential for the azure account, the build can take 15-20 minutes to finish, so it might be a good time to get some coffee or tea*.
+1. If your Azure Cloud Shell has already been set up, open it up in **Bash** mode, otherwise, use the following instructions to set it up for the first time.
+
+    ![Screenshot that shows the Azure Cloud Shell option.](media/16-open-azure-cloud-shell.png)
+
+    1. Select the **Azure Cloud Shell** button to open it.
+
+    1. Select **Bash** mode.
+
+        ![Screenshot that shows the Azure Cloud Shell Bash/PS options.](media/16-open-azure-cloud-shell-bash.png)
+ 
+    1. Assuming this is the first time you run the Azure Cloud Shell under this Azure account, you'll need to connect an Azure storage account to this Cloud Shell.  Choose **Show advanced settings** to link the storage account. 
+
+        ![Screenshot that shows the cloud shell advanced settings.](media/16-azure-cloud-shell-choose-storage-account.png)
+ 
+    1. Choose the correct *subscription* and *region*. Under **Resource Group** and **Storage account**, choose **Use existing** and select the correct resource group and storage account.  Under **File share**, give the share a unique name under that storage account. Select **Create storage** to finish setting up the Cloud Shell.
+
+        ![Screenshot that shows the cloud shell advanced settings.](media/16-azure-cloud-shell-choose-storage-account-details.png)
+ 
+1. In the **Azure Cloud Shell Bash terminal**, run the following commands. The commands run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *The build can take 15-20 minutes to finish, so it might be a good time to get some coffee or tea*.
 
     ```
-    az login
-    cd 16-measure-performance
+    git clone https://github.com/microsoftlearning/dp-420-cosmos-db-dev
+    cd dp-420-cosmos-db-dev/16-measure-performance
     bash init.sh
     dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
     dotnet build
@@ -42,7 +60,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
     ```
 
-1. Close the integrated terminal.
+1. Close the Cloud Shell terminal.
 
 ## Measure performance of entities in separate containers
 
@@ -52,16 +70,22 @@ In Database-v1, data is stored in individual containers. In that database, run q
 
 In Database-v1, run a query to get the customer entity and review the request charge.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
+1. If not already opened, in a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
 1. On the Azure portal menu, or from the **Home** page, select **Azure Cosmos DB**.
+
 1. Select the Azure Cosmos DB account with the name that starts with **cosmicworks**.
+
 1. Select **Data Explorer** on the left side.
+
 1. Expand **Database-v1**.
+
 1. Select the **Customer** container.
+
 1. At the top of the screen, select **New SQL Query**.
+
 1. Copy and paste the following SQL text and then select **Execute Query**.
 
     ```
@@ -77,7 +101,9 @@ In Database-v1, run a query to get the customer entity and review the request ch
 Run a query to get the customer address entity and review the request charge.
 
 1. Select the **CustomerAddress** container.
+
 1. At the top of the screen, select **New SQL Query**.
+
 1. Copy and paste the following SQL text and then select **Execute Query**.
 
     ```
@@ -93,7 +119,9 @@ Run a query to get the customer address entity and review the request charge.
 Run a query to get the customer password entity and review the request charge.
 
 1. Select the **CustomerPassword** container.
+
 1. At the top of the screen, select **New SQL Query**.
+
 1. Copy and paste the following SQL text and then select **Execute Query**.
 
     ```
@@ -120,7 +148,9 @@ Now that we've run all of our queries, let's add up all of the Request Unit cost
 Now we're going to query for the same information but with the entities embedded in a single document.
 
 1. Select the **Database-v2** database.
+
 1. Select the **Customer** container.
+
 1. Run the following query.
 
     ```
@@ -138,5 +168,3 @@ Now we're going to query for the same information but with the entities embedded
 When you compare the RU/s for each query that you ran, you see that the last query where the customer entities are in a single document is much less expensive than the combined cost for running the three queries independently. The latency for returning this data is lower because the data is returned in a single operation.
 
 When you're searching for a single item and know the partition key and ID of the data, you can retrieve this data via a *point-read* by calling `ReadItemAsync()` in the Azure Cosmos DB SDK. A point-read is even faster than our query. For the same customer data, the cost is just 1 RU/s, which is a nearly threefold improvement.
-
-[code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
