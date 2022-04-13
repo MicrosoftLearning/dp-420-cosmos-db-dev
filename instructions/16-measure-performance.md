@@ -28,6 +28,8 @@ If you haven't already prepared the Azure Cosmos DB database where you're workin
 
     1. Using lower case letters and numbers, choose a unique name for your *storage account name*.  If your resource group name is unique enough, you could use that as your *storage account name* too.  Leave all other options to their default values.
 
+    > &#128221; Take note of the ***Region*** you create this storage account in, you will need to choose the same region if setting up the Azure Cloud Shell for the first time below.
+
     1. Select **Review + Create**, and once the validation passes, choose **Create**.
 
 1. If your Azure Cloud Shell has already been set up, open it up in **Bash** mode, otherwise, use the following instructions to set it up for the first time.
