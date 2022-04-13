@@ -357,6 +357,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
 1. To compile and execute the project, run the following command:
 
     ```
+    dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
     dotnet build
     dotnet run
     ```
