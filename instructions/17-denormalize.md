@@ -390,6 +390,8 @@ Now that you've completed the code for change feed, let's see it in action.
 
 1. If you clicked too far and went back to the main menu, select **b** again to observe the changes.
 
+1. When you're done, type **x** to exit and return to the Shell.
+
 ---
 
 ## Exercise 3: Denormalizing Aggregates
