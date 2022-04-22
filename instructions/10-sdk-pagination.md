@@ -121,7 +121,7 @@ When processing query results, you must make sure your code progresses through a
 1. Create a new variable named **sql** of type *string* with a value of **SELECT p.name, t.name AS tag FROM products p JOIN t IN p.tags**:
 
     ```
-    string sql = "SELECT p.name, t.name AS tag FROM products p JOIN t IN p.tags";
+    string sql = "SELECT p.id, p.name, p.price FROM products p ";
     ```
 
 1. Create a new variable of type [QueryDefinition][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.querydefinition] passing in the **sql** variable as a parameter to the constructor:
@@ -175,7 +175,7 @@ When processing query results, you must make sure your code progresses through a
 1. Within the **foreach** loop, use the built-in **Console.WriteLine** static method to format and print the **id**, **name**, and **price** properties of the **product** variable:
 
     ```
-    Console.WriteLine($"[{product.name,40}]\t{product.tag}");
+    Console.WriteLine($"[{product.id}]\t[{product.name,40}]\t[{product.price,10}]");
     ```
 
 1. Back within the **while** loop, use the built-in **Console.WriteLine** static method to print the message *Press any key to get more results*:
@@ -212,7 +212,7 @@ When processing query results, you must make sure your code progresses through a
 
     Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId");
 
-    string sql = "SELECT p.name, t.name AS tag FROM products p JOIN t IN p.tags";
+    string sql = "SELECT p.id, p.name, p.price FROM products p ";
     QueryDefinition query = new (sql);
 
     QueryRequestOptions options = new ();
@@ -225,7 +225,7 @@ When processing query results, you must make sure your code progresses through a
         FeedResponse<Product> products = await iterator.ReadNextAsync();
         foreach (Product product in products)
         {
-            Console.WriteLine($"[{product.name,40}]\t{product.tag}");
+            Console.WriteLine($"[{product.id}]\t[{product.name,40}]\t[{product.price,10}]");
         }
 
         Console.WriteLine("Press any key for next page of results");
