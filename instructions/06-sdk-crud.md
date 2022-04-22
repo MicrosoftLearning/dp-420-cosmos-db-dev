@@ -95,7 +95,7 @@ Using the credentials from the newly created account, you will connect with the 
 
     > &#128221; For example, if your key is: **fDR2ci9QgkdkvERTQ==**, then the C# statement would be: **string key = "fDR2ci9QgkdkvERTQ==";**.
 
-1. Asynchronously invoke the CreateDatabaseIfNotExistsAsync method of the **client** variable passing in the name of the new database (**cosmicworks**) you would like to create within the emulator and storing the result in a variable of type **Database**:
+1. Asynchronously invoke the CreateDatabaseIfNotExistsAsync method of the **client** variable passing in the name of the new database (**cosmicworks**) you would like to create and storing the result in a variable of type **Database**:
 
     ```
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
