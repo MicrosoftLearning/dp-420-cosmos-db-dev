@@ -156,13 +156,7 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
 
     string key = "<cosmos-key>";
 
-    CosmosClientOptions clientoptions = new CosmosClientOptions()
-    {
-        RequestTimeout = new TimeSpan(0,0,90)
-        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
-    };
-
-    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
+    CosmosClient client = new CosmosClient(endpoint, key);
 
     CosmosDatabase database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
 
