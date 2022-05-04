@@ -218,13 +218,7 @@ The **Microsoft.Azure.Cosmos.Container** class ships with a series of methods to
     string endpoint = "<cosmos-endpoint>";
     string key = "<cosmos-key>";
 
-    CosmosClientOptions clientoptions = new CosmosClientOptions()
-    {
-        RequestTimeout = new TimeSpan(0,0,90)
-        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
-    };
-
-    CosmosClient client = new CosmosClient(endpoint, key, clientoptions);
+    CosmosClient client = new CosmosClient(endpoint, key);
     
     Container sourceContainer = client.GetContainer("cosmicworks", "products");
     Container leaseContainer = client.GetContainer("cosmicworks", "productslease");
