@@ -115,8 +115,6 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
     CosmosClientOptions options = new () 
     { 
         AllowBulkExecution = true 
-        , RequestTimeout = new TimeSpan(0,0,90)
-        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
     };
     ```
 
@@ -195,8 +193,6 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
     CosmosClientOptions options = new () 
     { 
         AllowBulkExecution = true 
-        , RequestTimeout = new TimeSpan(0,0,90)
-        , OpenTcpConnectionTimeout = new TimeSpan (0,0,90)
     };
     
     CosmosClient client = new (endpoint, key, options);  
