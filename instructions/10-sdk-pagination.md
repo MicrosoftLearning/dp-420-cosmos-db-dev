@@ -118,7 +118,7 @@ When processing query results, you must make sure your code progresses through a
 
     > &#128221; For example, if your key is: **fDR2ci9QgkdkvERTQ==**, then the C# statement would be: **string key = "fDR2ci9QgkdkvERTQ==";**.
 
-1. Create a new variable named **sql** of type *string* with a value of **SELECT p.name, t.name AS tag FROM products p JOIN t IN p.tags**:
+1. Create a new variable named **sql** of type *string* with a value of **SELECT p.name, t.name, p.price FROM products p**:
 
     ```
     string sql = "SELECT p.id, p.name, p.price FROM products p ";
