@@ -40,6 +40,27 @@ Before using the Azure CLI, you must first check the version of the CLI and logi
 
 1. Close your web browser window or tab.
 
+1. Check if your lab provider has created a resource group for you, if so, record its name since you will need it in the next section.
+
+    ```
+    az group list --query "[].{ResourceGroupName:name}" -o table
+    ```
+    
+    This command could return multiple Resource Group names.
+
+1. (Optional) ***If no Resource Group was created for you***, choose a Resource Group name and create it. *Be aware that some lab envrionments might be locked down and you will need an administrator to create the Resource Group for you.*
+
+    1. Get the your location name closet to you from this list
+
+    ```
+    az account list-locations --query "sort_by([].{YOURLOCATION:name, DisplayName:regionalDisplayName}, &YOURLOCATION)" --output table
+    ```
+
+    1. Create the resource group.  *Be aware that some lab envrionments might be locked down and you will need an administrator to create the Resource Group for you.*
+    ```
+    az group create --name YOURRESOURCEGROUPNAME --location YOURLOCATION
+    ```
+
 ## Create Azure Cosmos DB account using the Azure CLI
 
 The **cosmosdb** command group contains basic commands to create and manage Azure Cosmos DB accounts using the CLI. Since an Azure Cosmos DB account has an addressable URI, it's important to create a globally unique name for your new account, even if you create it via script.
