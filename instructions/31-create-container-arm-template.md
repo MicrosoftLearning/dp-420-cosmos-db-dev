@@ -89,6 +89,8 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
 
 1. The Azure CLI will automatically open a web browser window or tab. within the browser instance, sign into the Azure CLI using the Microsoft credentials associated with your subscription.
 
+1. Close your web browser window or tab.
+
 1. Check if your lab provider has created a resource group for you, if so, record its name since you will need it in the next section.
 
     ```
