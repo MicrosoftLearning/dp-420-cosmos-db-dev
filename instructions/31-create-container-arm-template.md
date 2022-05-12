@@ -81,6 +81,35 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
 
     > &#128221; This command will open the terminal with the starting directory already set to the **31-create-container-arm-template** folder.
 
+1. Begin the interactive login procedure for the Azure CLI using the following command:
+
+    ```
+    az login
+    ```
+
+1. The Azure CLI will automatically open a web browser window or tab. within the browser instance, sign into the Azure CLI using the Microsoft credentials associated with your subscription.
+
+1. Check if your lab provider has created a resource group for you, if so, record its name since you will need it in the next section.
+
+    ```
+    az group list --query "[].{ResourceGroupName:name}" -o table
+    ```
+    
+    This command could return multiple Resource Group names.
+
+1. (Optional) ***If no Resource Group was created for you***, choose a Resource Group name and create it. *Be aware that some lab envrionments might be locked down and you will need an administrator to create the Resource Group for you.*
+
+    i. Get the your location name closet to you from this list
+
+    ```
+    az account list-locations --query "sort_by([].{YOURLOCATION:name, DisplayName:regionalDisplayName}, &YOURLOCATION)" --output table
+    ```
+
+    ii. Create the resource group.  *Be aware that some lab envrionments might be locked down and you will need an administrator to create the Resource Group for you.*
+    ```
+    az group create --name YOURRESOURCEGROUPNAME --location YOURLOCATION
+    ```
+
 1. Create a new variable name **resourceGroup** using the name of the resource group you created or viewed earlier in this lab using the following command:
 
     ```
@@ -94,14 +123,6 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
     ```
     echo $resourceGroup
     ```
-
-1. Begin the interactive login procedure for the Azure CLI using the following command:
-
-    ```
-    az login
-    ```
-
-1. The Azure CLI will automatically open a web browser window or tab. within the browser instance, sign into the Azure CLI using the Microsoft credentials associated with your subscription.
 
 1. Deploy the Azure Resource Manager template using the [az deployment group create][docs.microsoft.com/cli/azure/deployment/group] command:
 
