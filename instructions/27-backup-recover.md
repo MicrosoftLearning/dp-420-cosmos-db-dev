@@ -249,9 +249,9 @@ SELECT GetCurrentDateTime ()
 
 1. Under **Data Explorer**, run the following query to get the current date and time. Copy that timestamp to notepad.
 
-```
-SELECT GetCurrentDateTime ()
-```
+    ```
+    SELECT GetCurrentDateTime ()
+    ```
 
 1. Delete the **customer** container.
 
