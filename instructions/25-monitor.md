@@ -42,6 +42,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Location** | *Choose any available region* |
     | **Capacity mode** | *Provisioned throughput* |
     | **Apply Free Tier Discount** | *`Do Not Apply`* |
+    | **Limit the total amount of throughput that can be provisioned on this account** | *Uncheck* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
