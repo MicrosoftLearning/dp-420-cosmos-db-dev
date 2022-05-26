@@ -44,7 +44,7 @@ public class Program
     
         while((consoleinputcharacter = Console.ReadLine()) != "5") 
         {
-            await CompeteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
+            await CompleteTaskOnCosmosDB(consoleinputcharacter, CustomersDB_Customer_container);
 
             Console.WriteLine("Choose an action:");
             Console.WriteLine("1) Add Document 1 with id = '0C297972-BE1B-4A34-8AE1-F39E6AA3D828'");
@@ -56,7 +56,7 @@ public class Program
         }
     }
 
-    public static async Task CompeteTaskOnCosmosDB(string consoleinputcharacter, Container container)
+    public static async Task CompleteTaskOnCosmosDB(string consoleinputcharacter, Container container)
     {
         switch (consoleinputcharacter)
         {
