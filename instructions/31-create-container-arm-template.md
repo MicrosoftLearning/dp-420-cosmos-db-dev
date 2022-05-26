@@ -137,6 +137,7 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
 1. Within the **resources** array, add another new JSON object to create a new Azure Cosmos DB SQL API database:
 
     ```
+    ,
     {
         "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
         "apiVersion": "2021-05-15",
@@ -177,6 +178,7 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
 1. Within the **resources** array, add another new JSON object to create a new Azure Cosmos DB SQL API container:
 
     ```
+    ,
     {
         "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
         "apiVersion": "2021-05-15",
