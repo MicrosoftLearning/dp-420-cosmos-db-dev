@@ -213,6 +213,8 @@ Let's add some documents to those containers.
 
 1. Select the **Continuous Backup** Option to turn on the feature. Selecting this option will bring up window, select the **Enable** button.  Enabling this feature could take over five minutes.
 
+    > &#128221; Note that *[Multi-regions write accounts are not currently supported for continuous backups][/azure/cosmos-db/continuous-backup-restore-introduction]*. If you did not disable Multi-region writes when you created your Azure Cosmos DB account, you will need to do it now or enabling the continuous backup feature will fail.  You can disable multi-region writes unde the **Replicate data globally** *Settings* section.
+
 ## Delete one of the salesOrder documents
 
 1. Under **Data Explorer**, run the following query to get the current date and time. Copy that timestamp to notepad. This Time stamp should be in UTC.
