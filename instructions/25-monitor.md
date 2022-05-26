@@ -104,9 +104,9 @@ We're now ready to run a workload to monitor its usage of the Azure Cosmos DB Ac
 
     > &#128221; For example, if your key is: **fDR2ci9QgkdkvERTQ==**, then the C# statement would be: **private static readonly string key = "fDR2ci9QgkdkvERTQ==";**.
 
-1. Save **Program.cs**.
+1. Save the **Program.cs** file.
 
-1. Return to the ***Integrated Terminal**.
+1. Return to the *Integrated Terminal*.
 
 1. Build and run the project using the [dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run] command:
 
