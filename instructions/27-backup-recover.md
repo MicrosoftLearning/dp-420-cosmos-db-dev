@@ -219,9 +219,9 @@ Let's add some documents to those containers.
 
 1. Under **Data Explorer**, run the following query to get the current date and time. Copy that timestamp to notepad. This Time stamp should be in UTC.
 
-```
-SELECT GetCurrentDateTime ()
-```
+    ```
+    SELECT GetCurrentDateTime ()
+    ```
 
 1. Under **Data Explorer**, locate the **salesOrder** document with **id** `0019092E-BD25-48F5-8050-7051B2655BC5`. Delete the Document, verify the document is no longer there.
 
