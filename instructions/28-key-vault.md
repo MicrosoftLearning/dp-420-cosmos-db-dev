@@ -108,9 +108,9 @@ We'll create a webapp that will connect to the Azure Cosmos DB account and creat
     ```
 
 
-1. That command created the shell of a web app, so it added several files and directories. We already have a couple of files with all the code we need. Replace the files `.\Controllers\HomeController.cs` and `.\Views\Home\Index.cshtml` for their respective files in the `.\KeyvaultFiles` directory.
+1. That command created the shell of a web app, so it added several files and directories. We already have a couple of files with all the code we need. Replace the files **.\Controllers\HomeController.cs** and **.\Views\Home\Index.cshtml** for their respective files in the **.\KeyvaultFiles** directory.
 
-1. Once you replace the files ***DELETE*** the `.\KeyvaultFiles` directory.
+1. Once you replace the files ***DELETE*** the **.\KeyvaultFiles** directory.
 
 ## Import the multiple missing libraries into the .NET script
 
@@ -182,7 +182,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
     - In *line 104-105*, we prepare the *Key Vault Client* that will connect to the Azure Key Vault. Notice we send the webapp token as a parameter. 
     - In *lines 107-108*, we provide the Key Vault Client with the URL address of our **Secret Identifier** which would return the secret stored in that key vault. 
 
-1.  Before we can deploy our webapp, we still need to send the **Secret Identifier** URL.  On *line 107*, replace the string **`<Key Vault Secret Identifier>`** with the **Secret Identifier** URL we recorded in the *secret* section and save the file.
+1.  Before we can deploy our webapp, we still need to send the **Secret Identifier** URL.  On *line 107*, replace the string ***<Key Vault Secret Identifier>*** with the **Secret Identifier** URL we recorded in the *secret* section and save the file.
 
 ```
         var KeyVaultSecret = await KVClient.GetSecretAsync("<Key Vault Secret Identifier>")
@@ -209,6 +209,8 @@ The rest of the code is straight forward, get the connection string, connect to 
 1. In Visual Studio Code, open the command pallet, search for ***Azure App Service: Create New Web App ... (Advanced)***
 
 1. Select ***Sign-in to Azure...***. This option will open a web browser window, follow the sign-in process, and close the browser when done.
+
+1. (Optional) If it asks for your subscription select your subscription.
 
 1. Enter a globally unique name for your web app.
 
