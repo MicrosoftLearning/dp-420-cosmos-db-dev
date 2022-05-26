@@ -241,7 +241,7 @@ Let's add some documents to those containers.
 
     > &#128221; For Azure Cosmos DB restores, you ***never*** restore on top of and *existing* account, and will always have to create a new Azure Cosmos DB account.
 
-    > &#128221; While you could have chosen to restore the whole database or even the whole accoount, in a real production environment, the databases could be huge. In many scenarios it might be quicker to just restore the containers or the databases needed.
+    > &#128221; While you could have chosen to restore the whole database or even the whole account, in a real production environment, the databases could be huge. In many scenarios it might be quicker to just restore the containers or the databases needed.
 
 1. This restore could take 15 minutes or more, go to the next section and leave this restore running in the background.
 
