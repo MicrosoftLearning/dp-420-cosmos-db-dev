@@ -56,8 +56,6 @@ The **Microsoft.Azure.Cosmos** library has already been pre-installed in the .NE
 
 1. Open the **script.cs** code file within the **05-sdk-offline** folder.
 
-    > &#128221; The **[Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1]** library has already been pre-imported from NuGet.
-
 1. Update the existing variable named **connectionString** with its value set to the **connection string** of the Azure Cosmos DB Emulator.
   
     ```
@@ -99,6 +97,12 @@ The **Microsoft.Azure.Cosmos** library has already been pre-installed in the .NE
 1. In **Visual Studio Code**, open the context menu for the **05-sdk-offline** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
     > &#128221; This command will open the terminal with the starting directory already set to the **05-sdk-offline** folder.
+
+1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1] package from NuGet using the following command:
+
+    ```
+    dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
+    ```
 
 1. Build and run the project using the [dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run] command:
 
