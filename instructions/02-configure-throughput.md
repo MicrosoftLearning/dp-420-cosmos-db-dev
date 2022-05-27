@@ -52,7 +52,7 @@ Let’s start simple by creating a serverless account. There’s not much to con
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *cosmicworks* |
+    | **Database id** | *`cosmicworks`* |
 
 1. Back in the **Data Explorer** pane, observe the **cosmicworks** database node within the hierarchy.
 
@@ -63,8 +63,8 @@ Let’s start simple by creating a serverless account. There’s not much to con
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Container id** | *`products`* |
+    | **Partition key** | *`/categoryId`* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -110,7 +110,7 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *nothroughputdb* |
+    | **Database id** | *`nothroughputdb`* |
     | **Provision throughput** | *Do not select* |
 
 1. Back in the **Data Explorer** pane, observe the **nothroughputdb** database node within the hierarchy.
@@ -122,10 +122,10 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *nothroughputdb* |
-    | **Container id** | *requiredthroughputcontainer* |
-    | **Partition key** | */primarykey* |
+    | **Container id** | *`requiredthroughputcontainer`* |
+    | **Partition key** | *`/primarykey`* |
     | **Container throughput** | *Manual* |
-    | **RU/s** | *400* |
+    | **RU/s** | *`400`* |
 
 1. Back in the **Data Explorer** pane, expand the **nothroughputdb** database node and then observe the **requiredthroughputcontainer** container node within the hierarchy.
 
@@ -135,10 +135,10 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *manualthroughputdb* |
+    | **Database id** | *`manualthroughputdb`* |
     | **Provision throughput** | *Select this option* |
     | **Database throughput** | *Manual* |
-    | **RU/s** | *400* |
+    | **RU/s** | *`400`* |
 
 1. Back in the **Data Explorer** pane, observe the **manualthroughputdb** database node within the hierarchy.
 
@@ -149,10 +149,10 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *manualthroughputdb* |
-    | **Container id** | *childcontainer* |
-    | **Partition key** | */primarykey* |
+    | **Container id** | *`childcontainer`* |
+    | **Partition key** | *`/primarykey`* |
     | **Provision dedicated throughput for this container** | *Select this option* |
     | **Container throughput** | *Manual* |
-    | **RU/s** | *1000* |
+    | **RU/s** | *`1000`* |
 
 1. Back in the **Data Explorer** pane, expand the **manualthroughputdb** database node and then observe the **childcontainer** container node within the hierarchy.
