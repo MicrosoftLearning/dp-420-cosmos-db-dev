@@ -67,6 +67,12 @@ Using the credentials from the newly created account, you will connect with the 
 
     > &#128221; This command will open the terminal with the starting directory already set to the **06-sdk-crud** folder.
 
+1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1] package from NuGet using the following command:
+
+    ```
+    dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
+    ```
+
 1. Build the project using the [dotnet build][docs.microsoft.com/dotnet/core/tools/dotnet-build] command:
 
     ```
