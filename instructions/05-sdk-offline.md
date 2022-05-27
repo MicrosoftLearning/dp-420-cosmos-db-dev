@@ -32,7 +32,7 @@ Your environment should already have the emulator pre-installed. If not, refer t
 
     > &#128221; You may be prompted to grant administrator access to start the emulator. In the lab environment, the **Admin** account has the same password as the **Student** account.
 
-    > &#128161; The Azure Cosmos DB Emulator is pinned to both the Windows taskbar and Start Menu.
+    > &#128161; The Azure Cosmos DB Emulator is pinned to both the Windows taskbar and Start Menu. ***If the Emulator does not start from the pinned icons, try opening it by double-clicking on the*** **C:\Program Files\Azure Cosmos DB Emulator\CosmosDB.Emulator.exe** ***file***. Note that the emulator takes 20-30 seconds to start.
 
 1. Wait for the emulator to automatically open your default browser and navigate to the **localhost:8081/_explorer/index.html** landing page.
 
