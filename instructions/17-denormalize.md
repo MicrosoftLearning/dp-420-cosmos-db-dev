@@ -301,7 +301,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
   
    When change feed sees a new change, it calls a delegate and passes the changes in a read-only collection.
 
-1. At line 603, you need to add some code that will be called when change feed has a new change that needs to be processed. To do so, copy the following code snippet and paste it below the line that starts with `//To-Do:`
+1. At line 603, you need to add some code that will be called when change feed has a new change that needs to be processed. To do so, copy the following code snippet and paste it below the line that starts with **//To-Do:**
 
     ```
     //Fetch each change to productCategory container
@@ -309,7 +309,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
     {
         string categoryId = item.id;
         string categoryName = item.name;
-    
+
         tasks.Add(UpdateProductCategoryName(productContainer, categoryId, categoryName));
     }
     ```
@@ -318,13 +318,13 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
     ![Screenshot of the Cloud Shell window that displays the fully completed code for change feed.](media/16-change-feed-function-delegate-code.png)
 
-    By default, change feed runs every second. In scenarios where there are a lot of inserts or updates made in the watched container, the delegate might have more than one change. For this reason, you type the delegate `input` as `IReadOnlyCollection`.
+    By default, change feed runs every second. In scenarios where there are a lot of inserts or updates made in the watched container, the delegate might have more than one change. For this reason, you type the delegate ***input** as ***IReadOnlyCollection***.
 
-    This code snippet loops through all the changes in the delegate `input` and saves them as strings for `categoryId` and `categoryName`. It then adds a task to the task list with a call to another function that updates the product container with the new category name.
+    This code snippet loops through all the changes in the delegate **input** and saves them as strings for ***categoryId*** and ***categoryName***. It then adds a task to the task list with a call to another function that updates the product container with the new category name.
 
-1. Select Ctrl+G, and then enter **647** to find your `UpdateProductCategoryName()` function. Here you write some code that updates each product in the product container with the new category name captured by change feed.
+1. Select Ctrl+G, and then enter **630** to find your ***UpdateProductCategoryName()*** function. Here you write some code that updates each product in the product container with the new category name captured by change feed.
 
-1. Copy the following code snippet and paste it below the line that starts with **//To-Do:**. The function does two things. It first queries the product container for all the products for the passed in `categoryId`. It then updates each product with the new product category name.
+1. Copy the following code snippet and paste it below the line that starts with **//To-Do:** around line **649**. The function does two things. It first queries the product container for all the products for the passed in ***categoryId***. It then updates each product with the new product category name.
 
     ```
     //Loop through all products
@@ -348,7 +348,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
 
     The code reads the rows from the response object of the query and then updates the product container with all the products returned by the query.
 
-    You're using a `foreach()` loop to go through each product that's returned by the query. For each row, you update a counter so that you know how many products were updated. You then update the category name for the product to the new `categoryName`. Finally, you call `ReplaceItemAsync()` to update the product back in the product container.
+    You're using a ***foreach()*** loop to go through each product that's returned by the query. For each row, you update a counter so that you know how many products were updated. You then update the category name for the product to the new ***categoryName***. Finally, you call ***ReplaceItemAsync()*** to update the product back in the product container.
 
 1. Select Ctrl+S to save your changes.
 
@@ -378,11 +378,11 @@ Now that you've completed the code for change feed, let's see it in action.
 
 1. Select **b** on the main menu to update the product category name. The following sequence takes place:
 
-    a. Queries the products container for the "Accessories, Tires, and Tubes" category, and counts how many products are in that category.  
-    b. Updates the category name and replaces the word "and" with an ampersand (&).  
-    c. Change feed picks up that change and, using the code you wrote, updates all the products for that category.  
-    d. Change feed reverts the name change and changes the category name back, replacing "&" with the original "and."  
-    e. Change feed picks up that change and updates all the products back to the original product category name.
+    1. Queries the products container for the "Accessories, Tires, and Tubes" category, and counts how many products are in that category.  
+    1. Updates the category name and replaces the word "and" with an ampersand (&).  
+    1. Change feed picks up that change and, using the code you wrote, updates all the products for that category.  
+    1. Change feed reverts the name change and changes the category name back, replacing "&" with the original "and."  
+    1. Change feed picks up that change and updates all the products back to the original product category name.
 
 1. Select **b** on the main menu and follow the prompts until change feed runs a second time, and then hold. The results will look like the following:
 
