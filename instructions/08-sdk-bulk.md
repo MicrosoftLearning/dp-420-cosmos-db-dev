@@ -59,11 +59,11 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Database id** | *Create new* &vert; *cosmicworks* |
+    | **Database id** | *Create new* &vert; *`cosmicworks`* |
     | **Share throughput across containers** | *Do not select* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
-    | **Container throughput** | *Autoscale* &vert; *4000* |
+    | **Container id** | *`products`* |
+    | **Partition key** | *`/categoryId`* |
+    | **Container throughput** | *Autoscale* &vert; *`4000`* |
 
 1. Close your web browser window or tab.
 
