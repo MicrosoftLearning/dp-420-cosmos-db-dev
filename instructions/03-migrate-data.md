@@ -30,6 +30,7 @@ To accompany the products container, you will create a **flatproducts** containe
     | **Location** | *Choose any available region* |
     | **Capacity mode** | *Provisioned throughput* |
     | **Apply Free Tier Discount** | *Do Not Apply* |
+    | **Limit the total amount of throughput that can be provisioned on this account** | *Unchecked* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
@@ -101,10 +102,10 @@ To accompany the products container, you will create a **flatproducts** containe
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
-    | **Container id** | *flatproducts* |
-    | **Partition key** | */category* |
+    | **Container id** | *`flatproducts`* |
+    | **Partition key** | *`/category`* |
     | **Container throughput (autoscale)** | *Manual* |
-    | **RU/s** | *400* |
+    | **RU/s** | *`400`* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **flatproducts** container node within the hierarchy.
 
@@ -147,7 +148,7 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Name** | *CosmosSqlConn* |
+    | **Name** | `*CosmosSqlConn*` |
     | **Connect via integration runtime** | *AutoResolveIntegrationRuntime* |
     | **Authentication method** | *Account key* &vert; *Connection string* |
     | **Account selection method** | *From Azure subscription* |
@@ -178,7 +179,7 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
 1. In the **Target** list, select **flatproducts** and then select **Next** to move to the **Settings** step of the wizard.
 
-1. In the **Settings** step of the wizard, in the **Task name** field, enter **FlattenAndMoveData**.
+1. In the **Settings** step of the wizard, in the **Task name** field, enter **`FlattenAndMoveData`**.
 
 1. Leave all remaining fields to their default blank values and then select **Next** to move to the final step of the wizard.
 
