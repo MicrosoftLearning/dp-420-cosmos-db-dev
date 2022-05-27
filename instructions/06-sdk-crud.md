@@ -163,11 +163,11 @@ You will now use the set of asynchronous methods in the Microsoft.Azure.Cosmos.C
 
     | Property | Value |
     | ---: | :--- |
-    | **id** | ``706cd7c6-db8b-41f9-aea2-0e0c7e8eb009`` |
-    | **categoryId** | ``9603ca6c-9e28-4a02-9194-51cdb7fea816`` |
-    | **name** | ``Road Saddle`` |
-    | **price** | ``45.99d`` |
-    | **tags** | ``{ tan, new, crisp }`` |
+    | **id** | *706cd7c6-db8b-41f9-aea2-0e0c7e8eb009* |
+    | **categoryId** | *9603ca6c-9e28-4a02-9194-51cdb7fea816* |
+    | **name** | *Road Saddle* |
+    | **price** | *45.99d* |
+    | **tags** | *{ tan, new, crisp }* |
 
     ```
     Product saddle = new()
@@ -344,8 +344,8 @@ While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK a
 
     | **Property** | **Value** |
     | ---: | :--- |
-    | **Name** | Road Saddle |
-    | **Price** | $45.99 |
+    | **Name** | *Road Saddle* |
+    | **Price** | *$45.99* |
 
     > &#128221; At this point in time, these values should not have been changed since you have created the item. You will change these values in this exercise.
 
@@ -431,8 +431,8 @@ While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK a
 
     | **Property** | **Value** |
     | ---: | :--- |
-    | **Name** | Road LL Saddle |
-    | **Price** | $32.55 |
+    | **Name** | *Road LL Saddle* |
+    | **Price** | *$32.55* |
 
     > &#128221; At this point in time, these values should  have been changed since you have observed the item.
 
