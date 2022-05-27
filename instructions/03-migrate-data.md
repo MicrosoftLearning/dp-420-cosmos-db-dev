@@ -148,7 +148,7 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Name** | `*CosmosSqlConn*` |
+    | **Name** | *`CosmosSqlConn`* |
     | **Connect via integration runtime** | *AutoResolveIntegrationRuntime* |
     | **Authentication method** | *Account key* &vert; *Connection string* |
     | **Account selection method** | *From Azure subscription* |
