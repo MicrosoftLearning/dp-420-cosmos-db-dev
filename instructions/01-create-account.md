@@ -35,6 +35,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Account Name** | *The globally unique account name. This name will be used as part of the DNS address for requests. Enter any globally unique name. The portal will check the name in real time.* |
     | **Location** | *Select the geographical region from which your database will initially be hosted. Choose any available region.* |
     | **Capacity mode** | *Select provisioned throughput* |
+    | **Limit the total amount of throughput that can be provisioned on this account** | Unchecked |
     | **Apply Free Tier Discount** | *Do Not Apply* |
 
 1. Select **Review + Create** to navigate to the **Review + Create** tab, and then select **Create**.
