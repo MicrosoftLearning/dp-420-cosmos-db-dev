@@ -247,7 +247,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
     {
         string categoryId = item.id;
         string categoryName = item.name;
-        
+    
         tasks.Add(UpdateProductCategoryName(productContainer, categoryId, categoryName));
     }
     ```
@@ -271,7 +271,7 @@ Add code to handle the changes that are passed into the delegate, loop through e
         productCount++;
         //update category name for product
         product.categoryName = categoryName;
-        
+    
         //write the update back to product container
         await productContainer.ReplaceItemAsync(
             partitionKey: new PartitionKey(categoryId),
