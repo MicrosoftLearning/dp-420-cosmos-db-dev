@@ -156,14 +156,14 @@ Last, run a query to return the tags for ML Headset.
 
 Now, let's add up all the RU costs from each of the queries you ran.
 
-| Query | RU cost |
-| - | - |
-| Category name | 2.93 |
-| Product | 2.9 |
-| HL product tags | 3.06 |
-| LL product tags | 3.47 |
-| ML product tags | 3.2 |
-| **Total RU cost** | **15.56** |
+|**Query**|**RU/s cost**|
+|---------|---------|
+|Category name|2.93|
+|Product|2.9|
+|HL product tags|3.06|
+|LL product tags|3.47|
+|ML product tags|3.2|
+|**Total RU cost**|**15.56**|
 
 ### Run the same queries for your NoSQL design
 
