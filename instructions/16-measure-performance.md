@@ -121,7 +121,7 @@ Now we're going to query for the same information but with the entities embedded
 
 1. Select the **Database-v2** database.
 1. Select the **Customer** container.
-1. Run the following query.
+1. Run the following query. 
 
     ```
     SELECT * FROM c WHERE c.id = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
