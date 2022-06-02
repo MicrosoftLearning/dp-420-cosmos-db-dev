@@ -164,7 +164,6 @@ Now, let's add up all the RU costs from each of the queries you ran.
 | LL product tags | 3.47 |
 | ML product tags | 3.2 |
 | **Total RU cost** | **15.56** |
-| | |
 
 ### Run the same queries for your NoSQL design
 
