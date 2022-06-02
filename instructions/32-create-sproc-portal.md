@@ -203,7 +203,7 @@ While the stored procedure authored earlier in this lab has basic functionality,
     }
     ```
 
-1. Select **Save** to persist the changes to the stored procedure.
+1. Select **Update** to persist the changes to the stored procedure.
 
 1. Select **Execute** and then execute the stored procedure using the following input parameters:
 
