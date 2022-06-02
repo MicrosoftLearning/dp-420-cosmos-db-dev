@@ -66,7 +66,7 @@ In Database-v1, run a query to get the customer entity and review the request ch
 
     ```
     SELECT * FROM c WHERE c.id = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
-   ```
+    ```
 
 1. Select the **Query Stats** tab and note the request charge of 2.83.
 
@@ -82,7 +82,7 @@ Run a query to get the customer address entity and review the request charge.
 
     ```
     SELECT * FROM c WHERE c.customerId = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
-   ```
+    ```
 
 1. Select the **Query Stats** tab and note the request charge of 2.83.
 
@@ -98,7 +98,7 @@ Run a query to get the customer password entity and review the request charge.
 
     ```
     SELECT * FROM c WHERE c.id = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
-   ```
+    ```
 
 1. Select the **Query Stats** tab and note the request charge of 2.83.
 
@@ -125,7 +125,7 @@ Now we're going to query for the same information but with the entities embedded
 
     ```
     SELECT * FROM c WHERE c.id = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447"
-   ```
+    ```
 
 1. Observe that the data coming back is now a hierarchy of customer, address, and password data.
 
