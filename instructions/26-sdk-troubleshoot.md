@@ -202,7 +202,7 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
     Can not insert a duplicate partition key, customer with the same ID already exists.
     ```
 
-1. This code added the error-handling for *403* and *409* exceptions, let's now additionally add code for some common communication types of exceptions. There are three common communication type of exceptions: *429*, *503*, and *408* or too many request, service unavailable, and request time out respectively. Around line *66* there should now be a **default** statement, so add the code below right after the previous **break;** statement and right before the **default** statement.  The code will verify if we find any of these communication exceptions, and if so, wait 10 minutes, and then try to insert the document one more time.  Lets' add beyond the code:
+1. This code added the error-handling for *403* and *409* exceptions, let's now additionally add code for some common communication types of exceptions. There are three common communication type of exceptions: *429*, *503*, and *408* or too many request, service unavailable, and request time out respectively. Around line *66* there should now be a **default** statement, so add the code below right after the previous **break;** statement and right before the **default** statement.  The code will verify if we find any of these communication exceptions, and if so, wait 10 seconds, and then try to insert the document one more time.  Lets' add beyond the code:
 
     ```C#
                         case ("TooManyRequests"):
