@@ -6,7 +6,7 @@ layout: home
 
 This repository contains the hands-on lab exercises for Microsoft course [DP-420 Designing and Implementing a Microsoft Azure AI Solution][course-description] and the equivalent [self-paced modules on Microsoft Learn][learn-collection]. The exercises are designed to accompany the learning materials and enable you to practice using the technologies they describe.
 
-> &#128221; To complete these exercises, you’ll require a Microsoft Azure subscription. If your instructor has not provided you with one, you can sign up for a free trial at [https://azure.microsoft.com][azure].
+> &#128221; To complete these exercises, you’ll require a Microsoft Azure subscription. You can sign up for a free trial at [https://azure.microsoft.com][azure].
 
 ## Labs
 
