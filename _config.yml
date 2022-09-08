@@ -1,5 +1,5 @@
 title: 'DP-420: Designing and Implementing Cloud-Native Applications Using Microsoft Azure Cosmos DB'
-remote_theme: MicrosoftLearning/Jekyll-Theme-Online
+remote_theme: MicrosoftLearning/Jekyll-Theme
 exclude:
   - readme.md
   - .github/
