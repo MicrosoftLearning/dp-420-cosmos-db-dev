@@ -1,12 +1,12 @@
 ﻿using System;
-using Azure.Cosmos;
+using Microsoft.Azure.Cosmos;
 
 string endpoint = "<cosmos-endpoint>";
 
 string key = "<cosmos-key>";
 
-CosmosClient client = new CosmosClient(endpoint, key);
+CosmosClient client = new (endpoint,key);
 
-CosmosDatabase database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
+Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
 
-CosmosContainer container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId");
+Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId");
