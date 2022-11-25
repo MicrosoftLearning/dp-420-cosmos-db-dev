@@ -1,24 +1,24 @@
 ---
 lab:
-    title: 'Optimize an Azure Cosmos DB SQL API container indexing policy for a query'
-    module: 'Module 10 - Optimize query performance in Azure Cosmos DB SQL API'
+    title: 'Optimize an Azure Cosmos DB for NoSQL container's index policy for a specific query'
+    module: 'Module 10 - Optimize query and operation performance in Azure Cosmos DB for NoSQL'
 ---
 
-# Optimize an Azure Cosmos DB SQL API container's indexing policy for a query
+# Optimize an Azure Cosmos DB for NoSQL container's indexing policy for a query
 
-When planning for an Azure Cosmos DB SQL API account, knowing our most popular queries can help us tune the indexing policy so that queries are as performant as possible.
+When planning for an Azure Cosmos DB for NoSQL account, knowing our most popular queries can help us tune the indexing policy so that queries are as performant as possible.
 
 In this lab, we will use the Data Explorer to test SQL queries with the default indexing policy and an indexing policy that includes a composite index.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB SQL API account using the Azure SDK for .NET or any other SDK of your choice.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **NOSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB for NoSQL account using the Azure SDK for .NET or any other SDK of your choice.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -56,7 +56,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Close your web browser window or tab.
 
-## Seed your Azure Cosmos DB SQL API account with sample data
+## Seed your Azure Cosmos DB for NoSQL account with sample data
 
 You will use a command-line utility that creates a **cosmicworks** database and a **products** container. The tool will then create a set of items that you will observe using the change feed processor running in your terminal window.
 
@@ -115,7 +115,7 @@ Before you modify the indexing policy, first, you will run a few sample SQL quer
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will return all documents where the **name** is equivalent to **HL Headset**:
+1. Create a new SQL query that will return three values from all documents:
 
     ```
     SELECT 
@@ -132,7 +132,7 @@ Before you modify the indexing policy, first, you will run a few sample SQL quer
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will return all documents where the **name** is equivalent to **HL Headset**:
+1. Create a new SQL query that will return three values from all documents ordered by **categoryName**:
 
     ```
     SELECT 
@@ -266,7 +266,7 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Select **Execute Query**.
 
-1. Observe the results and stats of the query. The request unit charge is higher again because of the complexity of the query and the lack of a supporting composite index.
+1. The query should fail with the error **The order by query does not have a corresponding composite index that it can be served from**.
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Settings** again.
 

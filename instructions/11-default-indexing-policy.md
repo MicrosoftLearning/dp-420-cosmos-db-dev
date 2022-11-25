@@ -1,24 +1,24 @@
 ---
 lab:
-    title: 'Review the default index policy for an Azure Cosmos DB SQL API container with the portal'
-    module: 'Module 6 - Define and implement an indexing strategy for Azure Cosmos DB SQL API'
+    title: 'Review the default index policy for an Azure Cosmos DB for NoSQL container with the portal'
+    module: 'Module 6 - Define and implement an indexing strategy for Azure Cosmos DB for NoSQL'
 ---
 
-# Review the default index policy for an Azure Cosmos DB SQL API container with the portal
+# Review the default index policy for an Azure Cosmos DB for NoSQL container with the portal
 
 Every container in Azure Cosmos DB has an indexing policy that directs the service on how to index items within the container. By default, this indexing policy indexes every property of every item. The default indexing policy makes it easy to get started with Azure Cosmos DB quickly as you don't have to think about indexing, performance, and management at the start of a project.
 
 In this lab, you'll observe and manipulate the default index policy for a few containers using the Data Explorer.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB SQL API account using the Azure SDK for .NET or any other SDK of your choice.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **NOSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB for NoSQL account using the Azure SDK for .NET or any other SDK of your choice.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -43,9 +43,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Close your web browser window or tab.
 
-## Seed the Azure Cosmos DB SQL API account with data
+## Seed the Azure Cosmos DB for NoSQL account with data
 
-The [cosmicworks][nuget.org/packages/cosmicworks] command-line tool deploys sample data to any Azure Cosmos DB SQL API account. The tool is open-source and available through NuGet. You will install this tool to the Azure Cloud Shell and then use it to seed your database.
+The [cosmicworks][nuget.org/packages/cosmicworks] command-line tool deploys sample data to any Azure Cosmos DB for NoSQL account. The tool is open-source and available through NuGet. You will install this tool to the Azure Cloud Shell and then use it to seed your database.
 
 1. Start **Visual Studio Code**.
 
@@ -92,9 +92,9 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
-1. Select the **products** container node within the **SQL API** navigation tree, and then select **New SQL Query**.
+1. Select the **products** container node within the **NOSQL API** navigation tree, and then select **New SQL Query**.
 
 1. Delete the contents of the editor area.
 
@@ -114,7 +114,7 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 
     > &#128221; All paths are currently indexed, so this query should be relatively efficient.
 
-1. Within the **products** container node of the **SQL API** navigation tree, select **Scale & Settings**.
+1. Within the **products** container node of the **NOSQL API** navigation tree, select **Scale & Settings**.
 
 1. Observe the default indexing policy within the **Indexing Policy** section:
 

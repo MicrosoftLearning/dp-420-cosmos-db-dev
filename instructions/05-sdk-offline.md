@@ -1,10 +1,10 @@
 ---
 lab:
-    title: 'Configure the Azure Cosmos DB SQL API SDK for offline development'
-    module: 'Module 3 - Connect to Azure Cosmos DB SQL API with the SDK'
+    title: 'Configure the Azure Cosmos DB for NoSQL SDK for offline development'
+    module: 'Module 3 - Connect to Azure Cosmos DB for NoSQL with the SDK'
 ---
 
-# Configure the Azure Cosmos DB SQL API SDK for offline development
+# Configure the Azure Cosmos DB for NoSQL SDK for offline development
 
 The Azure Cosmos DB Emulator is a local tool that emulates the Azure Cosmos DB service for development and testing. The emulator supports the SQL API and can be used in place of the cloud service when developing code using the Azure SDK for .NET.
 
@@ -44,7 +44,7 @@ Your environment should already have the emulator pre-installed. If not, refer t
 
 1. Navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, observe that there are no nodes within the **SQL API** navigation tree.
+1. In the **Data Explorer**, observe that there are no nodes within the **NOSQL API** navigation tree.
 
 1. Close your web browser window or tab.
 
@@ -120,7 +120,7 @@ Now that you have created a new database in the Azure Cosmos DB emulator, you wi
 
 1. In the **Azure Cosmos DB Emulator** landing page, navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, observe the new **cosmicworks** database node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, observe the new **cosmicworks** database node within the **NOSQL API** navigation tree.
 
 1. Close your web browser window or tab.
 
@@ -179,7 +179,7 @@ Creating a new container is similar to the pattern used to create a new database
 
 1. In the **Azure Cosmos DB Emulator** landing page, navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
 1. Close your web browser window or tab.
 

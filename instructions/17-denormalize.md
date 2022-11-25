@@ -1,7 +1,7 @@
 ---
 lab:
     title: 'Cost of denormalizing data and aggregates and using the change feed for referential integrity'
-    module: 'Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB SQL API'
+    module: 'Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB for NoSQL'
 ---
 
 # Cost of denormalizing data and aggregates and using the change feed for referential integrity
@@ -32,7 +32,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
     > &#128161; To open a **Git Bash** terminal, on the right hand side of the the terminal menu,click on the pulldown besides the **+** sign and choose *Git Bash*.
 
-1. In the **Git Bash terminal**, run the following commands. The commands open a browser window to connect to the azure portal where you will use the provided lab credentials, run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *Once the script ask you for the provided credential for the azure account, the build can take 15-20 minutes to finish, so it might be a good time to get some coffee or tea*.
+1. In the **Git Bash terminal**, run the following commands. The commands open a browser window to connect to the azure portal where you will use the provided lab credentials, run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *Once you have entered the provided credential for the azure account, the build may take 15-20 minutes to complete, so it might be a good time to get some coffee or tea*.
 
     ```
     az login
@@ -72,7 +72,7 @@ In the **database-v2** container, where data is stored in individual containers,
 
     ![Screenshot that shows the results of the query to the product category container.](media/16-product-category-results.png)
 
-1. Select the **Query Stats** tab, and note the request charge of 2.93 RUs (request units).
+1. Select the **Query Stats** tab, and note the request charge of 2.8 RUs (request units).
 
     ![Screenshot of the query stats for the query you ran in Data Explorer.](media/16-product-category-stats.png)
 
@@ -90,7 +90,7 @@ Next, query the product container to get all the products in the "Components, He
 
 1. Select the **Results** tab to review the results. You see there are three products returned, HL Headset, LL Headset, and ML Headset. Each product has a SKU, name, price, and an array of product tags.
 
-1. Select the **Query Stats** tab, and note the request charge of 2.9 RUs.
+1. Select the **Query Stats** tab, and note the request charge of 2.89 RUs.
 
     ![Screenshot of Azure Cosmos DB Data Explorer that shows the results of the query to the product container.](media/16-product-results.png)
 
@@ -130,7 +130,7 @@ Next, run a query to return the tags for LL Headset.
 
     This query returns the five tags for the LL Headset product.
 
-1. Select the **Query Stats** tab, and note the request charge of 3.47 RUs.
+1. Select the **Query Stats** tab, and note the request charge of 3.45 RUs.
 
     ![Screenshot of the results of the query to the product tag container for 'LL Headset' query stats.](media/16-product-tag-ll-stats.png)
 
@@ -148,7 +148,7 @@ Last, run a query to return the tags for ML Headset.
 
     This query returns the three tags for the ML Headset product.
 
-1. Select the **Query Stats** tab, and note the request charge of 3.2 RUs.
+1. Select the **Query Stats** tab, and note the request charge of 3.19 RUs.
 
     ![Screenshot of the results of our query to the product tag container for 'ML Headset' query stats.](media/16-product-tag-ml-stats.png)
 
@@ -158,12 +158,12 @@ Now, let's add up all the RU costs from each of the queries you ran.
 
 |**Query**|**RU/s cost**|
 |---------|---------|
-|Category name|2.93|
-|Product|2.9|
+|Category name|2.8|
+|Product|2.89|
 |HL product tags|3.06|
-|LL product tags|3.47|
-|ML product tags|3.2|
-|**Total RU cost**|**15.56**|
+|LL product tags|3.45|
+|ML product tags|3.19|
+|**Total RU cost**|**15.39**|
 
 ### Run the same queries for your NoSQL design
 
@@ -184,7 +184,7 @@ Let's query for the same information but in the denormalized database.
 
 1. Review the data that's returned in this query. It contains all the information you need to render the products for this category, including the category name and tag names for each of the three products.
 
-1. Select the **Query Stats** tab, and note the request charge of 2.9 RUs.
+1. Select the **Query Stats** tab, and note the request charge of 2.89 RUs.
 
 ### Compare the performance of the two models
 
