@@ -1,7 +1,7 @@
 ---
 lab:
     title: 'Create a stored procedure with the Azure portal'
-    module: 'Module 13 - Create server-side programming constructs in Azure Cosmos DB SQL API'
+    module: 'Module 13 - Create server-side programming constructs in Azure Cosmos DB for NoSQL'
 ---
 
 # Create a stored procedure with the Azure portal
@@ -18,7 +18,7 @@ Stored procedures are authored in language-integrated JavaScript and support exe
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -46,7 +46,7 @@ Stored procedures are authored in language-integrated JavaScript and support exe
     | **Indexing** | *Automatic* |
     | **Partition key** | */categoryId* |
 
-1. Still within the **Data Explorer**, expand the **cosmicworks** database node, then select the new **products** container node within the **SQL API** navigation tree.
+1. Still within the **Data Explorer**, expand the **cosmicworks** database node, then select the new **products** container node within the **NoSQL API** navigation tree.
 
 1. Select **New Stored Procedure**.
 
@@ -218,7 +218,7 @@ While the stored procedure authored earlier in this lab has basic functionality,
 
 To wrap up things, you will use the Data Explorer to issue a SQL query that will return the two documents created in this lab.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then select the **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then select the **products** container node within the **NoSQL API** navigation tree.
 
 1. Select **New SQL Query**.
 
