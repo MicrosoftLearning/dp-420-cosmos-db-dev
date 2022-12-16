@@ -1,7 +1,7 @@
 ---
 lab:
     title: 'Migrate existing data using Azure Data Factory'
-    module: 'Module 2 - Plan and implement Azure Cosmos DB SQL API'
+    module: 'Module 2 - Plan and implement Azure Cosmos DB for NoSQL'
 ---
 
 # Migrate existing data using Azure Data Factory
@@ -10,7 +10,7 @@ In Azure Data Factory, Azure Cosmos DB is supported as a source of data ingest a
 
 In this lab, we will populate Azure Cosmos DB using a helpful command-line utility and then use Azure Data Factory to move a subset of data from one container to another.
 
-## Create and seed your Azure Cosmos DB SQL API account
+## Create and seed your Azure Cosmos DB for NoSQL account
 
 You will use a command-line utility that creates a **cosmicworks** database and a **products** container at **4,000** request units per second (RU/s). Once created, you will adjust the throughput down to 400 RU/s.
 
@@ -20,7 +20,7 @@ To accompany the products container, you will create a **flatproducts** containe
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -113,7 +113,7 @@ To accompany the products container, you will create a **flatproducts** containe
 
 ## Create Azure Data Factory resource
 
-Now that the Azure Cosmos DB SQL API resources are in place, you will create an Azure Data Factory resource and configure all of the necessary components and connections to perform a one-time data movement from one SQL API container to another to extract data, transform it, and load it to another SQL API container.
+Now that the Azure Cosmos DB for NoSQL resources are in place, you will create an Azure Data Factory resource and configure all of the necessary components and connections to perform a one-time data movement from one NoSQL API container to another to extract data, transform it, and load it to another NoSQL API container.
 
 1. Select **+ Create a resource**, search for *Data Factory*, and then create a new **Azure Data Factory** resource with the following settings, leaving all remaining settings to their default values:
 
@@ -140,11 +140,11 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
 1. In the **Task cadence or task schedule** section, select **Run once now** and then select **Next** to move to the **Source** step of the wizard.
 
-1. In the **Source** step of the wizard, in the **Source type** list, select **Azure Cosmos DB (SQL API)**.
+1. In the **Source** step of the wizard, in the **Source type** list, select **Azure Cosmos DB (NoSQL API)**.
 
 1. In the **Connection** section, select **+ New connection**.
 
-1. In the **New connection (Azure Cosmos DB (SQL API))** popup, configure the new connection with the following values, and then select **Create**:
+1. In the **New connection (Azure Cosmos DB (NoSQL API))** popup, configure the new connection with the following values, and then select **Create**:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -173,7 +173,7 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
 1. Select **Preview data** to test the query's validity. Select **Next** to move to the **Target** step of the wizard.
 
-1. In the **Target** step of the wizard, in the **Target type** list, select **Azure Cosmos DB (SQL API)**.
+1. In the **Target** step of the wizard, in the **Target type** list, select **Azure Cosmos DB (NoSQL API)**.
 
 1. In the **Connection** list, select **CosmosSqlConn**.
 
