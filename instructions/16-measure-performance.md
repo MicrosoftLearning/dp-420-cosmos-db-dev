@@ -1,7 +1,7 @@
 ---
 lab:
     title: 'Measure performance of entities in separate and embeded containers'
-    module: 'Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB SQL API'
+    module: 'Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB for NoSQL'
 ---
 
 # Measure performance of entities in separate and embeded containers
