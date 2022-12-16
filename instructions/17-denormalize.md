@@ -1,7 +1,7 @@
 ---
 lab:
     title: 'Cost of denormalizing data and aggregates and using the change feed for referential integrity'
-    module: 'Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB SQL API'
+    module: 'Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB for NoSQL'
 ---
 
 # Cost of denormalizing data and aggregates and using the change feed for referential integrity
