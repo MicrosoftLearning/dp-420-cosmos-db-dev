@@ -1,12 +1,12 @@
 ---
 lab:
-    title: 'Configure the Azure Cosmos DB SQL API SDK for offline development'
-    module: 'Module 3 - Connect to Azure Cosmos DB SQL API with the SDK'
+    title: 'Configure the Azure Cosmos DB for NoSQL SDK for offline development'
+    module: 'Module 3 - Connect to Azure Cosmos DB for NoSQL with the SDK'
 ---
 
-# Configure the Azure Cosmos DB SQL API SDK for offline development
+# Configure the Azure Cosmos DB for NoSQL SDK for offline development
 
-The Azure Cosmos DB Emulator is a local tool that emulates the Azure Cosmos DB service for development and testing. The emulator supports the SQL API and can be used in place of the cloud service when developing code using the Azure SDK for .NET.
+The Azure Cosmos DB Emulator is a local tool that emulates the Azure Cosmos DB service for development and testing. The emulator supports the for NoSQL and can be used in place of the cloud service when developing code using the Azure SDK for .NET.
 
 In this lab, you'll connect to the Azure Cosmos DB Emulator from the Azure SDK for .NET.
 
@@ -114,13 +114,13 @@ The **Microsoft.Azure.Cosmos** library has already been pre-installed in the .NE
 
 ## View the changes in the emulator
 
-Now that you have created a new database in the Azure Cosmos DB emulator, you will use the online **Data Explorer** to observe the new SQL API database within the emulator.
+Now that you have created a new database in the Azure Cosmos DB emulator, you will use the online **Data Explorer** to observe the new NoSQL API database within the emulator.
 
 1. Navigate to the emulator icon in the Windows system tray, open the context menu, and then select **Open Data Explorer...** to navigate to the **localhost:8081/_explorer/** landing page using your default browser.
 
 1. In the **Azure Cosmos DB Emulator** landing page, navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, observe the new **cosmicworks** database node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, observe the new **cosmicworks** database node within the **NoSQL API** navigation tree.
 
 1. Close your web browser window or tab.
 
@@ -179,7 +179,7 @@ Creating a new container is similar to the pattern used to create a new database
 
 1. In the **Azure Cosmos DB Emulator** landing page, navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
 
 1. Close your web browser window or tab.
 
