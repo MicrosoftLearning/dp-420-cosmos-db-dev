@@ -1,7 +1,7 @@
 ---
 lab:
     title: 'Adjust provisioned throughput using an Azure CLI script'
-    module: 'Module 12 - Manage an Azure Cosmos DB SQL API solution using DevOps practices'
+    module: 'Module 12 - Manage an Azure Cosmos DB for NoSQL solution using DevOps practices'
 ---
 
 # Adjust provisioned throughput using an Azure CLI script
@@ -118,19 +118,19 @@ The **cosmosdb** command group contains basic commands to create and manage Azur
 
     > &#128161; The **create** command can take anywhere from two to twelve minutes to complete, on average.
 
-## Create Azure Cosmos DB SQL API resources using the Azure CLI
+## Create Azure Cosmos DB for NoSQL resources using the Azure CLI
 
-The **cosmosdb sql** command group contains commands for managing SQL API-specific resources for Azure Cosmos DB. You can always use the **--help** flag to review the options for these command groups.
+The **cosmosdb sql** command group contains commands for managing NoSQL API-specific resources for Azure Cosmos DB. You can always use the **--help** flag to review the options for these command groups.
 
 1. Return to the terminal instance already open within **Visual Studio Code**.
 
-1. View the most command Azure CLI command groups related to **Azure Cosmos DB SQL API** using the following command:
+1. View the most command Azure CLI command groups related to **Azure Cosmos DB for NoSQL** using the following command:
 
     ```
     az cosmosdb sql --help
     ```
 
-1. View the Azure CLI commands for managing **Azure Cosmos DB SQL API** databases using the following command:
+1. View the Azure CLI commands for managing **Azure Cosmos DB for NoSQL** databases using the following command:
 
     ```
     az cosmosdb sql database --help
@@ -144,7 +144,7 @@ The **cosmosdb sql** command group contains commands for managing SQL API-specif
 
 1. Wait for the **create** command to finish execution and return before proceeding forward with this lab.
 
-1. View the Azure CLI commands for managing **Azure Cosmos DB SQL API** containers using the following command:
+1. View the Azure CLI commands for managing **Azure Cosmos DB for NoSQL** containers using the following command:
 
     ```
     az cosmosdb sql container --help
@@ -166,9 +166,9 @@ The **cosmosdb sql** command group contains commands for managing SQL API-specif
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
 
-1. Select the **products** container node within the **SQL API** navigation tree, and then select **Scale & Settings**.
+1. Select the **products** container node within the **NoSQL API** navigation tree, and then select **Scale & Settings**.
 
 1. Observe the values within the **Scale** tab. Specifically, observe that the **Manual** option is selected in the **Throughput** section and that the provisioned throughput is set to **400** RU/s.
 
@@ -180,7 +180,7 @@ The Azure CLI can be used to migrate a container between manual and autoscale pr
 
 1. Return to the terminal instance already open within **Visual Studio Code**.
 
-1. View the Azure CLI commands for managing **Azure Cosmos DB SQL API** container throughput using the following command:
+1. View the Azure CLI commands for managing **Azure Cosmos DB for NoSQL** container throughput using the following command:
 
     ```
     az cosmosdb sql container throughput --help
@@ -218,9 +218,9 @@ The Azure CLI can be used to migrate a container between manual and autoscale pr
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
 
-1. Select the **products** container node within the **SQL API** navigation tree, and then select **Scale & Settings**.
+1. Select the **products** container node within the **NoSQL API** navigation tree, and then select **Scale & Settings**.
 
 1. Observe the values within the **Scale** tab. Specifically, observe that the **Autoscale** option is selected in the **Throughput** section and that the provisioned throughput is set to **5,000** RU/s.
 
