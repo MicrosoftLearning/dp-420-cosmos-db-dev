@@ -44,7 +44,7 @@ Your environment should already have the emulator pre-installed. If not, refer t
 
 1. Navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, observe that there are no nodes within the **SQL API** navigation tree.
+1. In the **Data Explorer**, observe that there are no nodes within the **NoSQL API** navigation tree.
 
 1. Close your web browser window or tab.
 
