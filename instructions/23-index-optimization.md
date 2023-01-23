@@ -1,10 +1,10 @@
 ---
 lab:
-    title: 'Optimize an Azure Cosmos DB for NoSQL container indexing policy for write operations'
-    module: 'Module 10 - Optimize query performance in Azure Cosmos DB for NoSQL'
+    title: 'Optimize an Azure Cosmos DB for NoSQL container's indexing policy for common operations'
+    module: 'Module 10 - Optimize query and operation performance in Azure Cosmos DB for NoSQL'
 ---
 
-# Optimize an Azure Cosmos DB for NoSQL container's indexing policy for write operations
+# Optimize an Azure Cosmos DB for NoSQL container's indexing policy for common operations
 
 For write-heavy workloads or workloads with large JSON objects, it can be advantageous to optimize the indexing policy to only index properties that you know you will want to use in your queries.
 
