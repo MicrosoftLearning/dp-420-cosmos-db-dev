@@ -1,7 +1,7 @@
 ---
 lab:
-    title: 'Optimize an Azure Cosmos DB for NoSQL container indexing policy for a query'
-    module: 'Module 10 - Optimize query performance in Azure Cosmos DB for NoSQL'
+    title: 'Optimize an Azure Cosmos DB for NoSQL container''s index policy for a specific query'
+    module: 'Module 10 - Optimize query and operation performance in Azure Cosmos DB for NoSQL'
 ---
 
 # Optimize an Azure Cosmos DB for NoSQL container's indexing policy for a query
@@ -115,7 +115,7 @@ Before you modify the indexing policy, first, you will run a few sample SQL quer
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will return all documents where the **name** is equivalent to **HL Headset**:
+1. Create a new SQL query that will return all three values from all documents:
 
     ```
     SELECT 
@@ -132,7 +132,7 @@ Before you modify the indexing policy, first, you will run a few sample SQL quer
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will return all documents where the **name** is equivalent to **HL Headset**:
+1. Create a new SQL query that will return three values from all documents ordered by **categoryName**:
 
     ```
     SELECT 
@@ -266,7 +266,7 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Select **Execute Query**.
 
-1. Observe the results and stats of the query. The request unit charge is higher again because of the complexity of the query and the lack of a supporting composite index.
+1. The query should fail with the error **The order by query does not have a corresponding composite index that it can be served from**.
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Settings** again.
 
