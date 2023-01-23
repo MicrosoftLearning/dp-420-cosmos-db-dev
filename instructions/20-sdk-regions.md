@@ -175,7 +175,7 @@ The **CosmosClientOptions** class includes a property to configure the list of r
 1. Create a new instance of the **CosmosClient** class named **client** passing in the **endpoint**, **key**, and **options** variables as constructor parameters:
 
     ```
-    CosmosClient client = new (endpoint, key, options); 
+    using CosmosClient client = new (endpoint, key, options); 
     ```
 
 1. Use the **GetContainer** method of the **client** variable to retrieve the existing container using the name of the database (*cosmicworks*) and the name of the container (*products*):
