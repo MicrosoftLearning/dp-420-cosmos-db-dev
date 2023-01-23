@@ -157,7 +157,7 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 1. Select **Next: Add cognitive skills**.
 
-1. Select **Next: Customize target index**.
+1. Select **Skip to: Customize target index**.
 
 1. In the **Customize target index** step of the wizard, configure the index with the following settings, leaving all remaining settings to their default values:
 
