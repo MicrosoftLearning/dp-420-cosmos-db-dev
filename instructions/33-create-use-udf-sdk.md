@@ -1,10 +1,10 @@
 ---
 lab:
-    title: 'Implement and then use a UDF using the SDK'
+    title: 'Implement and then use user-defined functions with the SDK'
     module: 'Module 13 - Create server-side programming constructs in Azure Cosmos DB for NoSQL'
 ---
 
-# Implement and then use a UDF using the SDK
+# Implement and then use user-defined functions with the SDK
 
 The .NET SDK for Azure Cosmos DB for NoSQL can be used to manage and invoke server-side programming constructs directly from a container. When preparing a new container, it may make sense to use the .NET SDK to publish UDFs directly to a container instead of performing the tasks manually using the Data Explorer.
 
