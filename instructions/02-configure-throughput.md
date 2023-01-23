@@ -22,7 +22,7 @@ Let’s start simple by creating a serverless account. There’s not much to con
 
     > &#128161; Alternatively; expand the **&#8801;** menu, select **All Services**, in the **Databases** category, select **Azure Cosmos DB**, and then select **Create**.
 
-1. In the **Select API option** pane, select the **Create** option within the **Core (SQL) - Recommended** section.
+1. In the **Select API option** pane, select the **Create** option within the **Azure Cosmos DB for NoSQL** section.
 
 1. Within the **Create Azure Cosmos DB Account** pane, observe the **Basics** tab.
 
@@ -78,7 +78,7 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     > &#128161; Alternatively; expand the **&#8801;** menu, select **All Services**, in the **Databases** category, select **Azure Cosmos DB**, and then select **Create**.
 
-1. In the **Select API option** pane, select the **Create** option within the **Core (SQL) - Recommended** section.
+1. In the **Select API option** pane, select the **Create** option within the **Azure Cosmos DB for NoSQL** section.
 
 1. Within the **Create Azure Cosmos DB Account** pane, observe the **Basics** tab.
 
