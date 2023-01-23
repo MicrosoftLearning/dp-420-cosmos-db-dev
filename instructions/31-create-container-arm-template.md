@@ -4,7 +4,7 @@ lab:
     module: 'Module 12 - Manage an Azure Cosmos DB for NoSQL solution using DevOps practices'
 ---
 
-# Create an Azure Cosmos DB for NoSQLcontainer using Azure Resource Manager templates
+# Create an Azure Cosmos DB for NoSQL container using Azure Resource Manager templates
 
 Azure Resource Manager templates are JSON files that declaratively define the infrastructure that you wish to deploy to Azure. Azure Resource Manager templates are a common infrastrucutre-as-code solution to deploying services to Azure. Bicep, takes the concept a bit further by defining an easier to read domain-specific language that can be used to create JSON templates.
 
