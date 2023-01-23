@@ -10,7 +10,7 @@ The latest version of the .NET SDK for the Azure Cosmos DB for NoSQL makes it ea
 
 > &#128161; This lab uses the *4.0.0-preview3* release of the [Azure.Cosmos][nuget.org/packages/azure.cosmos/4.0.0-preview3] library on NuGet. This library has special functionality to make it easier to query Azure Cosmos DB using [asynchronous streams][docs.microsoft.com/dotnet/csharp/whats-new/csharp-8#asynchronous-streams].
 
-In this lab, you'll use an asynchronous stream to iterate over a large result set returned from Azure Cosmos DB for NOSQL. You will use the .NET SDK to query and iterate over results.
+In this lab, you'll use an asynchronous stream to iterate over a large result set returned from Azure Cosmos DB for NoSQL. You will use the .NET SDK to query and iterate over results.
 
 ## Prepare your development environment
 
