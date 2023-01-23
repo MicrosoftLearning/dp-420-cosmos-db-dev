@@ -101,7 +101,7 @@ We'll create a webapp that will connect to the Azure Cosmos DB account and creat
 
     > &#128221; This command will open the terminal with the starting directory already set to the **28-key-vault** folder.
 
-1. Let's create and MVC webapp shell. We will replace a couple of the generated files in a moment. Run the following command to create the webapp:
+1. Let's create an MVC webapp shell. We will replace a couple of the generated files in a moment. Run the following command to create the webapp:
 
     ```
     dotnet new mvc
@@ -242,11 +242,11 @@ The rest of the code is straight forward, get the connection string, connect to 
 
 1. Select **Yes** when prompted to always deploy to that workspace.
 
-1. Select Browse Website when prompted.  Alternatively, open a browser and go to **`https://<yourwebappname>.azurewebsites.net`**. In either case, we have a problem. We should have gotten a user-defined message on our web page. The message should be, **Key Vault was not accessible** with an extended error message. Let's fix that.
+1. Select **Browse Website** when prompted.  Alternatively, open a browser and go to **`https://<yourwebappname>.azurewebsites.net`**. In either case, we have a problem. You will see a user-defined message on our web page. The message should be, **Key Vault was not accessible** with an extended error message. Let's fix that.
 
 ## Allow our app to use a managed identity
 
-The first problem we need to fix is to allow our app use a managed identity. Using a managed identity, will allow our app to use Azure Services like Azure Key Vault.
+The first problem we need to fix is to allow our app use a managed identity. Using a managed identity will allow our app to use Azure Services like Azure Key Vault.
 
 1. Open up your browser and login to the Azure portal.
 
@@ -268,21 +268,19 @@ The original goal of this lab was to prevent our Azure Cosmos DB Accounts from b
 
 1. In the Azure portal, go to the Key vault we created earlier.
 
-1. Under the *Settings* section, select **Access policies**.
+1. Under the *Settings* section, select **Access configuration**.
 
-1. Select **+ Add Access Policy**.
+1. Ensure **Vault access policy** is selected, and then select **Go to access policies**.
 
-1. Fill in the *Access policy* values with the following settings, *leaving all remaining settings to their default values*, then select to add the policy:
+1. Select **+ Create**.
 
-    | **Setting** | **Value** |
-    | ---: | :--- |
-    | **Key permissions** | *Get* |
-    | **Secret permissions** | *Get* |
-    | **Select principal** | *Search and select your application name* |
+1. On the **Permissions** tab, select the **Get** checkbox for **Key permissions** and **Secret permissions**, and then select **Next**.
 
-    > &#128221; Don't select an Authorized application.
+1. On the **Principal** tab, in the search box, enter the name you gave your App Service, select it from the list, and then select **Next**.
 
-1. **Save** the new policy.
+1. On the **Application (optional)** tab, select **Next**.
+    
+1. On the **Review + create** tab, select **Create**.
 
 1. Let's try our web app again.  On your browser, go to  **`https://<yourwebappname>.azurewebsites.net`**.
 
