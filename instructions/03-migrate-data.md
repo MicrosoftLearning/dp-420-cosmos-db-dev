@@ -130,7 +130,7 @@ Now that the Azure Cosmos DB for NoSQL resources are in place, you will create a
 
 1. Wait for the deployment task to complete before continuing with this task.
 
-1. Go to the newly created **Azure Data Factory** resource and select **Open Azure Data Factory Studio**.
+1. Go to the newly created **Azure Data Factory** resource and select **Launch Studio**.
 
     > &#128161; Alternatively, you can navigate to (``adf.azure.com/home``), select your newly created Data Factory resource, and then select the home icon.
 
@@ -171,9 +171,9 @@ Now that the Azure Cosmos DB for NoSQL resources are in place, you will create a
         products p
     ```
 
-1. Select **Preview data** to test the query's validity. Select **Next** to move to the **Target** step of the wizard.
+1. Select **Preview data** to test the query's validity. Select **Next** to move to the **Destination** step of the wizard.
 
-1. In the **Target** step of the wizard, in the **Target type** list, select **Azure Cosmos DB (NoSQL API)**.
+1. In the **Destination** step of the wizard, in the **Destination type** list, select **Azure Cosmos DB (NoSQL API)**.
 
 1. In the **Connection** list, select **CosmosSqlConn**.
 
