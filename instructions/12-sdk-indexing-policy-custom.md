@@ -1,6 +1,6 @@
 ---
 lab:
-    title: 'Configure an Azure Cosmos DB for NoSQL container''s index policy with the portal'
+    title: 'Review the default index policy for an Azure Cosmos DB for NoSQL container with the portal'
     module: 'Module 6 - Define and implement an indexing strategy for Azure Cosmos DB for NoSQL'
 ---
 
@@ -195,7 +195,7 @@ Just like with any other indexing policy, you can use the Data Explorer to view 
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
 
-1. Within the **products** container node of the **NoSQL API** navigation tree, select **Scale & Settings**.
+1. Within the **products** container node of the **NOSQL API** navigation tree, select **Scale & Settings**.
 
 1. Observe the indexing policy within the **Indexing Policy** section:
 
