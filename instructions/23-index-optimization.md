@@ -1,6 +1,6 @@
 ---
 lab:
-    title: 'Optimize an Azure Cosmos DB for NoSQL container's indexing policy for common operations'
+    title: 'Optimize an Azure Cosmos DB for NoSQL container''s indexing policy for common operations'
     module: 'Module 10 - Optimize query and operation performance in Azure Cosmos DB for NoSQL'
 ---
 
