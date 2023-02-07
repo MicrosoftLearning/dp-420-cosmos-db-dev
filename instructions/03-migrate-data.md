@@ -209,7 +209,7 @@ Now that the Azure Cosmos DB for NoSQL resources are in place, you will create a
         p.category, 
         p.price 
     FROM
-        products p
+        flatproducts p
     WHERE
         p.name = 'HL Headset'
     ```
