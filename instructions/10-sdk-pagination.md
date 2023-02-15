@@ -51,11 +51,11 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
 ## Seed the Azure Cosmos DB for NoSQL account with data
 

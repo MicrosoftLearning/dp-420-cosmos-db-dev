@@ -49,9 +49,9 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
 1. Still within the newly created **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
@@ -65,9 +65,9 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     | **Partition key** | *`/categoryId`* |
     | **Container throughput** | *Autoscale* &vert; *`4000`* |
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **08-sdk-bulk** folder.
+1. In  in the **Explorer** pane, browse to the **08-sdk-bulk** folder.
 
 1. Open the **script.cs** code file within the **08-sdk-bulk** folder.
 
@@ -241,19 +241,13 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
 
 1. Close the integrated terminal.
 
-1. Close **Visual Studio Code**.
-
 ## Observe the results
 
 Now that you have sent 25,000 items to Azure Cosmos DB let’s go and look at the Data Explorer.
 
-1. In a web browser, navigate to the Azure portal (``portal.azure.com``).
+1.Return to the web browser and navigate to the **Data Explorer** pane.
 
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
-
-1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
-
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the **products** container node within the **NOSQL API** navigation tree.
 
 1. Expand the **products** node, and then select the **Items** node. Observe the list of items within your container.
 

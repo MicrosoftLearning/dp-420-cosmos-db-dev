@@ -39,14 +39,14 @@ Stored procedures are authored in language-integrated JavaScript and support exe
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Database id** | *Create new* &vert; *cosmicworks* |
+    | **Database id** | *Create new* &vert; *``cosmicworks``* |
     | **Share throughput across containers** | *Select this option* |
     | **Database throughput** | *Manual* &vert; *400* |
-    | **Container id** | *products* |
+    | **Container id** | *``products``* |
     | **Indexing** | *Automatic* |
-    | **Partition key** | */categoryId* |
+    | **Partition key** | *``/categoryId``* |
 
-1. Still within the **Data Explorer**, expand the **cosmicworks** database node, then select the new **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then select the new **products** container node within the **NOSQL API** navigation tree.
 
 1. Select **New Stored Procedure**.
 
@@ -218,7 +218,7 @@ While the stored procedure authored earlier in this lab has basic functionality,
 
 To wrap up things, you will use the Data Explorer to issue a SQL query that will return the two documents created in this lab.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then select the **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then select the **products** container node within the **NOSQL API** navigation tree.
 
 1. Select **New SQL Query**.
 

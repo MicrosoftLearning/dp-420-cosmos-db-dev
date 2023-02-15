@@ -50,9 +50,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
 1. Select **Data Explorer** from the resource menu.
 
@@ -62,7 +62,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *cosmicworks* |
+    | **Database id** | *``cosmicworks``* |
 
 1. Back in the **Data Explorer** pane, observe the **cosmicworks** database node within the hierarchy.
 
@@ -73,8 +73,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -85,18 +85,18 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
-    | **Container id** | *productslease* |
-    | **Partition key** | */partitionKey* |
+    | **Container id** | *``productslease``* |
+    | **Partition key** | *``/partitionKey``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **productslease** container node within the hierarchy.
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
 ## Implement the change feed processor in the .NET SDK
 
 The **Microsoft.Azure.Cosmos.Container** class ships with a series of methods to build the change feed processor fluently. To start, you need a reference to your monitored container, your lease container, and a delegate in C\# (to handle each batch of changes) to get started.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **13-change-feed** folder.
+1. In the **Explorer** pane, browse to the **13-change-feed** folder.
 
 1. Open the **product.cs** code file.
 

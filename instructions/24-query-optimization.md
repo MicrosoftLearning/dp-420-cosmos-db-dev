@@ -40,9 +40,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *cosmicworks* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Database id** | *Create new* &vert; *``cosmicworks``* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -50,11 +50,11 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice of the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Open **Visual Studio Code**.
 
 ## Seed your Azure Cosmos DB for NoSQL account with sample data
 
@@ -89,17 +89,11 @@ You will use a command-line utility that creates a **cosmicworks** database and 
 
 1. Close the integrated terminal.
 
-1. Close **Visual Studio Code**.
+1. Close **Visual Studio Code** and return to your browser.
 
 ## Execute SQL queries and measure their request unit charge
 
 Before you modify the indexing policy, first, you will run a few sample SQL queries to get a baseline request unit charge expressed in RUs.
-
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 

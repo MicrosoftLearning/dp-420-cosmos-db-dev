@@ -51,11 +51,11 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Without closing the browser window, open **Visual Studio Code**.
 
 ## Seed the Azure Cosmos DB for NoSQL account with data
 
@@ -200,17 +200,13 @@ The [Container][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container] 
 
 Now that a new UDF has been created in the Azure Cosmos DB container, you will use the Data Explorer to validate that the UDF is working as expected.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Return to your web browser.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
-1. Select the **products** container node within the **NoSQL API** navigation tree, and then select **New SQL Query**.
+1. Select the **products** container node within the **NOSQL API** navigation tree, and then select **New SQL Query**.
 
 1. In the query tab, select **Execute Query** to view a standard query that selects all items without any filters.
 

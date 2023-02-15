@@ -52,17 +52,17 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Keep the browser tab open, as we will return to it later.
 
 ## View the Microsoft.Azure.Cosmos library on NuGet
 
 The NuGet website contains a searchable index of packages that are available to import into your .NET applications. To import prerelease packages such as **Microsoft.Azure.Cosmos**, you can use the NuGet website to get the appropriate versions and commands to import the package into your applications.
 
-1. In a web browser, navigate to the NuGet website (``nuget.org``).
+1. In new browser tab, navigate to the NuGet website (``nuget.org``).
 
 1. Review the description of NuGet, the package manager for .NET, and its capabilities.
 

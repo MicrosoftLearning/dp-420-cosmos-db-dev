@@ -49,15 +49,13 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Go to the newly created **Azure Cosmos DB** account resource and navigate to the **Keys** pane.
 
-1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
-
-    1. Record the value of the **PRIMARY CONNECTION STRING** field. You'll use this **connection string** value later in this exercise.
+1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically the **PRIMARY CONNECTION STRING** field. You'll use this **connection string** value later in this exercise.
 
 ## Create an Azure Key Vault and store the Azure Cosmos DB account credentials as a secret
 
 Before we create our web app, we will secure the Azure Cosmos DB account connection string by copying them to an *Azure Key Vault* encrypted *secret*. Let's do that now.
 
-1. In the Azure portal, navigate to the **Key vaults** page.
+1. In a new browser tab, navigate to the Azure portal, opening the **Key vaults** page.
 
 1. Add a vault by selecting the ***+ Create*** button, and fill out the vault with the following settings, *leaving all remaining settings to their default values*, then select to create the vault:
 
@@ -78,7 +76,7 @@ Before we create our web app, we will secure the Azure Cosmos DB account connect
     | ---: | :--- |
     | **Upload options** | *Manual* |
     | **Name** | *The name you will label your secret with* |
-    | **Value** | *This field is the most important field to fill out. This value is the PRIMARY CONNECTION STRING you previously copied from the key section of your Azure Cosmos DB account. This value will be convert into a secret.* |
+    | **Value** | *This field is the most important field to fill out. Copy here value of the PRIMARY CONNECTION STRING from the key section of your Azure Cosmos DB account. This value will be convert into a secret.* |
     | **Enabled** | *Yes* |
  
 1. Under the Secrets, you should now see your new secret listed. We need to get the *secret identifier* that we will add to the code of our webapp. Select the **secret** you created.
@@ -108,19 +106,15 @@ We'll create a webapp that will connect to the Azure Cosmos DB account and creat
     ```
 
 
-1. That command created the shell of a web app, so it added several files and directories. We already have a couple of files with all the code we need. Replace the files **.\Controllers\HomeController.cs** and **.\Views\Home\Index.cshtml** for their respective files in the **.\KeyvaultFiles** directory.
+    > &#128221;This command created the shell of a web app, so it added several files and directories. We already have a couple of files with all the code we need. 
+
+1. Replace the files **.\Controllers\HomeController.cs** and **.\Views\Home\Index.cshtml** for their respective files from the **.\KeyvaultFiles** directory.
 
 1. Once you replace the files ***DELETE*** the **.\KeyvaultFiles** directory.
 
 ## Import the multiple missing libraries into the .NET script
 
 The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotnet-add-package] command to import packages from a pre-configured package feed. A .NET installation uses NuGet as its default package feed.
-
-1. If you have not done so, in **Visual Studio Code**, in the **Explorer** pane, browse to the **28-key-vault** folder.
-
-1. If you have not done so, open the context menu for the **28-key-vault** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
-
-    > &#128221; This command will open the terminal with the starting directory already set to the **28-key-vault** folder.
 
 1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1] package from NuGet using the following command:
 
