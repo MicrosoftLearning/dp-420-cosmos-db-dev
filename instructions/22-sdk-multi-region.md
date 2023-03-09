@@ -57,7 +57,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     > &#128221; This operation can take approximately 5-10 minutes.
 
-1. Record the value of at least one of the extra regions you created. You will use this region value later in this exercise.
+1. Notice at least one of the extra regions you created. You will use this region value later in this exercise.
 
 1. In the resource blade, navigate to the **Data Explorer** pane.
 
@@ -67,10 +67,10 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *cosmicworks* |
+    | **Database id** | *Create new* &vert; *``cosmicworks``* |
     | **Share throughput across containers** | *Do not select* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
     | **Container throughput** | *Manual* &vert; *400* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
@@ -79,17 +79,17 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
 ## Connect to the Azure Cosmos DB for NoSQL account from the SDK
 
 Using the credentials from the newly created account, you will connect with the SDK classes and create a new database and container instance. Then, you will use the Data Explorer to validate that the instances exist in the Azure portal.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **22-sdk-multi-region** folder.
+1. In the **Explorer** pane, browse to the **22-sdk-multi-region** folder.
 
 1. Open the context menu for the **22-sdk-multi-region** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 

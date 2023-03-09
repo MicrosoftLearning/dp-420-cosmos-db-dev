@@ -41,7 +41,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
     | **Capacity mode** | *Provisioned throughput* |
-    | **Apply Free Tier Discount** | *`Do Not Apply`* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
     | **Limit the total amount of throughput that can be provisioned on this account** | *Uncheck* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
@@ -52,9 +52,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You'll use this **endpoint** value later in this exercise.
+    1.Notice the **URI** field. You'll use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You'll use this **key** value later in this exercise.
+    1.Notice the **PRIMARY KEY** field. You'll use this **key** value later in this exercise.
 
 1. Minimize, but don't close your browser window. We'll come back to the Azure portal a few minutes after we start a background workload in the next steps.
 

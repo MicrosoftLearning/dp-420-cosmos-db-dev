@@ -36,9 +36,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
 1. Select **Data Explorer** from the resource menu.
 
@@ -48,7 +48,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *cosmicworks* |
+    | **Database id** | *``cosmicworks``* |
 
 1. Back in the **Data Explorer** pane, observe the **cosmicworks** database node within the hierarchy.
 
@@ -59,8 +59,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -71,8 +71,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
-    | **Container id** | *productslease* |
-    | **Partition key** | */id* |
+    | **Container id** | *``productslease``* |
+    | **Partition key** | *``/id``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **productslease** container node within the hierarchy.
 
@@ -109,11 +109,11 @@ Before you can begin writing code, you will need to create the Azure Functions r
     | ---: | :--- |
     | **Development environment** | *Develop in portal* |
     | **Select a template** | *Azure Cosmos DB trigger* |
-    | **New Function** | *ItemsListener* |
+    | **New Function** | *``ItemsListener``* |
     | **Cosmos DB account connection** | *Select New* &vert; *Select Azure Cosmos DB Account* &vert; *Select the Azure Cosmos DB account you created earlier* |
-    | **Database name** | *cosmicworks* |
-    | **Collection name** | *products* |
-    | **Collection name for leases** | *productslease* |
+    | **Database name** | *``cosmicworks``* |
+    | **Collection name** | *``products``* |
+    | **Collection name for leases** | *``productslease``* |
     | **Create lease collection if it does not exist** | *No* |
 
 ## Implement function code in .NET

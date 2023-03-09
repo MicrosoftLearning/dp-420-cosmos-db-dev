@@ -30,11 +30,11 @@ Let’s start simple by creating a serverless account. There’s not much to con
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Subscription** | *All resources must belong to a resource group. Every resource group must belong to a subscription. Here, use your existing Azure subscription.* |
-    | **Resource Group** | *All resources must belong to a resource group. Here, select an existing or create a new resource group.* |
-    | **Account Name** | *The globally unique account name. This name will be used as part of the DNS address for requests. Enter any globally unique name. The portal will check the name in real time.* |
-    | **Location** | *Select the geographical region from which your database will initially be hosted. Choose any available region.* |
-    | **Capacity mode** | *Select Serverless* |
+    | **Subscription** | **Use your existing Azure subscription.** *All resources must belong to a resource group. Every resource group must belong to a subscription.* |
+    | **Resource Group** | **Use existing or create a new resource group.** *All resources must belong to a resource group.*|
+    | **Account Name** |  **Enter any globally unique name.** *The globally unique account name. This name will be used as part of the DNS address for requests.  The portal will check the name in real time.* |
+    | **Location** | **Choose any available region.** *Select the geographical region from which your database will initially be hosted.* |
+    | **Capacity mode** | **Select Serverless** |
 
 1. Select **Review + Create** to navigate to the **Review + Create** tab, and then select **Create**.
 
@@ -86,13 +86,13 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Subscription** | *All resources must belong to a resource group. Every resource group must belong to a subscription. Here, use your existing Azure subscription.* |
-    | **Resource Group** | *All resources must belong to a resource group. Here, select an existing or create a new resource group.* |
-    | **Account Name** | *The globally unique account name. This name will be used as part of the DNS address for requests. Enter any globally unique name. The portal will check the name in real time.* |
-    | **Location** | *Select the geographical region from which your database will initially be hosted. Choose any available region.* |
-    | **Capacity mode** | *Select provisioned throughput* |
-    | **Apply Free Tier Discount** | *Do Not Apply* |
-    | **Limit the total amount of throughput that can be provisioned on this account** | *Unchecked* |
+    | **Subscription** | **Use your existing Azure subscription.** *All resources must belong to a resource group. Every resource group must belong to a subscription.* |
+    | **Resource Group** | **Use existing or create a new resource group.** *All resources must belong to a resource group.*|
+    | **Account Name** |  **Enter any globally unique name.** *The globally unique account name. This name will be used as part of the DNS address for requests.  The portal will check the name in real time.* |
+    | **Location** | **Choose any available region.** *Select the geographical region from which your database will initially be hosted.* |
+    | **Capacity mode** | **Provisioned throughput** |
+    | **Apply Free Tier Discount** | **Do Not Apply** |
+    | **Limit the total amount of throughput that can be provisioned on this account** | **Unchecked** |
 
 1. Select **Review + Create** to navigate to the **Review + Create** tab, and then select **Create**.
 
@@ -111,7 +111,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *`nothroughputdb`* |
-    | **Provision throughput** | *Do not select* |
+    | **Provision throughput** | *Unchecked* |
 
 1. Back in the **Data Explorer** pane, observe the **nothroughputdb** database node within the hierarchy.
 
@@ -136,7 +136,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *`manualthroughputdb`* |
-    | **Provision throughput** | *Select this option* |
+    | **Provision throughput** | *Checked* |
     | **Database throughput** | *Manual* |
     | **RU/s** | *`400`* |
 
@@ -151,7 +151,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Database id** | *Use existing* &vert; *manualthroughputdb* |
     | **Container id** | *`childcontainer`* |
     | **Partition key** | *`/primarykey`* |
-    | **Provision dedicated throughput for this container** | *Select this option* |
+    | **Provision dedicated throughput for this container** | *Checked* |
     | **Container throughput** | *Manual* |
     | **RU/s** | *`1000`* |
 

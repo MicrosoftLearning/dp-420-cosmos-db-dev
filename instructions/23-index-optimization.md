@@ -54,9 +54,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *cosmicworks* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Database id** | *Create new* &vert; *``cosmicworks``* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -64,17 +64,17 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
 ## Run the test .NET application using the default indexing policy
 
 This lab has a pre-built test .NET application that will take a large JSON object and create a new item in the Azure Cosmos DB for NoSQL container. Once the single write operation is complete, the application will output the item’s unique identifier and RU charge to the console window.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **23-index-optimization** folder.
+1. In the **Explorer** pane, browse to the **23-index-optimization** folder.
 
 1. Open the context menu for the **23-index-optimization** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
@@ -134,11 +134,7 @@ This lab has a pre-built test .NET application that will take a large JSON objec
 
 This lab scenario will assume that our future queries focus primarily on the name and categoryName properties. To optimize for our large JSON item, you will exclude all other fields from the index by creating an indexing policy that starts by excluding all paths. Then the policy will selectively include specific paths.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Return to your web browser.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
@@ -190,8 +186,6 @@ This lab scenario will assume that our future queries focus primarily on the nam
     }
     ```
 
-1. Close your web browser window or tab.
-
 1. Return to **Visual Studio Code**. Return to the open terminal.
 
 1. Build and run the project at least two more times using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command. Observe the new RU charge in the console output, which should be significantly less than the original charge:
@@ -202,17 +196,9 @@ This lab scenario will assume that our future queries focus primarily on the nam
 
     > &#128221; If you are not seeing an updated RU charge, you may need to wait a couple of minutes.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
+1. Return to your web browser.
 
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
-
-1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
-
-1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Settings**.
-
-1. In the **Settings** tab, navigate to the **Indexing Policy** section.
+    > &#128221; If the **Indexing Policy** page is not open, go to **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, select **Settings** and navigate to the **Indexing Policy** section.
 
 1. Replace the indexing policy with this modified JSON object and then **Save** the changes:
 

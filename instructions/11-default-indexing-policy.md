@@ -37,11 +37,10 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
 
 ## Seed the Azure Cosmos DB for NoSQL account with data
 
@@ -80,21 +79,17 @@ The [cosmicworks][nuget.org/packages/cosmicworks] command-line tool deploys samp
 
 1. Close the integrated terminal.
 
-1. Close **Visual Studio Code**.
-
 ## View and manipulate the default indexing policy
 
 When a container is created by code, portal, or a tool; the indexing policy is set to an intelligent default if you do not specify it otherwise. You will observe that default indexing policy and make a change to the policy.
 
-1. In a web browser, navigate to the Azure portal (``portal.azure.com``).
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Return to your web browser.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
-1. Select the **products** container node within the **NoSQL API** navigation tree, and then select **New SQL Query**.
+1. Select the **products** container node within the **NOSQL API** navigation tree, and then select **New SQL Query**.
 
 1. Delete the contents of the editor area.
 
@@ -110,11 +105,11 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 
 1. In the **Query** tab, select **Query Stats**.
 
-1. Still in the **Query** tab, observe the value of the **Request Charge** field within the **Query Statistics** section.
+1. Observe the value of the **Request Charge** field within the **Query Statistics** section.
 
     > &#128221; All paths are currently indexed, so this query should be relatively efficient.
 
-1. Within the **products** container node of the **NoSQL API** navigation tree, select **Scale & Settings**.
+1. Within the **products** container node of the **NOSQL API** navigation tree, select **Scale & Settings**.
 
 1. Observe the default indexing policy within the **Indexing Policy** section:
 
@@ -174,7 +169,7 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 
 1. In the **Query** tab, select **Query Stats**.
 
-1. Still in the **Query** tab, observe the value of the **Request Charge** field within the **Query Statistics** section.
+1. Observe the value of the **Request Charge** field within the **Query Statistics** section.
 
     > &#128221; Now that the **name** property is not indexed, the request charge has increased.
 
@@ -192,7 +187,7 @@ When a container is created by code, portal, or a tool; the indexing policy is s
 
 1. In the **Query** tab, select **Query Stats**.
 
-1. Still in the **Query** tab, observe the value of the **Request Charge** field within the **Query Statistics** section.
+1. Observe the value of the **Request Charge** field within the **Query Statistics** section.
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
 [nuget.org/packages/cosmicworks]: https://www.nuget.org/packages/cosmicworks/

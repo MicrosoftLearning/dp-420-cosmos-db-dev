@@ -51,11 +51,11 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Switch back to **Visual Studio Code**.
 
 ## Connect to the Azure Cosmos DB for NoSQL account from the SDK
 
@@ -141,17 +141,11 @@ Using the credentials from the newly created account, you will connect with the 
 
 1. Close the integrated terminal.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Switch to your web browser window.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
-
-1. Close your web browser window or tab.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
 ## Perform create and read point operations on items with the SDK
 
@@ -336,15 +330,11 @@ You will now use the set of asynchronous methods in the Microsoft.Azure.Cosmos.C
 
 While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK account or the emulator to update an item and  oscillate back-and-forth between the Data Explorer and your IDE of choice as you perform an operation and check to see if your change has been applied. Here, you will do just that as you update and delete an item using the SDK.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Return to your web browser window or tab.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then expand the new **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then expand the new **products** container node within the **NOSQL API** navigation tree.
 
 1. Select the **Items** node. Select the only item within the container and then observe the values of the **name** and **price** properties of the item.
 
@@ -354,8 +344,6 @@ While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK a
     | **Price** | *$45.99* |
 
     > &#128221; At this point in time, these values should not have been changed since you have created the item. You will change these values in this exercise.
-
-1. Close your web browser window or tab.
 
 1. Return to **Visual Studio Code**. Return to the editor tab for the **script.cs** code file.
 
@@ -423,15 +411,11 @@ While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK a
 
 1. Close the integrated terminal.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Return to your web browser window or tab.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then expand the new **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then expand the new **products** container node within the **NOSQL API** navigation tree.
 
 1. Select the **Items** node. Select the only item within the container and then observe the values of the **name** and **price** properties of the item.
 
@@ -441,8 +425,6 @@ While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK a
     | **Price** | *$32.55* |
 
     > &#128221; At this point in time, these values should  have been changed since you have observed the item.
-
-1. Close your web browser window or tab.
 
 1. Return to **Visual Studio Code**. Return to the editor tab for the **script.cs** code file.
 
@@ -475,15 +457,11 @@ While learning the SDK, it's not uncommon to use an online Azure Cosmos DB SDK a
 
 1. Close the integrated terminal.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Return to your web browser window or tab.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then expand the new **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then expand the new **products** container node within the **NOSQL API** navigation tree.
 
 1. Select the **Items** node. Observe that the items list is now empty.
 

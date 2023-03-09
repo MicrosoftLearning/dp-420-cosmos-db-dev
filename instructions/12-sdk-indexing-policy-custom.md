@@ -51,17 +51,17 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
 ## Create a new indexing policy using the .NET SDK
 
 The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.Cosmos.IndexingPolicy][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.indexingpolicy] class to build new indexing policies in code.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **12-custom-index-policy** folder.
+1. In the **Explorer** pane, browse to the **12-custom-index-policy** folder.
 
 1. Open the **script.cs** code file.
 
@@ -181,19 +181,15 @@ The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.
 
 1. Close the integrated terminal.
 
-1. Close **Visual Studio Code**.
+1. Return to your web browser.
 
 ## Observe an indexing policy created by the .NET SDK using the Data Explorer
 
 Just like with any other indexing policy, you can use the Data Explorer to view policies that you pushed using the .NET SDKs. You will now use the portal to review the policy you created in this lab from code.
 
-1. In a web browser, navigate to the Azure portal (``portal.azure.com``).
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
-
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
 1. Within the **products** container node of the **NOSQL API** navigation tree, select **Scale & Settings**.
 

@@ -40,13 +40,13 @@ Your environment should already have the emulator pre-installed. If not, refer t
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **Primary Connection String** field. You will use this **connection string** value later in this exercise.
+    > &#128221; Notice the **Primary Connection String** field. You will use this **connection string** value later in this exercise.
 
 1. Navigate to the **Explorer** pane.
 
 1. In the **Data Explorer**, observe that there are no nodes within the **NoSQL API** navigation tree.
 
-1. Close your web browser window or tab.
+1. Leave this tab open and switch to **Visual Studio Code**.
 
 ## Connect to the emulator from the SDK
 
@@ -116,13 +116,13 @@ The **Microsoft.Azure.Cosmos** library has already been pre-installed in the .NE
 
 Now that you have created a new database in the Azure Cosmos DB emulator, you will use the online **Data Explorer** to observe the new NoSQL API database within the emulator.
 
-1. Navigate to the emulator icon in the Windows system tray, open the context menu, and then select **Open Data Explorer...** to navigate to the **localhost:8081/_explorer/** landing page using your default browser.
+1. Switch back to your browser
 
 1. In the **Azure Cosmos DB Emulator** landing page, navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, observe the new **cosmicworks** database node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, refresh the **SQL API** to observe the new **cosmicworks** database node within the navigation tree.
 
-1. Close your web browser window or tab.
+1. Switch back to **Visual Studio Code**.
 
 ## Create and view a new container
 
@@ -175,11 +175,11 @@ Creating a new container is similar to the pattern used to create a new database
 
 1. Close **Visual Studio Code**.
 
-1. Navigate to the emulator icon in the Windows system tray, open the context menu, and then select **Open Data Explorer...** to navigate to the **localhost:8081/_explorer/** landing page using your default browser.
+1. Switch to your browser.
 
 1. In the **Azure Cosmos DB Emulator** landing page, navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NoSQL API** navigation tree.
+1. In the **Data Explorer**, refresh the **SQL API** to observe the new **products** container node within the  **cosmicworks** database node.
 
 1. Close your web browser window or tab.
 
@@ -187,7 +187,7 @@ Creating a new container is similar to the pattern used to create a new database
 
 It is important to stop the emulator when you are done using it as it can use system resources in your environment. You will use the system tray icon to stop the emulator and all running instances.
 
-1. Navigate to the emulator icon in the Windows system tray, open the context menu, and then select **Exit** to shut down the emulator.
+ Navigate to the emulator icon in the Windows system tray, open the context menu, and then select **Exit** to shut down the emulator.
 
     > &#128221; It may take a minute for all instances of the emulator to exit.
 
