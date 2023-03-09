@@ -120,7 +120,7 @@ Now that you have created a new database in the Azure Cosmos DB emulator, you wi
 
 1. In the **Azure Cosmos DB Emulator** landing page, navigate to the **Explorer** pane.
 
-1. In the **Data Explorer**, refresh the **SQL API** to observe the new **cosmicworks** database node within the navigation tree.
+1. In the **Data Explorer**, refresh the **NOSQL API** to observe the new **cosmicworks** database node within the navigation tree.
 
 1. Switch back to **Visual Studio Code**.
 
