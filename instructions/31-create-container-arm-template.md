@@ -84,8 +84,10 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
 1. Install the tls/ssl certificates before you login to Azure:
 
     ```
+    $CurrentDirectory=$pwd
     CD "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\"
     .\python.exe -m pip install pip-system-certs
+    CD $CurrentDirectory
     ```
 
 1. Begin the interactive login procedure for the Azure CLI using the following command:
