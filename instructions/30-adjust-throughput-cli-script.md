@@ -30,6 +30,13 @@ Before using the Azure CLI, you must first check the version of the CLI and logi
     az --help
     ```
 
+1. Install the tls/ssl certificates before you login to Azure:
+
+    ```
+    CD "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\"
+    .\python.exe -m pip install pip-system-certs
+    ```
+
 1. Begin the interactive login procedure for the Azure CLI using the following command:
 
     ```
