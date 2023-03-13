@@ -81,6 +81,13 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
 
     > &#128221; This command will open the terminal with the starting directory already set to the **31-create-container-arm-template** folder.
 
+1. Install the tls/ssl certificates before you login to Azure:
+
+    ```
+    CD "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\"
+    .\python.exe -m pip install pip-system-certs
+    ```
+
 1. Begin the interactive login procedure for the Azure CLI using the following command:
 
     ```
