@@ -137,7 +137,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
 1. Add the [Microsoft.Azure.Services.AppAuthentication][nuget.org/packages/Microsoft.Azure.Services.AppAuthentication] package from NuGet using the following command:
 
     ```
-    dotnet add package Microsoft.Azure.Services.AppAuthentication
+    dotnet add package Microsoft.Azure.Services.AppAuthentication --version 1.6.2
     ```
 
 ## Adding the Secret Identifier to your webapp
