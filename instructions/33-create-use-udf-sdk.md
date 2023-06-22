@@ -1,12 +1,12 @@
 ---
 lab:
-    title: 'Implement and then use a UDF using the SDK'
-    module: 'Module 13 - Create server-side programming constructs in Azure Cosmos DB SQL API'
+    title: 'Implement and then use user-defined functions with the SDK'
+    module: 'Module 13 - Create server-side programming constructs in Azure Cosmos DB for NoSQL'
 ---
 
-# Implement and then use a UDF using the SDK
+# Implement and then use user-defined functions with the SDK
 
-The .NET SDK for Azure Cosmos DB SQL API can be used to manage and invoke server-side programming constructs directly from a container. When preparing a new container, it may make sense to use the .NET SDK to publish UDFs directly to a container instead of performing the tasks manually using the Data Explorer.
+The .NET SDK for Azure Cosmos DB for NoSQL can be used to manage and invoke server-side programming constructs directly from a container. When preparing a new container, it may make sense to use the .NET SDK to publish UDFs directly to a container instead of performing the tasks manually using the Data Explorer.
 
 In this lab, you'll create a new UDF using the .NET SDK and then use the Data Explorer to validate that the UDF is working correctly.
 
@@ -24,15 +24,15 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB SQL API account using the Azure SDK for .NET or any other SDK of your choice.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB for NoSQL account using the Azure SDK for .NET or any other SDK of your choice.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -51,15 +51,15 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Without closing the browser window, open **Visual Studio Code**.
 
-## Seed the Azure Cosmos DB SQL API account with data
+## Seed the Azure Cosmos DB for NoSQL account with data
 
-The [cosmicworks][nuget.org/packages/cosmicworks] command-line tool deploys sample data to any Azure Cosmos DB SQL API account. The tool is open-source and available through NuGet. You will install this tool to the Azure Cloud Shell and then use it to seed your database.
+The [cosmicworks][nuget.org/packages/cosmicworks] command-line tool deploys sample data to any Azure Cosmos DB for NoSQL account. The tool is open-source and available through NuGet. You will install this tool to the Azure Cloud Shell and then use it to seed your database.
 
 1. In **Visual Studio Code**, open the **Terminal** menu and then select **New Terminal** to open a new terminal instance.
 
@@ -92,7 +92,7 @@ The [cosmicworks][nuget.org/packages/cosmicworks] command-line tool deploys samp
 
 ## Create a user-defined function (UDF) using the .NET SDK
 
-The [Container][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container] class in the .NET SDK includes a [Scripts][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.scripts] property that is used to perform CRUD operations against Stored Procedures, UDFs, and Triggers directly from the SDK. You will use this property to create a new UDF and then push that UDF to an Azure Cosmos DB SQL API container. The UDF that we will create using the SDK, will compute the price of the product with the tax, which will let us run SQL queries on the products using their price with the tax.
+The [Container][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container] class in the .NET SDK includes a [Scripts][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.scripts] property that is used to perform CRUD operations against Stored Procedures, UDFs, and Triggers directly from the SDK. You will use this property to create a new UDF and then push that UDF to an Azure Cosmos DB for NoSQL container. The UDF that we will create using the SDK, will compute the price of the product with the tax, which will let us run SQL queries on the products using their price with the tax.
 
 1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **33-create-use-udf-sdk** folder.
 
@@ -200,17 +200,13 @@ The [Container][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container] 
 
 Now that a new UDF has been created in the Azure Cosmos DB container, you will use the Data Explorer to validate that the UDF is working as expected.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Return to your web browser.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
-1. Select the **products** container node within the **SQL API** navigation tree, and then select **New SQL Query**.
+1. Select the **products** container node within the **NOSQL API** navigation tree, and then select **New SQL Query**.
 
 1. In the query tab, select **Execute Query** to view a standard query that selects all items without any filters.
 

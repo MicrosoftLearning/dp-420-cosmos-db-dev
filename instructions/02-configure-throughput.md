@@ -1,12 +1,12 @@
 ---
 lab:
-    title: 'Configure throughput for Azure Cosmos DB SQL API with the Azure portal'
-    module: 'Module 2 - Plan and implement Azure Cosmos DB SQL API'
+    title: 'Configure throughput for Azure Cosmos DB For NoSQL with the Azure portal'
+    module: 'Module 2 - Plan and implement Azure Cosmos DB for NoSQL'
 ---
 
-# Configure throughput for Azure Cosmos DB SQL API with the Azure portal
+# Configure throughput for Azure Cosmos DB for NoSQL with the Azure portal
 
-One of the most important things to wrap your head around is configuring throughput in Azure Cosmos DB SQL API. To create an Azure Cosmos DB SQL API container, you must first create an account and then a database; in that order.
+One of the most important things to wrap your head around is configuring throughput in Azure Cosmos DB for NoSQL. To create an Azure Cosmos DB for NoSQL container, you must first create an account and then a database; in that order.
 
 In this lab, you will provision throughput using various methods in the Data Explorer. You will provision throughput either manually or using autoscale, at the database and the container level.
 
@@ -22,7 +22,7 @@ Let’s start simple by creating a serverless account. There’s not much to con
 
     > &#128161; Alternatively; expand the **&#8801;** menu, select **All Services**, in the **Databases** category, select **Azure Cosmos DB**, and then select **Create**.
 
-1. In the **Select API option** pane, select the **Create** option within the **Core (SQL) - Recommended** section.
+1. In the **Select API option** pane, select the **Create** option within the **Azure Cosmos DB for NoSQL** section.
 
 1. Within the **Create Azure Cosmos DB Account** pane, observe the **Basics** tab.
 
@@ -30,15 +30,15 @@ Let’s start simple by creating a serverless account. There’s not much to con
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Subscription** | *All resources must belong to a resource group. Every resource group must belong to a subscription. Here, use your existing Azure subscription.* |
-    | **Resource Group** | *All resources must belong to a resource group. Here, select an existing or create a new resource group.* |
-    | **Account Name** | *The globally unique account name. This name will be used as part of the DNS address for requests. Enter any globally unique name. The portal will check the name in real time.* |
-    | **Location** | *Select the geographical region from which your database will initially be hosted. Choose any available region.* |
-    | **Capacity mode** | *Select Serverless* |
+    | **Subscription** | **Use your existing Azure subscription.** *All resources must belong to a resource group. Every resource group must belong to a subscription.* |
+    | **Resource Group** | **Use existing or create a new resource group.** *All resources must belong to a resource group.*|
+    | **Account Name** |  **Enter any globally unique name.** *The globally unique account name. This name will be used as part of the DNS address for requests.  The portal will check the name in real time.* |
+    | **Location** | **Choose any available region.** *Select the geographical region from which your database will initially be hosted.* |
+    | **Capacity mode** | **Select Serverless** |
 
 1. Select **Review + Create** to navigate to the **Review + Create** tab, and then select **Create**.
 
-    > &#128221; It can take 10-15 minutes for the Azure Cosmos DB SQL API account to be ready for use.
+    > &#128221; It can take 10-15 minutes for the Azure Cosmos DB for NoSQL account to be ready for use.
 
 1. Observe the **Deployment** pane. When the deployment is complete, the pane will update with a **Deployment successful** message.
 
@@ -78,7 +78,7 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     > &#128161; Alternatively; expand the **&#8801;** menu, select **All Services**, in the **Databases** category, select **Azure Cosmos DB**, and then select **Create**.
 
-1. In the **Select API option** pane, select the **Create** option within the **Core (SQL) - Recommended** section.
+1. In the **Select API option** pane, select the **Create** option within the **Azure Cosmos DB for NoSQL** section.
 
 1. Within the **Create Azure Cosmos DB Account** pane, observe the **Basics** tab.
 
@@ -86,17 +86,17 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Subscription** | *All resources must belong to a resource group. Every resource group must belong to a subscription. Here, use your existing Azure subscription.* |
-    | **Resource Group** | *All resources must belong to a resource group. Here, select an existing or create a new resource group.* |
-    | **Account Name** | *The globally unique account name. This name will be used as part of the DNS address for requests. Enter any globally unique name. The portal will check the name in real time.* |
-    | **Location** | *Select the geographical region from which your database will initially be hosted. Choose any available region.* |
-    | **Capacity mode** | *Select provisioned throughput* |
-    | **Apply Free Tier Discount** | *Do Not Apply* |
-    | **Limit the total amount of throughput that can be provisioned on this account** | *Unchecked* |
+    | **Subscription** | **Use your existing Azure subscription.** *All resources must belong to a resource group. Every resource group must belong to a subscription.* |
+    | **Resource Group** | **Use existing or create a new resource group.** *All resources must belong to a resource group.*|
+    | **Account Name** |  **Enter any globally unique name.** *The globally unique account name. This name will be used as part of the DNS address for requests.  The portal will check the name in real time.* |
+    | **Location** | **Choose any available region.** *Select the geographical region from which your database will initially be hosted.* |
+    | **Capacity mode** | **Provisioned throughput** |
+    | **Apply Free Tier Discount** | **Do Not Apply** |
+    | **Limit the total amount of throughput that can be provisioned on this account** | **Unchecked** |
 
 1. Select **Review + Create** to navigate to the **Review + Create** tab, and then select **Create**.
 
-    > &#128221; It can take 10-15 minutes for the Azure Cosmos DB SQL API account to be ready for use.
+    > &#128221; It can take 10-15 minutes for the Azure Cosmos DB for NoSQL account to be ready for use.
 
 1. Observe the **Deployment** pane. When the deployment is complete, the pane will update with a **Deployment successful** message.
 
@@ -111,7 +111,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *`nothroughputdb`* |
-    | **Provision throughput** | *Do not select* |
+    | **Provision throughput** | *Unchecked* |
 
 1. Back in the **Data Explorer** pane, observe the **nothroughputdb** database node within the hierarchy.
 
@@ -136,7 +136,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *`manualthroughputdb`* |
-    | **Provision throughput** | *Select this option* |
+    | **Provision throughput** | *Checked* |
     | **Database throughput** | *Manual* |
     | **RU/s** | *`400`* |
 
@@ -151,7 +151,7 @@ Now, we are going to create a provisioned throughput account with more tradition
     | **Database id** | *Use existing* &vert; *manualthroughputdb* |
     | **Container id** | *`childcontainer`* |
     | **Partition key** | *`/primarykey`* |
-    | **Provision dedicated throughput for this container** | *Select this option* |
+    | **Provision dedicated throughput for this container** | *Checked* |
     | **Container throughput** | *Manual* |
     | **RU/s** | *`1000`* |
 

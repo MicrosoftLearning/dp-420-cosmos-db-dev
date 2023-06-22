@@ -1,10 +1,10 @@
 ---
 lab:
-    title: 'Use Azure Monitor to analyze an Azure Cosmos DB SQL API account'
-    module: 'Module 11 - Monitor and troubleshoot an Azure Cosmos DB SQL API solution'
+    title: 'Use Azure Monitor to analyze an Azure Cosmos DB for NoSQL account'
+    module: 'Module 11 - Monitor and troubleshoot an Azure Cosmos DB for NoSQL solution'
 ---
 
-# Use Azure Monitor to analyze an Azure Cosmos DB SQL API account
+# Use Azure Monitor to analyze an Azure Cosmos DB for NoSQL account
 
 Azure Monitor is a full stack monitoring service in Azure that provides a complete set of features to monitor Azure resources.  Azure Cosmos DB creates monitoring data using Azure Monitor.  Azure Monitor captures Cosmos DB's metrics and telemetry data.
 
@@ -24,15 +24,15 @@ If you haven't already cloned the lab code repository for **DP-420** to the envi
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB SQL API account programatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB for NoSQL account programatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -41,7 +41,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
     | **Capacity mode** | *Provisioned throughput* |
-    | **Apply Free Tier Discount** | *`Do Not Apply`* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
     | **Limit the total amount of throughput that can be provisioned on this account** | *Uncheck* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
@@ -52,9 +52,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You'll use this **endpoint** value later in this exercise.
+    1.Notice the **URI** field. You'll use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You'll use this **key** value later in this exercise.
+    1.Notice the **PRIMARY KEY** field. You'll use this **key** value later in this exercise.
 
 1. Minimize, but don't close your browser window. We'll come back to the Azure portal a few minutes after we start a background workload in the next steps.
 
@@ -128,7 +128,7 @@ In this part of the exercise, we'll go back to the browser and review some of th
 
 1. In the Azure Comsos DB left-hand menu, under *Monitoring*, select **Metrics**. You'll notice that the **Scope** and **Metric Namespace** fields are prepopulated with the correct information. In the following steps, we'll take a look at a few **Metric** options and the *Add filter* and *Apply splitting* features.
 
-1. By default, the *Metrics* section will show us diagnostic information for the last 24 hours. We need to get more granular to look at the metrics during the workload we created in the previous step. On the upper right-hand corner, select the button labeled ***Local time: Last 24 hours (Automatic)***, we'll then get a window with multiple radio button time range options.  Choose the radio button labeled **Last 30 minute**s and select the **Apply** button. If needed, you can get much more granular by choosing the *Custom* radio button and picking a start and end date and time. 
+1. By default, the *Metrics* section will show us diagnostic information for the last 24 hours. We need to get more granular to look at the metrics during the workload we created in the previous step. On the upper right-hand corner, select the button labeled ***Local time: Last 24 hours (Automatic)***, we'll then get a window with multiple radio button time range options.  Choose the radio button labeled ***Last 30 minutes*** and select the **Apply** button. If needed, you can get much more granular by choosing the *Custom* radio button and picking a start and end date and time. 
 
 1. Now that we have a good time range for our diagnostic charts, let's take a look at some Metrics. We'll start with a common metric. From the *Metric* pulldown, choose **Total Request Units**. By default this metric will be displayed as the total sum of RUs. Or, you can change the Aggregation pulldown to avg or max. Once you check out those two aggregations, set it back to *Sum* for the following steps.
 

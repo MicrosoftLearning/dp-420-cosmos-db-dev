@@ -1,10 +1,10 @@
 ---
 lab:
-    title: 'Batch multiple point operations together with the Azure Cosmos DB SQL API SDK'
-    module: 'Module 4 - Access and manage data with the Azure Cosmos DB SQL API SDKs'
+    title: 'Batch multiple point operations together with the Azure Cosmos DB for NoSQL SDK'
+    module: 'Module 4 - Access and manage data with the Azure Cosmos DB for NoSQL SDKs'
 ---
 
-# Batch multiple point operations together with the Azure Cosmos DB SQL API SDK
+# Batch multiple point operations together with the Azure Cosmos DB for NoSQL SDK
 
 The [TransactionalBatch][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatch] and [TransactionalBatchResponse][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.transactionalbatchresponse] classes together are the key to composing and decomposing operations into a single logical step. Using these classes, you can write your code to perform multiple operations and then determine if they were completed successfully server-side.
 
@@ -24,13 +24,13 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-## Create an Azure Cosmos DB SQL API account and configure the SDK project
+## Create an Azure Cosmos DB for NoSQL account and configure the SDK project
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -49,13 +49,13 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **07-sdk-batch** folder.
+1. In  in the **Explorer** pane, browse to the **07-sdk-batch** folder.
 
 1. Open the **script.cs** code file within the **07-sdk-batch** folder.
 
@@ -179,7 +179,7 @@ First, let’s create a simple transactional batch that makes two fictional prod
     dotnet run
     ```
 
-1. Observe the output from the terminal. The status code should be an HTTP 200 **OK**.
+1. Observe the output from the terminal. The status code should be an **OK**.
 
 1. Close the integrated terminal.
 
@@ -282,7 +282,7 @@ Now, let’s create a transactional batch that will error purposefully. This bat
     dotnet run
     ```
 
-1. Observe the output from the terminal. The status code should either be an HTTP 400 **Bad Request** or 409 **Conflict**. This occured because all items within the transaction did not share the same partition key value as the transactional batch.
+1. Observe the output from the terminal. The status code should either be a **Bad Request** or **Conflict**. This occured because all items within the transaction did not share the same partition key value as the transactional batch.
 
 1. Close the integrated terminal.
 

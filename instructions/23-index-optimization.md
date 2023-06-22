@@ -1,14 +1,14 @@
 ---
 lab:
-    title: 'Optimize an Azure Cosmos DB SQL API container indexing policy for write operations'
-    module: 'Module 10 - Optimize query performance in Azure Cosmos DB SQL API'
+    title: 'Optimize an Azure Cosmos DB for NoSQL container''s indexing policy for common operations'
+    module: 'Module 10 - Optimize query and operation performance in Azure Cosmos DB for NoSQL'
 ---
 
-# Optimize an Azure Cosmos DB SQL API container's indexing policy for write operations
+# Optimize an Azure Cosmos DB for NoSQL container's indexing policy for common operations
 
 For write-heavy workloads or workloads with large JSON objects, it can be advantageous to optimize the indexing policy to only index properties that you know you will want to use in your queries.
 
-In this lab, we will use a test .NET application to insert a large JSON item into an Azure Cosmos DB SQL API container using the default indexing policy, and then using an indexing policy that has been tuned slightly.
+In this lab, we will use a test .NET application to insert a large JSON item into an Azure Cosmos DB for NoSQL container using the default indexing policy, and then using an indexing policy that has been tuned slightly.
 
 ## Prepare your development environment
 
@@ -24,15 +24,15 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB SQL API account using the Azure SDK for .NET or any other SDK of your choice.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB for NoSQL account using the Azure SDK for .NET or any other SDK of your choice.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -54,9 +54,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *cosmicworks* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Database id** | *Create new* &vert; *``cosmicworks``* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -64,17 +64,17 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
 ## Run the test .NET application using the default indexing policy
 
-This lab has a pre-built test .NET application that will take a large JSON object and create a new item in the Azure Cosmos DB SQL API container. Once the single write operation is complete, the application will output the item’s unique identifier and RU charge to the console window.
+This lab has a pre-built test .NET application that will take a large JSON object and create a new item in the Azure Cosmos DB for NoSQL container. Once the single write operation is complete, the application will output the item’s unique identifier and RU charge to the console window.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **23-index-optimization** folder.
+1. In the **Explorer** pane, browse to the **23-index-optimization** folder.
 
 1. Open the context menu for the **23-index-optimization** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
@@ -134,11 +134,7 @@ This lab has a pre-built test .NET application that will take a large JSON objec
 
 This lab scenario will assume that our future queries focus primarily on the name and categoryName properties. To optimize for our large JSON item, you will exclude all other fields from the index by creating an indexing policy that starts by excluding all paths. Then the policy will selectively include specific paths.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
+1. Return to your web browser.
 
 1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
@@ -190,8 +186,6 @@ This lab scenario will assume that our future queries focus primarily on the nam
     }
     ```
 
-1. Close your web browser window or tab.
-
 1. Return to **Visual Studio Code**. Return to the open terminal.
 
 1. Build and run the project at least two more times using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command. Observe the new RU charge in the console output, which should be significantly less than the original charge:
@@ -202,17 +196,9 @@ This lab scenario will assume that our future queries focus primarily on the nam
 
     > &#128221; If you are not seeing an updated RU charge, you may need to wait a couple of minutes.
 
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
+1. Return to your web browser.
 
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
-
-1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
-
-1. In the **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, and then select **Settings**.
-
-1. In the **Settings** tab, navigate to the **Indexing Policy** section.
+    > &#128221; If the **Indexing Policy** page is not open, go to **Data Explorer**, expand the **cosmicworks** database node, expand the **products** container node, select **Settings** and navigate to the **Indexing Policy** section.
 
 1. Replace the indexing policy with this modified JSON object and then **Save** the changes:
 

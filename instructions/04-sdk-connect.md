@@ -1,14 +1,14 @@
 ---
 lab:
-    title: 'Connect to Azure Cosmos DB SQL API with the SDK'
-    module: 'Module 3 - Connect to Azure Cosmos DB SQL API with the SDK'
+    title: 'Connect to Azure Cosmos DB for NoSQL with the SDK'
+    module: 'Module 3 - Connect to Azure Cosmos DB for NoSQL with the SDK'
 ---
 
-# Connect to Azure Cosmos DB SQL API with the SDK
+# Connect to Azure Cosmos DB for NoSQL with the SDK
 
 The Azure SDK for .NET is a suite of libraries that provides a consistent developer interface to interact with many Azure services. The Azure SDK for .NET is built to the .NET Standard 2.0 specification ensuring that it can be used in .NET Framework (4.6.1 or above), .NET Core (2.1 or above), and .NET (5 or above) applications.
 
-In this lab, you'll connect to an Azure Cosmos DB SQL API account using the Azure SDK for .NET.
+In this lab, you'll connect to an Azure Cosmos DB for NoSQL account using the Azure SDK for .NET.
 
 ## Prepare your development environment
 
@@ -24,15 +24,15 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB SQL API account using the Azure SDK for .NET or any other SDK of your choice.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB for NoSQL account using the Azure SDK for .NET or any other SDK of your choice.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -52,17 +52,17 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Keep the browser tab open, as we will return to it later.
 
 ## View the Microsoft.Azure.Cosmos library on NuGet
 
 The NuGet website contains a searchable index of packages that are available to import into your .NET applications. To import prerelease packages such as **Microsoft.Azure.Cosmos**, you can use the NuGet website to get the appropriate versions and commands to import the package into your applications.
 
-1. In a web browser, navigate to the NuGet website (``nuget.org``).
+1. In new browser tab, navigate to the NuGet website (``nuget.org``).
 
 1. Review the description of NuGet, the package manager for .NET, and its capabilities.
 
@@ -94,7 +94,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
 
 ## Use the Microsoft.Azure.Cosmos library
 
-Once the Azure Cosmos DB library from the Azure SDK for .NET has been imported, you can immediately use its classes within the [Microsoft.Azure.Cosmos][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos] namespace to connect to an Azure Cosmos DB SQL API account. The [CosmosClient][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclient] class is the core class that is used to make the initial connection to an Azure Cosmos DB SQL API account.
+Once the Azure Cosmos DB library from the Azure SDK for .NET has been imported, you can immediately use its classes within the [Microsoft.Azure.Cosmos][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos] namespace to connect to an Azure Cosmos DB for NoSQL account. The [CosmosClient][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.cosmosclient] class is the core class that is used to make the initial connection to an Azure Cosmos DB for NoSQL account.
 
 1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **04-sdk-connect** folder.
 
@@ -176,7 +176,7 @@ Once the Azure Cosmos DB library from the Azure SDK for .NET has been imported, 
 
 ## Test the script
 
-Now that the .NET code to connect to the Azure Cosmos DB SQL API account is complete, you can test the script. This script will print the name of the account, and the name of the first writable region. When you created the account, you specified a location and you should expect to see that same location value printed as the result of this script.
+Now that the .NET code to connect to the Azure Cosmos DB for NoSQL account is complete, you can test the script. This script will print the name of the account, and the name of the first writable region. When you created the account, you specified a location and you should expect to see that same location value printed as the result of this script.
 
 1. In **Visual Studio Code**, open the context menu for the **04-sdk-connect** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 

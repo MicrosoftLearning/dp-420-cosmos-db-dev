@@ -1,24 +1,24 @@
 ---
 Lab:
     title: 'Recover a database or container from a recovery point'
-    module: 'Module 11 - Monitor and troubleshoot an Azure Cosmos DB SQL API solution'
+    module: 'Module 11 - Monitor and troubleshoot an Azure Cosmos DB for NoSQL solution'
 ---
 
 # Recover a database or container from a recovery point 
 
 Azure Automatically takes encrypted backups of your data. These backups are taken in two modes, **Periodic** and **Continuous** backup modes.
 
-In this lab, you'll do `backup` and `restores` using the continuous backup mode. First, you'll Create an Azure Cosmos DB account. You'll then create two containers and add a few documents to them. Next, you'll then update a couple of the documents in those containers. Finally you'll create restores of the account to a point before each delete.
+In this lab, you'll do **backup** and **restores** using the continuous backup mode. First, you'll Create an Azure Cosmos DB account. You'll then create two containers and add a few documents to them. Next, you'll then update a couple of the documents in those containers. Finally you'll create restores of the account to a point before each delete.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB SQL API account programatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB for NoSQL account programatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -30,7 +30,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Apply Free Tier Discount** | *Do Not Apply* |
     | **Global Distribution** TAB | Disable Multi-region Writes |
 
-    > &#128221; Note that you can enabled **Continuous** mode during the creation of the Azure Cosmos DB account, by selecting it under the **Backup Policy** tab. In this Lab you have the choice of enabling this feature during account creation or after the account is created in the optional section below. **Enabling the feature *after* the account is created *could take longer than 5 minutes*.**
+    > &#128221; Note that you can enable **Continuous** mode during the creation of the Azure Cosmos DB account, by selecting it under the **Backup Policy** tab. In this Lab you have the choice of enabling this feature during account creation or after the account is created in the optional section below. **Enabling the feature *after* the account is created *could take longer than 5 minutes*.**
 
     > &#128221; Note that *[Multi-regions write accounts are not currently supported for continuous backups][/azure/cosmos-db/continuous-backup-restore-introduction]*.
 
@@ -42,18 +42,12 @@ Let's create a database and a couple of containers.
 
 1. On the Azure portal, navigate to your Azure Cosmos DB account page.
 
-1. Under **Data Explorer**, add a new database with the following settings
-
-    | **Setting** | **Value** |
-    | ---: | :--- |
-    | **Database id** | *`Sales`* |
-    | **Share throughput across containers** | *Do not select* |
-
 1. Under **Data Explorer**, add a new container with the following settings
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Database id** | *Use existing* name: *Sales* |
+    | **Database id** | *Create new* name: *`Sales`* |
+    | **Share throughput across containers** | *Do not select* |
     | **Container id** | *`customer`* |
     | **Partition key** | *`/id`* |
     | **Container throughput (400 - unlimited RU/s)** | *Manual* throughput: *400*|
@@ -209,9 +203,9 @@ Let's add some documents to those containers.
 
 1. On the Azure portal, navigate to your Azure Cosmos DB account page.
 
-1. Under the **Settings**, section, select **Features**.
+1. Under the **Settings**, section, select **Backup & Restore**.
 
-1. Select the **Continuous Backup** Option to turn on the feature. Selecting this option will bring up window, select the **Enable** button.  Enabling this feature could take over five minutes.
+1. Select **Change** next to **Backup Policy mode**, in the screen select the **Continuous (7 Days)** option and then select **Save**. Enabling this feature could take over five minutes.
 
     > &#128221; Note that *[Multi-regions write accounts are not currently supported for continuous backups][/azure/cosmos-db/continuous-backup-restore-introduction]*. If you did not disable Multi-region writes when you created your Azure Cosmos DB account, you will need to do it now or enabling the continuous backup feature will fail.  You can disable multi-region writes unde the **Replicate data globally** *Settings* section.
 

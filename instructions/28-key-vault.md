@@ -1,10 +1,10 @@
 ---
 lab:
-    title: 'Store Azure Cosmos DB SQL API account keys in Azure Key Vault'
-    module: 'Module 11 - Monitor and troubleshoot an Azure Cosmos DB SQL API solution'
+    title: 'Store Azure Cosmos DB for NoSQL account keys in Azure Key Vault'
+    module: 'Module 11 - Monitor and troubleshoot an Azure Cosmos DB for NoSQL solution'
 ---
 
-# Store Azure Cosmos DB SQL API account keys in Azure Key Vault
+# Store Azure Cosmos DB for NoSQL account keys in Azure Key Vault
 
 Adding an Azure Cosmos DB account connection code to your application is as simple as providing the account's URI and keys. This security information might sometimes be hard-coded into the application code. However, if your application is being deployed to the Azure App Service, you can save the encrypt connection information into Azure Key Vault.
 
@@ -24,15 +24,15 @@ If you haven't already cloned the lab code repository for **DP-420** to the envi
 
 1. Once the repository has been cloned, ***CLOSE*** *Visual Studio Code*. We will later open it pointing directly to the **28-key-vault** folder.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB SQL API account programatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB for NoSQL account programatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -49,15 +49,13 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Go to the newly created **Azure Cosmos DB** account resource and navigate to the **Keys** pane.
 
-1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
-
-    1. Record the value of the **PRIMARY CONNECTION STRING** field. You'll use this **connection string** value later in this exercise.
+1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically the **PRIMARY CONNECTION STRING** field. You'll use this **connection string** value later in this exercise.
 
 ## Create an Azure Key Vault and store the Azure Cosmos DB account credentials as a secret
 
 Before we create our web app, we will secure the Azure Cosmos DB account connection string by copying them to an *Azure Key Vault* encrypted *secret*. Let's do that now.
 
-1. In the Azure portal, navigate to the **Key vaults** page.
+1. In a new browser tab, navigate to the Azure portal, opening the **Key vaults** page.
 
 1. Add a vault by selecting the ***+ Create*** button, and fill out the vault with the following settings, *leaving all remaining settings to their default values*, then select to create the vault:
 
@@ -78,7 +76,7 @@ Before we create our web app, we will secure the Azure Cosmos DB account connect
     | ---: | :--- |
     | **Upload options** | *Manual* |
     | **Name** | *The name you will label your secret with* |
-    | **Value** | *This field is the most important field to fill out. This value is the PRIMARY CONNECTION STRING you previously copied from the key section of your Azure Cosmos DB account. This value will be convert into a secret.* |
+    | **Value** | *This field is the most important field to fill out. Copy here value of the PRIMARY CONNECTION STRING from the key section of your Azure Cosmos DB account. This value will be convert into a secret.* |
     | **Enabled** | *Yes* |
  
 1. Under the Secrets, you should now see your new secret listed. We need to get the *secret identifier* that we will add to the code of our webapp. Select the **secret** you created.
@@ -101,26 +99,22 @@ We'll create a webapp that will connect to the Azure Cosmos DB account and creat
 
     > &#128221; This command will open the terminal with the starting directory already set to the **28-key-vault** folder.
 
-1. Let's create and MVC webapp shell. We will replace a couple of the generated files in a moment. Run the following command to create the webapp:
+1. Let's create an MVC webapp shell. We will replace a couple of the generated files in a moment. Run the following command to create the webapp:
 
     ```
     dotnet new mvc
     ```
 
 
-1. That command created the shell of a web app, so it added several files and directories. We already have a couple of files with all the code we need. Replace the files **.\Controllers\HomeController.cs** and **.\Views\Home\Index.cshtml** for their respective files in the **.\KeyvaultFiles** directory.
+    > &#128221;This command created the shell of a web app, so it added several files and directories. We already have a couple of files with all the code we need. 
+
+1. Replace the files **.\Controllers\HomeController.cs** and **.\Views\Home\Index.cshtml** for their respective files from the **.\KeyvaultFiles** directory.
 
 1. Once you replace the files ***DELETE*** the **.\KeyvaultFiles** directory.
 
 ## Import the multiple missing libraries into the .NET script
 
 The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotnet-add-package] command to import packages from a pre-configured package feed. A .NET installation uses NuGet as its default package feed.
-
-1. If you have not done so, in **Visual Studio Code**, in the **Explorer** pane, browse to the **28-key-vault** folder.
-
-1. If you have not done so, open the context menu for the **28-key-vault** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
-
-    > &#128221; This command will open the terminal with the starting directory already set to the **28-key-vault** folder.
 
 1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1] package from NuGet using the following command:
 
@@ -143,7 +137,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
 1. Add the [Microsoft.Azure.Services.AppAuthentication][nuget.org/packages/Microsoft.Azure.Services.AppAuthentication] package from NuGet using the following command:
 
     ```
-    dotnet add package Microsoft.Azure.Services.AppAuthentication
+    dotnet add package Microsoft.Azure.Services.AppAuthentication --version 1.6.2
     ```
 
 ## Adding the Secret Identifier to your webapp
@@ -242,11 +236,11 @@ The rest of the code is straight forward, get the connection string, connect to 
 
 1. Select **Yes** when prompted to always deploy to that workspace.
 
-1. Select Browse Website when prompted.  Alternatively, open a browser and go to **`https://<yourwebappname>.azurewebsites.net`**. In either case, we have a problem. We should have gotten a user-defined message on our web page. The message should be, **Key Vault was not accessible** with an extended error message. Let's fix that.
+1. Select **Browse Website** when prompted.  Alternatively, open a browser and go to **`https://<yourwebappname>.azurewebsites.net`**. In either case, we have a problem. You will see a user-defined message on our web page. The message should be, **Key Vault was not accessible** with an extended error message. Let's fix that.
 
 ## Allow our app to use a managed identity
 
-The first problem we need to fix is to allow our app use a managed identity. Using a managed identity, will allow our app to use Azure Services like Azure Key Vault.
+The first problem we need to fix is to allow our app use a managed identity. Using a managed identity will allow our app to use Azure Services like Azure Key Vault.
 
 1. Open up your browser and login to the Azure portal.
 
@@ -268,21 +262,19 @@ The original goal of this lab was to prevent our Azure Cosmos DB Accounts from b
 
 1. In the Azure portal, go to the Key vault we created earlier.
 
-1. Under the *Settings* section, select **Access policies**.
+1. Under the *Settings* section, select **Access configuration**.
 
-1. Select **+ Add Access Policy**.
+1. Ensure **Vault access policy** is selected, and then select **Go to access policies**.
 
-1. Fill in the *Access policy* values with the following settings, *leaving all remaining settings to their default values*, then select to add the policy:
+1. Select **+ Create**.
 
-    | **Setting** | **Value** |
-    | ---: | :--- |
-    | **Key permissions** | *Get* |
-    | **Secret permissions** | *Get* |
-    | **Select principal** | *Search and select your application name* |
+1. On the **Permissions** tab, select the **Get** checkbox for **Key permissions** and **Secret permissions**, and then select **Next**.
 
-    > &#128221; Don't select an Authorized application.
+1. On the **Principal** tab, in the search box, enter the name you gave your App Service, select it from the list, and then select **Next**.
 
-1. **Save** the new policy.
+1. On the **Application (optional)** tab, select **Next**.
+    
+1. On the **Review + create** tab, select **Create**.
 
 1. Let's try our web app again.  On your browser, go to  **`https://<yourwebappname>.azurewebsites.net`**.
 

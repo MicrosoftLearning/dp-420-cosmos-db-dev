@@ -1,7 +1,7 @@
 ---
 lab:
     title: 'Migrate existing data using Azure Data Factory'
-    module: 'Module 2 - Plan and implement Azure Cosmos DB SQL API'
+    module: 'Module 2 - Plan and implement Azure Cosmos DB for NoSQL'
 ---
 
 # Migrate existing data using Azure Data Factory
@@ -10,7 +10,7 @@ In Azure Data Factory, Azure Cosmos DB is supported as a source of data ingest a
 
 In this lab, we will populate Azure Cosmos DB using a helpful command-line utility and then use Azure Data Factory to move a subset of data from one container to another.
 
-## Create and seed your Azure Cosmos DB SQL API account
+## Create and seed your Azure Cosmos DB for NoSQL account
 
 You will use a command-line utility that creates a **cosmicworks** database and a **products** container at **4,000** request units per second (RU/s). Once created, you will adjust the throughput down to 400 RU/s.
 
@@ -20,7 +20,7 @@ To accompany the products container, you will create a **flatproducts** containe
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -40,11 +40,11 @@ To accompany the products container, you will create a **flatproducts** containe
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Keep the browser tab open, as we will return to it later.
 
 1. Start **Visual Studio Code**.
 
@@ -64,8 +64,8 @@ To accompany the products container, you will create a **flatproducts** containe
 
     | **Option** | **Value** |
     | ---: | :--- |
-    | **--endpoint** | *The endpoint value you copied earlier in this lab* |
-    | **--key** | *The key value you coped earlier in this lab* |
+    | **--endpoint** | *The endpoint value you checked earlier in this lab* |
+    | **--key** | *The key value you checked earlier in this lab* |
     | **--datasets** | *product* |
 
     ```
@@ -79,11 +79,7 @@ To accompany the products container, you will create a **flatproducts** containe
 
 1. Close the integrated terminal.
 
-1. Close **Visual Studio Code**.
-
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
+1. Switch back to the web browser, open a new tab and navigate to the Azure portal (``portal.azure.com``).
 
 1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
 
@@ -113,9 +109,9 @@ To accompany the products container, you will create a **flatproducts** containe
 
 ## Create Azure Data Factory resource
 
-Now that the Azure Cosmos DB SQL API resources are in place, you will create an Azure Data Factory resource and configure all of the necessary components and connections to perform a one-time data movement from one SQL API container to another to extract data, transform it, and load it to another SQL API container.
+Now that the Azure Cosmos DB for NoSQL resources are in place, you will create an Azure Data Factory resource and configure all of the necessary components and connections to perform a one-time data movement from one NoSQL API container to another to extract data, transform it, and load it to another NoSQL API container.
 
-1. Select **+ Create a resource**, search for *Data Factory*, and then create a new **Azure Data Factory** resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Data Factory*, and then create a new **Data Factory** resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -130,7 +126,7 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
 1. Wait for the deployment task to complete before continuing with this task.
 
-1. Go to the newly created **Azure Data Factory** resource and select **Open Azure Data Factory Studio**.
+1. Go to the newly created **Data Factory** resource and select **Launch studio**.
 
     > &#128161; Alternatively, you can navigate to (``adf.azure.com/home``), select your newly created Data Factory resource, and then select the home icon.
 
@@ -140,11 +136,11 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
 1. In the **Task cadence or task schedule** section, select **Run once now** and then select **Next** to move to the **Source** step of the wizard.
 
-1. In the **Source** step of the wizard, in the **Source type** list, select **Azure Cosmos DB (SQL API)**.
+1. In the **Source** step of the wizard, in the **Source type** list, select **Azure Cosmos DB for NoSQL**.
 
 1. In the **Connection** section, select **+ New connection**.
 
-1. In the **New connection (Azure Cosmos DB (SQL API))** popup, configure the new connection with the following values, and then select **Create**:
+1. In the **New connection (Azure Cosmos DB for NoSQL)** popup, configure the new connection with the following values, and then select **Create**:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -171,9 +167,9 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
         products p
     ```
 
-1. Select **Preview data** to test the query's validity. Select **Next** to move to the **Target** step of the wizard.
+1. Select **Preview data** to test the query's validity. Select **Next** to move to the **Destination** step of the wizard.
 
-1. In the **Target** step of the wizard, in the **Target type** list, select **Azure Cosmos DB (SQL API)**.
+1. In the **Destination** step of the wizard, in the **Destination type** list, select **Azure Cosmos DB for NoSQL**.
 
 1. In the **Connection** list, select **CosmosSqlConn**.
 
@@ -187,15 +183,7 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
 
 1. Observe the various steps in the deployment. When the deployment has finished, select **Finish**.
 
-1. Close your web browser window or tab.
-
-1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
-
-1. Sign into the portal using the Microsoft credentials associated with your subscription.
-
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
-
-1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
+1. Return to the browser tab that has your **Azure Cosmos DB account** and navigate to the **Data Explorer** pane.
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, select the **flatproducts** container node, and then select **New SQL Query**.
 
@@ -209,7 +197,7 @@ Now that the Azure Cosmos DB SQL API resources are in place, you will create an 
         p.category, 
         p.price 
     FROM
-        products p
+        flatproducts p
     WHERE
         p.name = 'HL Headset'
     ```

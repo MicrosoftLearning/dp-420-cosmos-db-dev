@@ -1,12 +1,12 @@
 ---
 lab:
-    title: 'Move multiple documents in bulk with the Azure Cosmos DB SQL API SDK'
-    module: 'Module 4 - Access and manage data with the Azure Cosmos DB SQL API SDKs'
+    title: 'Move multiple documents in bulk with the Azure Cosmos DB for NoSQL SDK'
+    module: 'Module 4 - Access and manage data with the Azure Cosmos DB for NoSQL SDKs'
 ---
 
-# Move multiple documents in bulk with the Azure Cosmos DB SQL API SDK
+# Move multiple documents in bulk with the Azure Cosmos DB for NoSQL SDK
 
-The easiest way to learn how to perform a bulk operation is to attempt to push many documents to an Azure Cosmos DB SQL API account in the cloud. Using the bulk features of the SDK, this can be done with some minor help from the [System.Threading.Tasks][docs.microsoft.com/dotnet/api/system.threading.tasks] namespace.
+The easiest way to learn how to perform a bulk operation is to attempt to push many documents to an Azure Cosmos DB for NoSQL account in the cloud. Using the bulk features of the SDK, this can be done with some minor help from the [System.Threading.Tasks][docs.microsoft.com/dotnet/api/system.threading.tasks] namespace.
 
 In this lab, you'll use the [Bogus][nuget.org/packages/bogus/33.1.1] library from NuGet to generate fictional data and place that into an Azure Cosmos DB account.
 
@@ -24,13 +24,13 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-## Create an Azure Cosmos DB SQL API account and configure the SDK project
+## Create an Azure Cosmos DB for NoSQL account and configure the SDK project
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -49,9 +49,9 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
 1. Still within the newly created **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
 
@@ -65,9 +65,9 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     | **Partition key** | *`/categoryId`* |
     | **Container throughput** | *Autoscale* &vert; *`4000`* |
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **08-sdk-bulk** folder.
+1. In  in the **Explorer** pane, browse to the **08-sdk-bulk** folder.
 
 1. Open the **script.cs** code file within the **08-sdk-bulk** folder.
 
@@ -111,7 +111,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 ## Bulk inserting a twenty-five thousand documents
 
-Let's "go for the gusto" and try to insert a lot of documents to see how this works. In our internal testing, this can take approximately 1-2 minutes if the lab virtual machine and Azure Cosmos DB SQL API account are relatively close to each other geographically speaking.
+Let's "go for the gusto" and try to insert a lot of documents to see how this works. In our internal testing, this can take approximately 1-2 minutes if the lab virtual machine and Azure Cosmos DB for NoSQL account are relatively close to each other geographically speaking.
 
 1. Return to the editor tab for the **script.cs** code file.
 
@@ -164,7 +164,7 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
     }
     ```
 
-1. Within the foreach loop, create a **Task** to asynchornously insert a product into Azure Cosmos DB SQL API being sure to explicitly specify the partition key and to add the task to list of tasks named **concurrentTasks**:
+1. Within the foreach loop, create a **Task** to asynchornously insert a product into Azure Cosmos DB for NoSQL being sure to explicitly specify the partition key and to add the task to list of tasks named **concurrentTasks**:
 
     ```
     concurrentTasks.Add(
@@ -241,23 +241,17 @@ Let's "go for the gusto" and try to insert a lot of documents to see how this wo
 
 1. Close the integrated terminal.
 
-1. Close **Visual Studio Code**.
-
 ## Observe the results
 
 Now that you have sent 25,000 items to Azure Cosmos DB let’s go and look at the Data Explorer.
 
-1. In a web browser, navigate to the Azure portal (``portal.azure.com``).
+1.Return to the web browser and navigate to the **Data Explorer** pane.
 
-1. Select **Resource groups**, then select the resource group you created or viewed earlier in this lab, and then select the **Azure Cosmos DB account** resource you created in this lab.
-
-1. Within the **Azure Cosmos DB** account resource, navigate to the **Data Explorer** pane.
-
-1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the **products** container node within the **SQL API** navigation tree.
+1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the **products** container node within the **NOSQL API** navigation tree.
 
 1. Expand the **products** node, and then select the **Items** node. Observe the list of items within your container.
 
-1. Select the **products** container node within the **SQL API** navigation tree, and then select **New SQL Query**.
+1. Select the **products** container node within the **NoSQL API** navigation tree, and then select **New SQL Query**.
 
 1. Delete the contents of the editor area.
 

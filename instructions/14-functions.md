@@ -1,24 +1,24 @@
 ---
 lab:
-    title: 'Process Azure Cosmos DB SQL API data using Azure Functions'
-    module: 'Module 7 - Integrate Azure Cosmos DB SQL API with Azure services'
+    title: 'Process Azure Cosmos DB for NoSQL data using Azure Functions'
+    module: 'Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services'
 ---
 
-# Process Azure Cosmos DB SQL API data using Azure Functions
+# Process Azure Cosmos DB for NoSQL data using Azure Functions
 
-The Azure Cosmos DB trigger for Azure Functions is implemented using a change feed processor. You can create functions that respond to create and update operations in your Azure Cosmos DB SQL API container with this knowledge. If you have implemented a change feed processor manually, the setup for Azure Functions is similar.
+The Azure Cosmos DB trigger for Azure Functions is implemented using a change feed processor. You can create functions that respond to create and update operations in your Azure Cosmos DB for NoSQL container with this knowledge. If you have implemented a change feed processor manually, the setup for Azure Functions is similar.
 
 In this lab, you will
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB SQL API account using the Azure SDK for .NET or any other SDK of your choice.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB for NoSQL account using the Azure SDK for .NET or any other SDK of your choice.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -36,9 +36,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
 1. Select **Data Explorer** from the resource menu.
 
@@ -48,7 +48,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *cosmicworks* |
+    | **Database id** | *``cosmicworks``* |
 
 1. Back in the **Data Explorer** pane, observe the **cosmicworks** database node within the hierarchy.
 
@@ -59,8 +59,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -71,8 +71,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
-    | **Container id** | *productslease* |
-    | **Partition key** | */id* |
+    | **Container id** | *``productslease``* |
+    | **Partition key** | *``/id``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **productslease** container node within the hierarchy.
 
@@ -109,11 +109,11 @@ Before you can begin writing code, you will need to create the Azure Functions r
     | ---: | :--- |
     | **Development environment** | *Develop in portal* |
     | **Select a template** | *Azure Cosmos DB trigger* |
-    | **New Function** | *ItemsListener* |
+    | **New Function** | *``ItemsListener``* |
     | **Cosmos DB account connection** | *Select New* &vert; *Select Azure Cosmos DB Account* &vert; *Select the Azure Cosmos DB account you created earlier* |
-    | **Database name** | *cosmicworks* |
-    | **Collection name** | *products* |
-    | **Collection name for leases** | *productslease* |
+    | **Database name** | *``cosmicworks``* |
+    | **Collection name** | *``products``* |
+    | **Collection name for leases** | *``productslease``* |
     | **Create lease collection if it does not exist** | *No* |
 
 ## Implement function code in .NET
@@ -202,9 +202,9 @@ The function you created earlier is a C# script that is edited in-portal. You wi
 
 1. **Maximize** the log section to expand the output window to fill the maximum available space.
 
-    > &#128221; You will use another tool to generate items in your Azure Cosmos DB SQL API container. Once you generate the items, you will return to this browser window to observe the output. Do not close the browser window prematurely.
+    > &#128221; You will use another tool to generate items in your Azure Cosmos DB for NoSQL container. Once you generate the items, you will return to this browser window to observe the output. Do not close the browser window prematurely.
 
-## Seed your Azure Cosmos DB SQL API account with sample data
+## Seed your Azure Cosmos DB for NoSQL account with sample data
 
 You will use a command-line utility that creates a **cosmicworks** database and a **products** container. The tool will then create a set of items that you will observe using the change feed processor running in your terminal window.
 

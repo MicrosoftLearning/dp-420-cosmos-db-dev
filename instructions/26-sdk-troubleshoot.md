@@ -1,10 +1,10 @@
 ---
 lab:
-    title: 'Troubleshoot an application using the Azure Cosmos DB SQL API SDK'
-    module: 'Module 11 - Monitor and troubleshoot an Azure Cosmos DB SQL API solution'
+    title: 'Troubleshoot an application using the Azure Cosmos DB for NoSQL SDK'
+    module: 'Module 11 - Monitor and troubleshoot an Azure Cosmos DB for NoSQL solution'
 ---
 
-# Troubleshoot an application using the Azure Cosmos DB SQL API SDK
+# Troubleshoot an application using the Azure Cosmos DB for NoSQL SDK
 
 Azure Cosmos DB offers an extensive set of response codes, which help us easily troubleshoot issues that could arise with our different operation types. The catch is to make sure we program proper error handling when creating apps for Azure Cosmos DB.
 
@@ -24,15 +24,15 @@ If you haven't already cloned the lab code repository for **DP-420** to the envi
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB SQL API account programmatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you'll select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key. Use the endpoint and key to connect to the Azure Cosmos DB for NoSQL account programmatically. Use the endpoint and key on the connection strings of the Azure SDK for .NET or any other SDK.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -41,7 +41,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
     | **Capacity mode** | *Provisioned throughput* |
-    | **Apply Free Tier Discount** | *`Do Not Apply`* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
@@ -51,9 +51,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You'll use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You'll use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You'll use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You'll use this **key** value later in this exercise.
 
 1. Minimize, but don't close your browser window. We'll come back to the Azure portal a few minutes after we start a background workload in the next steps.
 

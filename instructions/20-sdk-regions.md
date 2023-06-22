@@ -1,12 +1,12 @@
 ---
 lab:
-    title: 'Connect to different regions with the Azure Cosmos DB SQL API SDK'
-    module: 'Module 9 - Design and implement a replication strategy for Azure Cosmos DB SQL API'
+    title: 'Connect to different regions with the Azure Cosmos DB for NoSQL SDK'
+    module: 'Module 9 - Design and implement a replication strategy for Azure Cosmos DB for NoSQL'
 ---
 
-# Connect to different regions with the Azure Cosmos DB SQL API SDK
+# Connect to different regions with the Azure Cosmos DB for NoSQL SDK
 
-When you enable geo-redundancy for an Azure Cosmos DB SQL API account, you can then use the SDK to read data from regions in any order you configure. This technique is beneficial when you distribute your read requests across all of your available read regions.
+When you enable geo-redundancy for an Azure Cosmos DB for NoSQL account, you can then use the SDK to read data from regions in any order you configure. This technique is beneficial when you distribute your read requests across all of your available read regions.
 
 In this lab, you will configure the CosmosClient class to connect to read regions in a fallback order that you manually configure.
 
@@ -24,15 +24,15 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB SQL API account using the Azure SDK for .NET or any other SDK of your choice.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB for NoSQL account using the Azure SDK for .NET or any other SDK of your choice.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -67,10 +67,10 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *cosmicworks* |
+    | **Database id** | *Create new* &vert; *``cosmicworks``* |
     | **Share throughput across containers** | *Do not select* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
     | **Container throughput** | *Manual* &vert; *400* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
@@ -98,17 +98,17 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-1. Close your web browser window or tab.
+1. Return to **Visual Studio Code**.
 
-## Connect to the Azure Cosmos DB SQL API account from the SDK
+## Connect to the Azure Cosmos DB for NoSQL account from the SDK
 
 Using the credentials from the newly created account, you will connect with the SDK classes and access the database and container instance from a different region.
 
-1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **20-sdk-regions** folder.
+1. In the **Explorer** pane, browse to the **20-sdk-regions** folder.
 
 1. Open the context menu for the **20-sdk-regions** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
@@ -150,7 +150,7 @@ Using the credentials from the newly created account, you will connect with the 
 
 The **CosmosClientOptions** class includes a property to configure the list of regions you would like to connect to with the SDK. The list is ordered by failover priority, attempting to connect to each region in the order that you configure.
 
-1. Create a new variable of generic type **List\<string\>** that contains a list of the regions you configured with your account, starting with the third region and ending with the first (primary) region. For example, if you created your Azure Cosmos DB SQL API account in the **West US** region, and then added **South Africa North**, and finally added **East Asia**; then your list variable would contain:
+1. Create a new variable of generic type **List\<string\>** that contains a list of the regions you configured with your account, starting with the third region and ending with the first (primary) region. For example, if you created your Azure Cosmos DB for NoSQL account in the **West US** region, and then added **South Africa North**, and finally added **East Asia**; then your list variable would contain:
 
     ```
     List<string> regions = new()
@@ -175,7 +175,7 @@ The **CosmosClientOptions** class includes a property to configure the list of r
 1. Create a new instance of the **CosmosClient** class named **client** passing in the **endpoint**, **key**, and **options** variables as constructor parameters:
 
     ```
-    CosmosClient client = new (endpoint, key, options); 
+    using CosmosClient client = new (endpoint, key, options); 
     ```
 
 1. Use the **GetContainer** method of the **client** variable to retrieve the existing container using the name of the database (*cosmicworks*) and the name of the container (*products*):

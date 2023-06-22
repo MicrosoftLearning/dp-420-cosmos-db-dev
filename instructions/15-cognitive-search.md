@@ -1,24 +1,24 @@
 ---
 lab:
-    title: 'Search data using Azure Cognitive Search and Azure Cosmos DB SQL API'
-    module: 'Module 7 - Integrate Azure Cosmos DB SQL API with Azure services'
+    title: 'Search data using Azure Cognitive Search and Azure Cosmos DB for NoSQL'
+    module: 'Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services'
 ---
 
-# Search data using Azure Cognitive Search and Azure Cosmos DB SQL API
+# Search data using Azure Cognitive Search and Azure Cosmos DB for NoSQL
 
 Azure Cognitive Search combines a search engine as a service with deep integration with AI capabilities to enrich the information in the search index.
 
-In this lab, you will build an Azure Cognitive Search index that automatically indexes data in an Azure Cosmos DB SQL API container and enriches the data using the Azure Cognitive Services Translator functionality.
+In this lab, you will build an Azure Cognitive Search index that automatically indexes data in an Azure Cosmos DB for NoSQL container and enriches the data using the Azure Cognitive Services Translator functionality.
 
-## Create an Azure Cosmos DB SQL API account
+## Create an Azure Cosmos DB for NoSQL account
 
-Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **SQL API**). Once the Azure Cosmos DB SQL API account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB SQL API account using the Azure SDK for .NET or any other SDK of your choice.
+Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple APIs. When provisioning an Azure Cosmos DB account for the first time, you will select which of the APIs you want the account to support (for example, **Mongo API** or **NoSQL API**). Once the Azure Cosmos DB for NoSQL account is done provisioning, you can retrieve the endpoint and key and use them to connect to the Azure Cosmos DB for NoSQL account using the Azure SDK for .NET or any other SDK of your choice.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB SQL API** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cosmos DB*, and then create a new **Azure Cosmos DB for NoSQL** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -36,11 +36,11 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Record the value of the **URI** field. You will use this **endpoint** value later in this exercise.
+    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
 
-    1. Record the value of the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
-    1. Record the value of the **PRIMARY CONNECTION STRING** field. You will use this **connection string** value later in this exercise.
+    1. Notice the **PRIMARY CONNECTION STRING** field. You will use this **connection string** value later in this exercise.
 
 1. Select **Data Explorer** from the resource menu.
 
@@ -50,19 +50,17 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *cosmicworks* |
-    | **Container id** | *products* |
-    | **Partition key** | */categoryId* |
+    | **Database id** | *Create new* &vert; *``cosmicworks``* |
+    | **Container id** | *``products``* |
+    | **Partition key** | *``/categoryId``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
-1. Close your web browser window or tab.
+## Seed your Azure Cosmos DB for NoSQL account with sample data
 
-## Seed your Azure Cosmos DB SQL API account with sample data
+You will use a command-line utility that creates a **cosmicworks** database and a **products** container.
 
-You will use a command-line utility that creates a **cosmicworks** database and a **products** container. The tool will then create a set of items that you will observe using the change feed processor running in your terminal window.
-
-1. In **Visual Studio Code**, open the **Terminal** menu and then select **Split Terminal** to open a new terminal side by side with your existing instance.
+1. In **Visual Studio Code**, open the **Terminal** menu and select **New Terminal**.
 
 1. Install the [cosmicworks][nuget.org/packages/cosmicworks] command-line tool for global use on your machine.
 
@@ -117,9 +115,9 @@ Before continuing with this exercise, you must first create a new Azure Cognitiv
 
 1. Go to the newly created **Azure Cognitive Search** account resource.
 
-## Build indexer and index for Azure Cosmos DB SQL API data
+## Build indexer and index for Azure Cosmos DB for NoSQL data
 
-You will create an indexer that indexes a subset of data in a specific Azure Cosmos DB SQL API container on an hourly basis.
+You will create an indexer that indexes a subset of data in a specific Azure Cosmos DB for NoSQL container on an hourly basis.
 
 1. From the **Azure Cognitive Search** resource blade, select **Import data**.
 
@@ -129,8 +127,8 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Data source name** | *products-cosmossql-source* |
-    | **Connection string** | ***connection string** of the Azure Cosmos DB SQL API account created earlier* |
+    | **Data source name** | *``products-cosmossql-source``* |
+    | **Connection string** | ***connection string** of the Azure Cosmos DB for NoSQL account created earlier* |
     | **Database** | *cosmicworks* |
     | **Collection** | *products* |
 
@@ -157,13 +155,13 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 1. Select **Next: Add cognitive skills**.
 
-1. Select **Next: Customize target index**.
+1. Select **Skip to: Customize target index**.
 
 1. In the **Customize target index** step of the wizard, configure the index with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Index name** | *products-index* |
+    | **Index name** | *``products-index``* |
     | **Key** | *id* |
 
 1. In the field table, configure the **Retrievable**, **Filterable**, **Sortable**, **Facetable**, and **Searchable** options for each field using the following table:
@@ -181,7 +179,7 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Name** | *products-cosmosdb-indexer* |
+    | **Name** | *``products-cosmosdb-indexer``* |
     | **Schedule** | *Hourly* |
 
 1. Select **Submit** to create the data source, index, and indexer.
@@ -198,7 +196,7 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 ## Validate index with example search queries
 
-Now that your materialized view of the Azure Cosmos DB SQL API data is in the search index, you can perform a few basic queries that take advantage of the features in Azure Cognitive Search.
+Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the search index, you can perform a few basic queries that take advantage of the features in Azure Cognitive Search.
 
 > &#128221; This lab is not intended to teach the Azure Cognitive Search syntax. These queries were curated to showcase some of the features available in the search index and engine.
 
