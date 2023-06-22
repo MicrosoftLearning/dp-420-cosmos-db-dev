@@ -6,9 +6,9 @@ lab:
 
 # Execute a query with the Azure Cosmos DB for NoSQL SDK
 
-The latest version of the .NET SDK for the Azure Cosmos DB for NoSQL makes it easier than ever to query a container and asynchronously iterate over result sets using the latest best practices and language features from C#.
+The latest version of the .NET SDK for Azure Cosmos DB for NoSQL makes it easier than ever to query a container and asynchronously iterate over result sets using the latest best practices and language features from C#.
 
-> &#128161; This lab uses the *4.0.0-preview3* release of the [Azure.Cosmos][nuget.org/packages/azure.cosmos/4.0.0-preview3] library on NuGet. This library has special functionality to make it easier to query Azure Cosmos DB using [asynchronous streams][docs.microsoft.com/dotnet/csharp/whats-new/csharp-8#asynchronous-streams].
+This library has special functionality to make it easier to query Azure Cosmos DB using [https://learn.microsoft.com/en-us/dotnet/api/microsoft.azure.cosmos.feediterator?view=azure-dotnet].
 
 In this lab, you'll use an asynchronous stream to iterate over a large result set returned from Azure Cosmos DB for NoSQL. You will use the .NET SDK to query and iterate over results.
 
@@ -132,18 +132,26 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
     QueryDefinition query = new (sql);
     ```
 
-1. Create a new **await foreach** loop by invoking the generic [GetItemQueryIterator][docs.microsoft.com/dotnet/api/azure.cosmos.cosmoscontainer.getitemqueryiterator] method of the [CosmosContainer][docs.microsoft.com/dotnet/api/azure.cosmos.cosmoscontainer] class passing in the **query** variable as a parameter, and then asynchronously iterating over the results using the variable **product** to represent an instance of type **Product**:
+1. Create a new **while** loop by invoking the generic [GetItemQueryIterator][docs.microsoft.com/dotnet/api/azure.cosmos.cosmoscontainer.getitemqueryiterator] method of the [CosmosContainer][docs.microsoft.com/dotnet/api/azure.cosmos.cosmoscontainer] class passing in the **query** variable as a parameter, and then iterating over the results:
 
     ```
-    await foreach (Product product in container.GetItemQueryIterator<Product>(query))
+    using FeedIterator<Product> feed = container.GetItemQueryIterator<Product>(
+        queryDefinition: query
+    );
+
+    while (feed.HasMoreResults)
     {
     }
     ```
 
-1. Within the **await foreach** loop, use the built-in **Console.WriteLine** static method to format and print the **id**, **name**, and **price** properties of the **product** variable:
+1. Within the **while** loop, read the next result asynchronously, use the built-in **Console.WriteLine** static method to format and print the **id**, **name**, and **price** properties of the **product** variable:
 
     ```
-    Console.WriteLine($"[{product.id}]\t{product.name,35}\t{product.price,15:C}");
+    FeedResponse<Product> response = await feed.ReadNextAsync();
+    foreach (Product product in response)
+    {
+        Console.WriteLine($"[{product.id}]\t{product.name,35}\t{product.price,15:C}");
+    }
     ```
 
 1. Once you are done, your code file should now include:
@@ -165,9 +173,17 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
     string sql = "SELECT * FROM products p";
     QueryDefinition query = new (sql);
 
-    await foreach (Product product in container.GetItemQueryIterator<Product>(query))
+    using FeedIterator<Product> feed = container.GetItemQueryIterator<Product>(
+        queryDefinition: query
+    );
+
+    while (feed.HasMoreResults)
     {
-        Console.WriteLine($"[{product.id}]\t{product.name,35}\t{product.price,15:C}");
+        FeedResponse<Product> response = await feed.ReadNextAsync();
+        foreach (Product product in response)
+        {
+            Console.WriteLine($"[{product.id}]\t{product.name,35}\t{product.price,15:C}");
+        }
     }
     ```
 
@@ -191,7 +207,6 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
 [docs.microsoft.com/dotnet/api/azure.cosmos.querydefinition]: https://docs.microsoft.com/dotnet/api/azure.cosmos.querydefinition
 [docs.microsoft.com/dotnet/api/azure.cosmos.cosmoscontainer]: https://docs.microsoft.com/dotnet/api/azure.cosmos.cosmoscontainer
 [docs.microsoft.com/dotnet/api/azure.cosmos.cosmoscontainer.getitemqueryiterator]: https://docs.microsoft.com/dotnet/api/azure.cosmos.cosmoscontainer.getitemqueryiterator
-[docs.microsoft.com/dotnet/csharp/whats-new/csharp-8#asynchronous-streams]: https://docs.microsoft.com/dotnet/csharp/whats-new/csharp-8#asynchronous-streams
+[learn.microsoft.com/en-us/dotnet/api/microsoft.azure.cosmos.feediterator?view=azure-dotnet]: https://learn.microsoft.com/en-us/dotnet/api/microsoft.azure.cosmos.feediterator?view=azure-dotnet
 [docs.microsoft.com/dotnet/core/tools/dotnet-run]: https://docs.microsoft.com/dotnet/core/tools/dotnet-run
-[nuget.org/packages/azure.cosmos/4.0.0-preview3]: https://www.nuget.org/packages/azure.cosmos/4.0.0-preview3
 [nuget.org/packages/cosmicworks]: https://www.nuget.org/packages/cosmicworks/

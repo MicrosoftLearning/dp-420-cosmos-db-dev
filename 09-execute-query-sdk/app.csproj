@@ -4,6 +4,6 @@
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Azure.Cosmos" Version="4.0.0-preview3" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.31.2" />
   </ItemGroup>
 </Project>
