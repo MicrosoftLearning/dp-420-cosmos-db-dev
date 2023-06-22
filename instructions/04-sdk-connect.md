@@ -86,7 +86,7 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
 1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos] package from NuGet using the following command:
 
     ```
-    dotnet add package Microsoft.Azure.Cosmos
+    dotnet add package Microsoft.Azure.Cosmos --version 3.*
     ```
 
 1. Close the integrated terminal.
