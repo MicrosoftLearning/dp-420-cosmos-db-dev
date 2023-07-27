@@ -66,7 +66,7 @@ The [cosmicworks][nuget.org/packages/cosmicworks] command-line tool deploys samp
 1. Install the [cosmicworks][nuget.org/packages/cosmicworks] command-line tool for global use on your machine.
 
     ```
-    dotnet tool install --global cosmicworks
+    dotnet tool install cosmicworks --global --version 1.*
     ```
 
     > &#128161; This command may take a couple of minutes to complete. This command will output the warning message (*Tool 'cosmicworks' is already installed') if you have already installed the latest version of this tool in the past.
