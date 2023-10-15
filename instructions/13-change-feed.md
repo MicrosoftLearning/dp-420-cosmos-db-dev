@@ -136,14 +136,11 @@ The **Microsoft.Azure.Cosmos.Container** class ships with a series of methods to
 
     1. A parameter named **context** of type **ChangeFeedProcessorContext**.
 
-    1. A parameter named **changes** of type **IReadOnlyCollection\<Product\>**.
-
     1. A parameter named **cancellationToken** of type **CancellationToken**.
 
     ```
     ChangesHandler<Product> handleChanges = async (
         ChangeFeedProcessorContext context,
-        IReadOnlyCollection<Product> changes, 
         CancellationToken cancellationToken
     ) => {
     };
@@ -228,7 +225,6 @@ The **Microsoft.Azure.Cosmos.Container** class ships with a series of methods to
     
     ChangesHandler<Product> handleChanges = async (
         ChangeFeedProcessorContext context,
-        IReadOnlyCollection<Product> changes, 
         CancellationToken cancellationToken
     ) => {
         Console.WriteLine($"START\tHandling batch of changes...");
