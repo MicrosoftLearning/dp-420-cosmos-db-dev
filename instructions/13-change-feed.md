@@ -134,13 +134,13 @@ The **Microsoft.Azure.Cosmos.Container** class ships with a series of methods to
 
 1. Create a new delegate variable named **handleChanges** of type [ChangesHandler<>][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.changefeedhandler-1] using an empty asynchronous anonymous function that has two input parameters:
 
-    1. A parameter named **context** of type **ChangeFeedProcessorContext**.
-
+    1. A parameter named **changes** of type **IReadOnlyCollection\<Product\>**.
+    
     1. A parameter named **cancellationToken** of type **CancellationToken**.
 
     ```
     ChangesHandler<Product> handleChanges = async (
-        ChangeFeedProcessorContext context,
+        IReadOnlyCollection<Product> changes,
         CancellationToken cancellationToken
     ) => {
     };
@@ -224,7 +224,7 @@ The **Microsoft.Azure.Cosmos.Container** class ships with a series of methods to
     Container leaseContainer = client.GetContainer("cosmicworks", "productslease");
     
     ChangesHandler<Product> handleChanges = async (
-        ChangeFeedProcessorContext context,
+        IReadOnlyCollection<Product> changes,
         CancellationToken cancellationToken
     ) => {
         Console.WriteLine($"START\tHandling batch of changes...");
