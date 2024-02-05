@@ -1,14 +1,14 @@
 ---
 lab:
-    title: 'Search data using Azure Cognitive Search and Azure Cosmos DB for NoSQL'
+    title: 'Search data using Azure AI services AI Search and Azure Cosmos DB for NoSQL'
     module: 'Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services'
 ---
 
-# Search data using Azure Cognitive Search and Azure Cosmos DB for NoSQL
+# Search data using AI Search and Azure Cosmos DB for NoSQL
 
-Azure Cognitive Search combines a search engine as a service with deep integration with AI capabilities to enrich the information in the search index.
+AI Search combines a search engine as a service with deep integration with AI capabilities to enrich the information in the search index.
 
-In this lab, you will build an Azure Cognitive Search index that automatically indexes data in an Azure Cosmos DB for NoSQL container and enriches the data using the Azure Cognitive Services Translator functionality.
+In this lab, you will build an AI Search index that automatically indexes data in an Azure Cosmos DB for NoSQL container and enriches the data using the Azure Cognitive Services Translator functionality.
 
 ## Create an Azure Cosmos DB for NoSQL account
 
@@ -91,15 +91,15 @@ You will use a command-line utility that creates a **cosmicworks** database and 
 
 1. Close **Visual Studio Code**.
 
-## Create Azure Cognitive Search resource
+## Create AI Search resource
 
-Before continuing with this exercise, you must first create a new Azure Cognitive Search instance.
+Before continuing with this exercise, you must first create a new AI Search instance.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cognitive Search*, and then create a new **Azure Cognitive Search** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Cognitive Search*, and then create a new **AI Search** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -107,19 +107,18 @@ Before continuing with this exercise, you must first create a new Azure Cognitiv
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
-    | **Pricing tier** | *Free* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
 1. Wait for the deployment task to complete before continuing with this task.
 
-1. Go to the newly created **Azure Cognitive Search** account resource.
+1. Go to the newly created **AI Search** account resource.
 
 ## Build indexer and index for Azure Cosmos DB for NoSQL data
 
 You will create an indexer that indexes a subset of data in a specific Azure Cosmos DB for NoSQL container on an hourly basis.
 
-1. From the **Azure Cognitive Search** resource blade, select **Import data**.
+1. From the **AI Search** resource blade, select **Import data**.
 
 1. In the **Connect to your data** step of the **Import data** wizard, in the **Data Source** list, select **Azure Cosmos DB**.
 
@@ -151,7 +150,7 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 1. Select the **Query results ordered by _ts** checkbox.
 
-    > &#128221; This checkbox lets Azure Cognitive Search know that the query sorts results by the **_ts** field. This type of sorting enables incremental progress tracking. If the indexer fails, it can pick right back up form the same **_ts** value since the results are ordered by the timestamp.
+    > &#128221; This checkbox lets AI Search know that the query sorts results by the **_ts** field. This type of sorting enables incremental progress tracking. If the indexer fails, it can pick right back up form the same **_ts** value since the results are ordered by the timestamp.
 
 1. Select **Next: Add cognitive skills**.
 
@@ -186,7 +185,7 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
     > &#128221; You may be required to dismiss a survey popup after creating your first indexer.
 
-1. From the **Azure Cognitive Search** resource blade, navigate to the **Indexers** tab to observe the result of your first indexing operation.
+1. From the **AI Search** resource blade, navigate to the **Indexers** tab to observe the result of your first indexing operation.
 
 1. Wait for the **products-cosmosdb-indexer** indexer to have a status of **Success** before continuing with this task.
 
@@ -196,58 +195,91 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 ## Validate index with example search queries
 
-Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the search index, you can perform a few basic queries that take advantage of the features in Azure Cognitive Search.
+Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the search index, you can perform a few basic queries that take advantage of the features in AI Search.
 
-> &#128221; This lab is not intended to teach the Azure Cognitive Search syntax. These queries were curated to showcase some of the features available in the search index and engine.
+> &#128221; This lab is not intended to teach the AI Search syntax. These queries were curated to showcase some of the features available in the search index and engine.
 
-1. In the **products-index** &vert; **index** pane, select **Search** to issue a default search query that returns all possible results using a **\*** (wildcard) operator.
+1. In the **Search explorer** tab, select the **View** pulldown and then select the **JSON view**.
+
+1. Notice the in the **JSON query editor** the syntax of the default JSON search query that returns all possible results using a **\*** (wildcard) operator.
+
+   ```json
+   {
+       "search": "*"
+   }
+   ```
+
+1. Select the **Search** button to perform the search.
 
 1. Observe that this search query returns all possible results.
 
-1. In the **Query string** editor, enter the following query and then select **Search**:
+1. In the **JSON query editor**, enter the following query and then select **Search**:
 
     ```
-    touring 3000
+    {
+        "search": "touring 3000"
+    }
     ```
 
 1. Observe that this search query returns results that contain either the terms **touring** or **3000** giving a higher score to results that contains both terms. The results are then sorted in descending order by the **@search.score** field.
 
-1. In the **Query string** editor, enter the following query and then select **Search**:
+1. In the **JSON query editor**, enter the following query and then select **Search**:
 
     ```
-    red&$count=true
+    {
+        "search": "red"
+        , "count": true
+    }
     ```
 
 1. Observe that this search query returns results with the term **red**, but also now includes a metadata field indicating the total count of results even if they are not all included in the same page.
 
-1. In the **Query string** editor, enter the following query and then select **Search**:
+1. In the **JSON query editor**, enter the following query and then select **Search**:
 
     ```
-    blue&$count=true&$top=6
+    {
+        "search": "blue"
+        , "count": true
+        , "top": 6
+    }
     ```
 
 1. Observe that this search query only returns a set of six results at a time even though there are more matches server-side.
 
-1. In the **Query string** editor, enter the following query and then select **Search**:
+1. In the **JSON query editor**, enter the following query and then select **Search**:
 
     ```
-    mountain&$count=true&$top=25&$skip=50
+    {
+        "search": "mountain"
+        , "count": true
+        , "top": 25
+        , "skip": 50
+    }
     ```
 
 1. Observe that this search query skips the first 50 results and returns a set of 25 results. If this was a paginated view in a client-side application, you could infer that this would be the third "page" of results.
 
-1. In the **Query string** editor, enter the following query and then select **Search**:
+1. In the **JSON query editor**, enter the following query and then select **Search**:
 
     ```
-    touring&$count=true&$filter=price lt 500
+    {
+        "search": "touring"
+        , "count": true
+        , "filter": "price lt 500"
+    }
     ```
 
 1. Observe that this search query only returns results where the value of the numeric price field is less than 500.
 
-1. In the **Query string** editor, enter the following query and then select **Search**:
+1. In the **JSON query editor**, enter the following query and then select **Search**:
 
     ```
-    road&$count=true&$top=15&facet=price,interval:500
+    {
+        "search": "road"
+        , "count": true
+        , "top": 15
+        , "facets": ["price,interval:500"]
+    }
     ```
 
 1. Observe that this search query returns a collection of facet data that indicates how many items belong to each category even if they are not all present in the current page of results. In this example, the matching items are broken down into numeric price categories in intervals of 500. This is typically used to populate filters and navigation aids in client-side applications.
