@@ -133,7 +133,7 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 1. In the **query** field, enter the following SQL query to create a materialized view of a subset of your data in the container:
 
-    ```
+    ```sql
     SELECT 
         p.id, 
         p.categoryId, 
@@ -215,7 +215,7 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
-    ```
+    ```json
     {
         "search": "touring 3000"
     }
@@ -225,7 +225,7 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
-    ```
+    ```json
     {
         "search": "red"
         , "count": true
@@ -236,7 +236,7 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
-    ```
+    ```json
     {
         "search": "blue"
         , "count": true
@@ -248,7 +248,7 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
-    ```
+    ```json
     {
         "search": "mountain"
         , "count": true
@@ -261,7 +261,7 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
-    ```
+    ```json
     {
         "search": "touring"
         , "count": true
@@ -273,7 +273,7 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
-    ```
+    ```json
     {
         "search": "road"
         , "count": true
