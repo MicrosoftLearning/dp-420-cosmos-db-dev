@@ -164,7 +164,7 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
 
     string key = "<cosmos-key>";
 
-    CosmosClient client = new CosmosClient(endpoint, key);
+    CosmosClient client = new (endpoint, key);
 
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
 
