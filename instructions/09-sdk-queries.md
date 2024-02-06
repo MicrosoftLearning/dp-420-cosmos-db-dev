@@ -120,7 +120,7 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
 
     > &#128221; For example, if your key is: **fDR2ci9QgkdkvERTQ==**, then the C# statement would be: **string key = "fDR2ci9QgkdkvERTQ==";**.
 
-1. Create a new variable named **sql** of type *string* with a value of **SELECT * FROM products p**:
+1. Let's append some additional code to the end of the the **script.cs** file, create a new variable named **sql** of type *string* with a value of **SELECT * FROM products p**:
 
     ```
     string sql = "SELECT * FROM products p";
@@ -158,7 +158,7 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
   
     ```
     using System;
-    using Azure.Cosmos;
+    using Microsoft.Azure.Cosmos;
 
     string endpoint = "<cosmos-endpoint>";
 
@@ -190,6 +190,12 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
 1. **Save** the **script.cs** file.
 
 1. In **Visual Studio Code**, open the context menu for the **09-execute-query-sdk** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
+
+1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1] package from NuGet using the following command:
+
+    ```
+    dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
+    ```
 
 1. Build and run the project using the [dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run] command:
 
