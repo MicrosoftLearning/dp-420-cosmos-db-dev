@@ -166,9 +166,9 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
 
     CosmosClient client = new CosmosClient(endpoint, key);
 
-    CosmosDatabase database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
+    Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
 
-    CosmosContainer container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId");
+    Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId");
 
     string sql = "SELECT * FROM products p";
     QueryDefinition query = new (sql);
