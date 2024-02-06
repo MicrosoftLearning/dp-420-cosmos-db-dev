@@ -1,14 +1,14 @@
 ---
 lab:
-    title: 'Search data using Azure AI services AI Search and Azure Cosmos DB for NoSQL'
+    title: 'Search data using Azure AI Search and Azure Cosmos DB for NoSQL'
     module: 'Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services'
 ---
 
-# Search data using AI Search and Azure Cosmos DB for NoSQL
+# Search data using Azure AI Search and Azure Cosmos DB for NoSQL
 
-AI Search combines a search engine as a service with deep integration with AI capabilities to enrich the information in the search index.
+Azure AI Search combines a search engine as a service with deep integration with AI capabilities to enrich the information in the search index.
 
-In this lab, you will build an AI Search index that automatically indexes data in an Azure Cosmos DB for NoSQL container and enriches the data using the Azure Cognitive Services Translator functionality.
+In this lab, you will build an Azure AI Search index that automatically indexes data in an Azure Cosmos DB for NoSQL container and enriches the data using the Azure Cognitive Services Translator functionality.
 
 ## Create an Azure Cosmos DB for NoSQL account
 
@@ -91,15 +91,15 @@ You will use a command-line utility that creates a **cosmicworks** database and 
 
 1. Close **Visual Studio Code**.
 
-## Create AI Search resource
+## Create an Azure AI Search resource
 
-Before continuing with this exercise, you must first create a new AI Search instance.
+Before continuing with this exercise, you must first create a new Azure AI Search instance.
 
 1. In a new web browser window or tab, navigate to the Azure portal (``portal.azure.com``).
 
 1. Sign into the portal using the Microsoft credentials associated with your subscription.
 
-1. Select **+ Create a resource**, search for *Cognitive Search*, and then create a new **AI Search** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *AI Search*, and then create a new **Azure AI Search** account resource with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -112,7 +112,7 @@ Before continuing with this exercise, you must first create a new AI Search inst
 
 1. Wait for the deployment task to complete before continuing with this task.
 
-1. Go to the newly created **AI Search** account resource.
+1. Go to the newly created **Azure AI Search** account resource.
 
 ## Build indexer and index for Azure Cosmos DB for NoSQL data
 
@@ -150,7 +150,7 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 1. Select the **Query results ordered by _ts** checkbox.
 
-    > &#128221; This checkbox lets AI Search know that the query sorts results by the **_ts** field. This type of sorting enables incremental progress tracking. If the indexer fails, it can pick right back up form the same **_ts** value since the results are ordered by the timestamp.
+    > &#128221; This checkbox lets Azure AI Search know that the query sorts results by the **_ts** field. This type of sorting enables incremental progress tracking. If the indexer fails, it can pick right back up form the same **_ts** value since the results are ordered by the timestamp.
 
 1. Select **Next: Add cognitive skills**.
 
@@ -195,9 +195,9 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 ## Validate index with example search queries
 
-Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the search index, you can perform a few basic queries that take advantage of the features in AI Search.
+Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the search index, you can perform a few basic queries that take advantage of the features in Azure AI Search.
 
-> &#128221; This lab is not intended to teach the AI Search syntax. These queries were curated to showcase some of the features available in the search index and engine.
+> &#128221; This lab is not intended to teach the Azure AI Search syntax. These queries were curated to showcase some of the features available in the search index and engine.
 
 1. In the **Search explorer** tab, select the **View** pulldown and then select the **JSON view**.
 
