@@ -150,7 +150,7 @@ You will create an indexer that indexes a subset of data in a specific Azure Cos
 
 1. Select the **Query results ordered by _ts** checkbox.
 
-    > &#128221; This checkbox lets Azure AI Search know that the query sorts results by the **_ts** field. This type of sorting enables incremental progress tracking. If the indexer fails, it can pick right back up form the same **_ts** value since the results are ordered by the timestamp.
+    > &#128221; This checkbox lets Azure AI Search know that the query sorts results by the **_ts** field. This type of sorting enables incremental progress tracking. If the indexer fails, it can pick right back up from the same **_ts** value since the results are ordered by the timestamp.
 
 1. Select **Next: Add cognitive skills**.
 
@@ -221,7 +221,7 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
     }
     ```
 
-1. Observe that this search query returns results that contain either the terms **touring** or **3000** giving a higher score to results that contains both terms. The results are then sorted in descending order by the **@search.score** field.
+1. Observe that this search query returns results that contain either the terms **touring** or **3000** giving a higher score to results that contain both terms. The results are then sorted in descending order by the **@search.score** field.
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
