@@ -91,7 +91,7 @@ Before you can begin writing code, you will need to create the Azure Functions r
     | **Name** | *Enter a globally unique name* |
     | **Publish** | *Code* |
     | **Runtime stack** | *.NET* |
-    | **Version** | *6* |
+    | **Version** | *6 (LTS) In-process* |
     | **Region** | *Choose any available region* |
     | **Storage account** | *Create a new storage account* |
 
