@@ -52,6 +52,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. In the **Replicate data globally** pane, add two extra read regions to the account and then **Save** your changes.
 
+    > &#128221; In a couple of steps, you will be asked to change the consistency level to Strong, but do note that strong consistency for accounts with regions spanning more than 5000 miles (8000 kilometers) is blocked by default due to high write latency. Make sure you pick regions that are closer together.  In a production environment, to enable this capability, please contact support.
+
 1. Wait for the replication task to complete before continuing with this task.
 
     > &#128221; This operation can take approximately 5-10 minutes.and navigate to the **Default consistency** pane.
