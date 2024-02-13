@@ -98,6 +98,8 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
 
     > &#128221; For example, if your key is: **fDR2ci9QgkdkvERTQ==**, then the C# statement would be: **private static readonly string key = "fDR2ci9QgkdkvERTQ==";**.
 
+1. Save the file.
+
 1. Build and run the project using the [dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run] command:
 
     ```
@@ -305,7 +307,7 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
         }
     ```
 
-1. Note that **CreateDocument2** function will also be fixed by changes above.
+1. Note that **CreateDocument2** function will also be fixed by the changes above.
 
 1. Finally the functions **DeleteDocument1** and **DeleteDocument2** also need the following code to be replaced for the proper error-handling code similar to the **CreateDocument1** function. The only difference with these functions besides using **DeleteItemAsync** instead of **CreateItemAsync** is that [deletes status codes][/rest/api/cosmos-db/delete-a-document] are different than the insert status codes. For the deletes, we only care about a **404** status code, which represents document not found. Lets update error handling of **CompleteTaskOnCosmosDB** function call with additional case.  On the **Main** function the following code needs to be added above **default** case:
 
@@ -315,6 +317,8 @@ Before we can run our application, we need to connect it to our Azure Cosmos DB 
                         Console.WriteLine("Can not delete customer, customer not found.");
                         break;         
     ```
+
+1. Save the file.
 
 1. Once you're done fixing all functions, test all the menu options several times to make sure you that your app is returning a message when encountering an exception and not crashing.  If your app crashes, fix the errors and just rerun the command:
 
