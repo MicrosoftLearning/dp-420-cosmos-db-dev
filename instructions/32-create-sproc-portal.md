@@ -175,6 +175,7 @@ While the stored procedure authored earlier in this lab has basic functionality,
 1. Finally, add a third parameter to the **createDocument** method invocation that is a function that takes in two parameters named **error** and **newDoc**, checks to see if the error is null, and then sets the newDoc to the response body of the stored procedure:
 
     ```
+    ,
     (error, newDoc) => {
       if (error) throw new Error(error.message);
       context.getResponse().setBody(newDoc);
