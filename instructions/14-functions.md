@@ -92,7 +92,7 @@ Before you create the *Azure Funtion Application*, you will need to enable an *A
     | ---: | :--- |
     | **Subscription** | *Your existing Azure subscription* |
     | **Resource group** | *Select an existing or create a new resource group* |
-    | **Name** | *lab14laworkspace* |
+    | **Name** | *``lab14laworkspace``* |
     | **Location** | *Choose any available region* |
 
 1. Once your *Log Analytics workspace* is created, in the search box search for **Application Insights**.
@@ -105,7 +105,7 @@ Before you create the *Azure Funtion Application*, you will need to enable an *A
     | ---: | :--- |
     | **Subscription (both entries)** | *Your existing Azure subscription* |
     | **Resource group** | *Select an existing or create a new resource group* |
-    | **Name** | *lab14appinsight* |
+    | **Name** | *``lab14appinsight``* |
     | **Location** | *Choose any available region* |
     | **Log Analytics Workspace** | *lab14laworkspace* |
 
