@@ -189,7 +189,7 @@ It is important to stop the emulator when you are done using it as it can use sy
 
  Navigate to the emulator icon in the Windows system tray, open the context menu, and then select **Exit** to shut down the emulator.
 
-    > &#128221; It may take a minute for all instances of the emulator to exit.
+> &#128221; It may take a minute for all instances of the emulator to exit.
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
 [docs.microsoft.com/azure/cosmos-db/local-emulator]: https://docs.microsoft.com/azure/cosmos-db/local-emulator
