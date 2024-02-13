@@ -212,7 +212,7 @@ This lab scenario will assume that our future queries focus primarily on the nam
 
 1. Return to **Visual Studio Code**. Return to the open terminal.
 
-1. Build and run the project at least two more times using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command. Observe the new RU charge in the console output, which should much less than the original charge.  How can this be? Since this script is measuring the RUs when we write the item, by choosing to have no index, there is no overhead mantaining that index. The flipside to this is that while our writes will generate less RUs, our reads will be very costly.
+1. Build and run the project at least two more times using the **[dotnet run][docs.microsoft.com/dotnet/core/tools/dotnet-run]** command. Observe the new RU charge in the console output, which should much less than the original charge.  How can this be? Since this script is measuring the RUs when you write the item, by choosing to have no index, there is no overhead mantaining that index. The flipside to this is that while your writes will generate less RUs, your reads will be very costly.
 
     ```
     dotnet run
