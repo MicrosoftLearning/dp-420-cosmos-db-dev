@@ -60,7 +60,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 You will use a command-line utility that creates a **cosmicworks** database and a **products** container. The tool will then create a set of items that you will observe using the change feed processor running in your terminal window.
 
-1. In **Visual Studio Code**, open the **Terminal** menu and then select **Split Terminal** to open a new terminal side by side with your existing instance.
+1. In **Visual Studio Code**, open the **Terminal** menu and then select **New Terminal** to open a new terminal.
 
 1. Install the [cosmicworks][nuget.org/packages/cosmicworks] command-line tool for global use on your machine.
 
