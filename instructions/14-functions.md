@@ -78,6 +78,39 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Return to the **Home** of the Azure portal.
 
+## Create Application Insight
+
+Before you create the *Azure Funtion Application*, you will need to enable an *Azure Application Insight* so you can monitor the application funtion. The Application Insight will first need a *Log Analytics workspace*.
+
+1. In the search box search for **Log Analytics workspaces**.
+
+1. Select to **+Create** a new *Log Analytics* workspace.
+
+1. In the **Log Analytics workspace** dialog, enter the following values for each setting, and then select **Review+Create** and then select **Create**:
+
+    | **Setting** | **Value** |
+    | ---: | :--- |
+    | **Subscription** | *Your existing Azure subscription* |
+    | **Resource group** | *Select an existing or create a new resource group* |
+    | **Name** | *lab14laworkspace* |
+    | **Location** | *Choose any available region* |
+
+1. Once your *Log Analytics workspace* is created, in the search box search for **Application Insights**.
+
+1. Select to **+Create** a new *Application Insight*.
+
+1. In the **Application Insights** dialog, enter the following values for each setting, and then select **Review+Create** and then select **Create**:
+
+    | **Setting** | **Value** |
+    | ---: | :--- |
+    | **Subscription (both entries)** | *Your existing Azure subscription* |
+    | **Resource group** | *Select an existing or create a new resource group* |
+    | **Name** | *lab14appinsight* |
+    | **Location** | *Choose any available region* |
+    | **Log Analytics Workspace** | *lab14laworkspace* |
+
+You should now be able to monitor your application function.
+
 ## Create an Azure Function app and Azure Cosmos DB-triggered function
 
 Before you can begin writing code, you will need to create the Azure Functions resource and its dependent resources (Application Insights, Storage) using the creation wizard.
