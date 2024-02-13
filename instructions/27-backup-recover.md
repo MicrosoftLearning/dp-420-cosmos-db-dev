@@ -205,7 +205,7 @@ Let's add some documents to those containers.
 
 1. Under the **Settings**, section, select **Backup & Restore**.
 
-1. Select **Change** next to **Backup Policy mode**, in the screen select the **Continuous (7 Days)** option and then select **Save**. Enabling this feature could take over five minutes.
+1. Select **Change** next to **Backup Policy mode**, in the screen select the **Continuous (7 Days)** option and then select **Save**. ***Enabling this feature could take over five minutes***.
 
     > &#128221; Note that *[Multi-regions write accounts are not currently supported for continuous backups][/azure/cosmos-db/continuous-backup-restore-introduction]*. If you did not disable Multi-region writes when you created your Azure Cosmos DB account, you will need to do it now or enabling the continuous backup feature will fail.  You can disable multi-region writes unde the **Replicate data globally** *Settings* section.
 
