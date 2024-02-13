@@ -239,7 +239,7 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Select **Execute Query**.
 
-1. Observe the results and stats of the query. The request unit charge should be smaller now that the composite index is in place.
+1. Observe the results and stats of the query. This time, since the query completed, you can again review the RUs charge.
 
 1. Delete the contents of the editor area.
 
@@ -328,7 +328,7 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Select **Execute Query**.
 
-1. Observe the results and stats of the query. The request unit charge should be lower now that a composite index is in place.
+1. Observe the results and stats of the query. This time, since the query completed, you can again review the RUs charge.
 
 1. Close your web browser window or tab.
 
