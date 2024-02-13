@@ -271,9 +271,11 @@ Bicep is an efficient domain-specific language that makes it simpler and easier 
 1. Within the file, add a new object to create a new Azure Cosmos DB account:
 
     ```
+    param location string = resourceGroup().location
+    
     resource Account 'Microsoft.DocumentDB/databaseAccounts@2021-05-15' = {
       name: 'csmsbicep${uniqueString(resourceGroup().id)}'
-      location: resourceGroup().location
+      location: location
       properties: {
         databaseAccountOfferType: 'Standard'
         locations: [
