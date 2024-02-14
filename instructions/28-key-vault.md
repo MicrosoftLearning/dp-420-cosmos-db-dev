@@ -206,7 +206,7 @@ The rest of the code is straight forward, get the connection string, connect to 
 
 1. In Visual Studio Code, open the command pallet, search for ***Azure App Service: Create New Web App ... (Advanced)***
 
-1. Select ***Sign-in to Azure...***. This option will open a web browser window, follow the sign-in process, and close the browser when done.
+1. Select ***Sign-in to Azure...***. This option will open a web browser window, follow the sign-in process, and close the browser when done and return to Visual Studio Code.
 
 1. (Optional) If it asks for your subscription select your subscription.
 
