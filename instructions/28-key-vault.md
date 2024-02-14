@@ -97,7 +97,7 @@ We'll create a webapp that will connect to the Azure Cosmos DB account and creat
 
 1. Open **Visual Studio Code**.  Open the **28-key-vault** folder, by selecting File->Open folder, and browsing all the way into the **28-key-vault** folder.
 
-    > &#128221; Note, you should only see the **28-key-vault** folder and its files and subfolders in the **Explorer** tree. If you can see the whole GitHub repository we cloned earlier, the web app will not work correctly, so make sure you can only see the **28-key-vault** folder and its files and subfolder in the **Explorer** tree.
+    > &#128221; Note, you should only see the **28-key-vault** folder and its files and subfolders in the **Explorer** tree. If you can see the whole GitHub repository we cloned earlier, ***Close Visual Studio Code*** and reopen it directly to the **28-key-vault** folder.  The web app will not work correctly if that directory is not your projects root directory, so make sure you can only see the **28-key-vault** folder and its files and subfolder in the **Explorer** tree.
 
 1. Open the context menu for the **28-key-vault** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
 
