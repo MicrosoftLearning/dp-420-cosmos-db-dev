@@ -65,10 +65,14 @@ Before we create our web app, we will secure the Azure Cosmos DB account connect
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Key vault name** | *Enter a globally unique name* |
     | **Region** | *Choose any available region* |
+    | **Access Configuration/Permission model** | *Vault Access Policy* |
+    | **Access Configuration/Access policies** | *select the current username checkbox* |
+
+    > &#128221; Note, in a production environment you would most likely select RBAC control instead of Vault Access policy, and your administrator will most likely assign you the proper RBAC role to limit your Key Vault access .
 
 1. Once the vault is created, navigate to the vault.
 
-1. Under the *Settings* section, select **Secrets**.
+1. Under the *Objects* section, select **Secrets**.
 
 1. Select the **+ Generate/Import** to encrypt our credential connection string and fill in the *secret* values with the following settings, *leaving all remaining settings to their default values*, then select to create the secret:
 
