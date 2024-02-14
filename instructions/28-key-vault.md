@@ -202,7 +202,7 @@ In Visual studio, if you bring up the command pallet (**CTRL+SHIFT+P**), and it 
 
 The rest of the code is straight forward, get the connection string, connect to Azure Cosmos DB, and add some documents. The application should also provide us with some feedback on any issues. We should not need to do any more changes after we deploy the application. Let's get started. 
 
-> &#128221; Most of the steps below will be run in the command pallet in the upper middle of your Visual Studio screen.
+> &#128221; Most of the steps below will be run in the command pallet (**CTRL+SHIFT+P**) in the upper middle of your Visual Studio screen. 
 
 1. In Visual Studio Code, open the command pallet, search for ***Azure App Service: Create New Web App ... (Advanced)***
 
