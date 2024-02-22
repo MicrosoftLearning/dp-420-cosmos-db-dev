@@ -400,7 +400,6 @@ To get to the code that you'll use in this unit, do the following:
         .CreateItem<SalesOrder>(salesOrder)
         .ReplaceItem<CustomerV4>(customer.id, customer)
         .ExecuteAsync();
-    
     if (txBatchResponse.IsSuccessStatusCode)
         Console.WriteLine("Order created successfully");
     ```
