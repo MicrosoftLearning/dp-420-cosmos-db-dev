@@ -74,7 +74,7 @@ In the **database-v2** container, where data is stored in individual containers,
 
     ![Screenshot that shows the results of the query to the product category container.](media/16-product-category-results.png)
 
-1. Select the **Query Stats** tab, and note the request charge of 2.8 RUs (request units).
+1. Select the **Query Stats** tab, and note the request charge of 2.92 RUs (request units).
 
     ![Screenshot of the query stats for the query you ran in Data Explorer.](media/16-product-category-stats.png)
 
@@ -160,12 +160,12 @@ Now, let's add up all the RU costs from each of the queries you ran.
 
 |**Query**|**RU/s cost**|
 |---------|---------|
-|Category name|2.8|
+|Category name|2.92|
 |Product|2.89|
 |HL product tags|3.06|
 |LL product tags|3.45|
 |ML product tags|3.19|
-|**Total RU cost**|**15.39**|
+|**Total RU cost**|**15.51**|
 
 ### Run the same queries for your NoSQL design
 
