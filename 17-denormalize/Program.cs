@@ -766,7 +766,7 @@ public class Program
         using (StreamReader streamReader = new StreamReader(file))
         {
 
-            int maxDegreeOfParallelismPerWorker = 200;
+            int maxDegreeOfParallelismPerWorker = 1500;
             bool usebulk = true;
 
             string recordsJson = streamReader.ReadToEnd();
