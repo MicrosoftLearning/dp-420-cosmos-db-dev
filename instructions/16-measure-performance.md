@@ -22,6 +22,8 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
+    > &#128161; If you ran the **Cost of denormalizing data** lab first, and didn't remove the Azure resources created by that lab, ignore the following steps and move to the next section. Note that if you already have the resources created by the **Cost of denormalizing data** lab, and you try to run the script below, the script will fail.
+
 1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **16-measure-performance** folder.
 
 1. Open the context menu for the **16-measure-performance** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
@@ -43,7 +45,6 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     echo "Data load process completed."
 
     ```
-
 1. Close the integrated terminal.
 
 ## Measure performance of entities in separate containers
@@ -140,5 +141,9 @@ Now we're going to query for the same information but with the entities embedded
 When you compare the RU/s for each query that you ran, you see that the last query where the customer entities are in a single document is much less expensive than the combined cost for running the three queries independently. The latency for returning this data is lower because the data is returned in a single operation.
 
 When you're searching for a single item and know the partition key and ID of the data, you can retrieve this data via a *point-read* by calling `ReadItemAsync()` in the Azure Cosmos DB SDK. A point-read is even faster than our query. For the same customer data, the cost is just 1 RU/s, which is a nearly threefold improvement.
+
+## Clean up
+
+Delete the Resource Group created in this lab.  If you don't have the access to remove the Resource Group, remove all the Azure objects created by this lab.
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
