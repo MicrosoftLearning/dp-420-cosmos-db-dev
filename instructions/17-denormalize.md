@@ -24,6 +24,8 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
 1. Once the repository has been cloned, open the local folder you selected in **Visual Studio Code**.
 
+    > &#128161; If you ran the **Measure performance for customer entities** lab first, and didn't remove the Azure resources created by that lab, close the integrated terminal, ignore the following steps and move to the next section. Note that if you already have the resources created by the **Measure performance for customer entities** lab, and you try to run the script below, the script will fail.
+
 1. In **Visual Studio Code**, in the **Explorer** pane, browse to the **17-denormalize** folder.
 
 1. Open the context menu for the **17-denormalize** folder and then select **Open in Integrated Terminal** to open a new terminal instance.
@@ -523,5 +525,9 @@ Let's look at the query for your top 10 customers.
     Something you might not realize is that the top 10 customers query is a cross-partition query that fans out across all the partitions in your container.
 
     The companion lab to this one pointed out that you should strive to avoid cross-partition queries. However, in reality, such queries can be OK in situations where the container is still small or the query is run infrequently. If the query is run frequently or the container is exceptionally large, it would be worth exploring the cost of materializing this data into another container and using it to serve this query.
+
+## Clean up
+
+Delete the Resource Group created in this lab.  If you don't have the access to remove the Resource Group, remove all the Azure objects created by this lab.
 
 [code.visualstudio.com/docs/getstarted]: https://code.visualstudio.com/docs/getstarted/tips-and-tricks
