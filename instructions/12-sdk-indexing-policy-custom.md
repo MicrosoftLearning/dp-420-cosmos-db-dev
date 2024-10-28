@@ -1,6 +1,6 @@
 ---
 lab:
-    title: 'Review the default index policy for an Azure Cosmos DB for NoSQL container with the portal'
+    title: 'Configure an Azure Cosmos DB for NoSQL container's index policy using the SDK'
     module: 'Module 6 - Define and implement an indexing strategy for Azure Cosmos DB for NoSQL'
 ---
 
