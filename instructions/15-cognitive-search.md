@@ -204,14 +204,15 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
 1. Notice the in the **JSON query editor** the syntax of the default JSON search query that returns all possible results using a **\*** (wildcard) operator.
 
    ```json
-   {
-       "search": "*"
-   }
+    {
+      "search": "*",
+      "count": true
+    }
    ```
 
 1. Select the **Search** button to perform the search.
 
-1. Observe that this search query returns all possible results.
+1. Observe that this search query returns all possible results, and also includes a metadata field indicating the total count of results even if they are not all included in the same page.
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
@@ -222,17 +223,6 @@ Now that your materialized view of the Azure Cosmos DB for NoSQL data is in the 
     ```
 
 1. Observe that this search query returns results that contain either the terms **touring** or **3000** giving a higher score to results that contain both terms. The results are then sorted in descending order by the **@search.score** field.
-
-1. In the **JSON query editor**, enter the following query and then select **Search**:
-
-    ```json
-    {
-        "search": "red"
-        , "count": true
-    }
-    ```
-
-1. Observe that this search query returns results with the term **red**, but also now includes a metadata field indicating the total count of results even if they are not all included in the same page.
 
 1. In the **JSON query editor**, enter the following query and then select **Search**:
 
