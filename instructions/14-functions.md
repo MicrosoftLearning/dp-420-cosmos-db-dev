@@ -8,7 +8,7 @@ lab:
 
 The Azure Cosmos DB trigger for Azure Functions is implemented using a change feed processor. You can create functions that respond to create and update operations in your Azure Cosmos DB for NoSQL container with this knowledge. If you have implemented a change feed processor manually, the setup for Azure Functions is similar.
 
-In this lab, you will
+In this lab, you will create a function app, and all its necessary resources, that monitors your database and ouputs log information for each detected operation within it.
 
 ## Create an Azure Cosmos DB for NoSQL account
 
