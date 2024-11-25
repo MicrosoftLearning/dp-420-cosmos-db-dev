@@ -115,7 +115,7 @@ You should now be able to monitor your application function.
 
 Before you can begin writing code, you will need to create the Azure Functions resource and its dependent resources (Application Insights, Storage) using the creation wizard.
 
-1. Select **+ Create a resource**, search for *Functions*, and then create a new **Function App** account resource with the following settings, leaving all remaining settings to their default values:
+1. Select **+ Create a resource**, search for *Functions*, and then create a new **Function App** account resource. Select **Consumption** as the hosting option and setup the App with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
@@ -124,7 +124,7 @@ Before you can begin writing code, you will need to create the Azure Functions r
     | **Name** | *Enter a globally unique name* |
     | **Publish** | *Code* |
     | **Runtime stack** | *.NET* |
-    | **Version** | *6 (LTS) In-process* |
+    | **Version** | *8 (LTS) In-process* |
     | **Region** | *Choose any available region* |
     | **Storage account** | *Create a new storage account* |
 
@@ -132,17 +132,14 @@ Before you can begin writing code, you will need to create the Azure Functions r
 
 1. Wait for the deployment task to complete before continuing with this task.
 
-1. Go to the newly created **Azure Functions** account resource and navigate to the **Functions** pane.
-
-1. In the **Functions** pane, select **+ Create**.
+1. Go to the newly created **Azure Functions** account resource and in the overview page, select **Create function**.
 
 1. In the **Create function** popup, create a new function with the following settings, leaving all remaining settings to their default values:
 
     | **Setting** | **Value** |
     | ---: | :--- |
-    | **Development environment** | *Develop in portal* |
     | **Select a template** | *Azure Cosmos DB trigger* |
-    | **New Function** | *``ItemsListener``* |
+    | **Function name** | *``ItemsListener``* |
     | **Cosmos DB account connection** | *Select New* &vert; *Select Azure Cosmos DB Account* &vert; *Select the Azure Cosmos DB account you created earlier* |
     | **Database name** | *``cosmicworks``* |
     | **Collection name** | *``products``* |
@@ -153,9 +150,7 @@ Before you can begin writing code, you will need to create the Azure Functions r
 
 The function you created earlier is a C# script that is edited in-portal. You will now use the portal to write a short function to output the unique identifier of any item inserted or updated in the container.
 
-1. In the **ItemsListener** &vert; **Function** pane, navigate to the **Code + Test** pane.
-
-1. In the editor for the **run.csx** script, delete the contents of the editor area.
+1. In the **ItemsListener** &vert; **Code + Test** pane, navigate to the editor for the **run.csx** script and delete its contents.
 
 1. In the editor area, reference the **Microsoft.Azure.DocumentDB.Core** library:
 
@@ -223,7 +218,7 @@ The function you created earlier is a C# script that is edited in-portal. You wi
     }
     ```
 
-1. Expand the **Logs** section to connect to the streaming logs for the current function.
+1. Expand the **Logs** section at the bottom of the page, expand the **App Insights Logs**, and select **Filesystem Logs** to connect to the streaming logs for the current function.
 
     > &#128161; It can take a couple of seconds to connect to the streaming log service. You will see a message in the log output once you are connected.
 
