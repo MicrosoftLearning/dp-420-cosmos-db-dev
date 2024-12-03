@@ -37,7 +37,6 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     ```
     "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe" -m pip install pip-system-certs
     az login
-    cd 17-denormalize
     dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
     ```
 
@@ -103,6 +102,8 @@ Next, query the product container to get all the products in the "Components, He
 
     ![Screenshot of Azure Cosmos DB Data Explorer that shows the results of the query to the product container.](media/16-product-results.png)
 
+   > **Note**: You may observe a slightly different request charge than what is reported in this exercise, within a +/- 0.1 range.
+
 ### Query for each product's tags
 
 Next, query the productTag container three times, once for each of the three products: HL Headset, LL Headset, and ML Headset.
@@ -139,7 +140,7 @@ Next, run a query to return the tags for LL Headset.
 
     This query returns the five tags for the LL Headset product.
 
-1. Select the **Query Stats** tab, and note the request charge of 3.45 RUs.
+1. Select the **Query Stats** tab, and note the request charge of 3.47 RUs.
 
     ![Screenshot of the results of the query to the product tag container for 'LL Headset' query stats.](media/16-product-tag-ll-stats.png)
 
@@ -157,7 +158,7 @@ Last, run a query to return the tags for ML Headset.
 
     This query returns the three tags for the ML Headset product.
 
-1. Select the **Query Stats** tab, and note the request charge of 3.19 RUs.
+1. Select the **Query Stats** tab, and note the request charge of 3.2 RUs.
 
     ![Screenshot of the results of our query to the product tag container for 'ML Headset' query stats.](media/16-product-tag-ml-stats.png)
 
@@ -170,9 +171,9 @@ Now, let's add up all the RU costs from each of the queries you ran.
 |Category name|2.92|
 |Product|2.89|
 |HL product tags|3.06|
-|LL product tags|3.45|
-|ML product tags|3.19|
-|**Total RU cost**|**15.51**|
+|LL product tags|3.47|
+|ML product tags|3.20|
+|**Total RU cost**|**15.54**|
 
 ### Run the same queries for your NoSQL design
 
