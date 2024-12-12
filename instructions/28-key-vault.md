@@ -214,7 +214,7 @@ The rest of the code is straight forward, get the connection string, connect to 
 
 1. Select an existing Resource Group or create a new one if needed.
 
-1. Select **.NET 6 (LTS)**.
+1. Select **.NET 8 (LTS)**.
 
 1. Select **Windows**.
 
