@@ -35,7 +35,6 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     ```
     "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe" -m pip install pip-system-certs
     az login
-    cd 16-measure-performance
     dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
 
     ```

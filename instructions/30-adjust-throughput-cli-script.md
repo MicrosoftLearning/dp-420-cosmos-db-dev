@@ -33,7 +33,7 @@ Before using the Azure CLI, you must first check the version of the CLI and logi
 1. Install the tls/ssl certificates before you login to Azure:
 
     ```
-    CD "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\"
+    cd "C:\Program Files\Microsoft SDKs\Azure\CLI2\"
     .\python.exe -m pip install pip-system-certs
     ```
 
@@ -57,7 +57,7 @@ Before using the Azure CLI, you must first check the version of the CLI and logi
 
 1. (Optional) ***If no Resource Group was created for you***, choose a Resource Group name and create it. *Be aware that some lab envrionments might be locked down and you will need an administrator to create the Resource Group for you.*
 
-    i. Get the your location name closet to you from this list
+    i. Get the your location name closest to you from this list
 
     ```
     az account list-locations --query "sort_by([].{YOURLOCATION:name, DisplayName:regionalDisplayName}, &YOURLOCATION)" --output table
@@ -74,7 +74,7 @@ The **cosmosdb** command group contains basic commands to create and manage Azur
 
 1. Return to the terminal instance already open within **Visual Studio Code**.
 
-1. View the most command Azure CLI commands related to **Azure Cosmos DB** using the following command:
+1. View the most common Azure CLI commands related to **Azure Cosmos DB** using the following command:
 
     ```
     az cosmosdb --help
@@ -131,7 +131,7 @@ The **cosmosdb sql** command group contains commands for managing NoSQL API-spec
 
 1. Return to the terminal instance already open within **Visual Studio Code**.
 
-1. View the most command Azure CLI command groups related to **Azure Cosmos DB for NoSQL** using the following command:
+1. View the most common Azure CLI command groups related to **Azure Cosmos DB for NoSQL** using the following command:
 
     ```
     az cosmosdb sql --help

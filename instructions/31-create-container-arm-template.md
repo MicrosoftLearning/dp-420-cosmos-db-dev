@@ -85,7 +85,7 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
 
     ```
     $CurrentDirectory=$pwd
-    CD "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\"
+    CD "C:\Program Files\Microsoft SDKs\Azure\CLI2\"
     .\python.exe -m pip install pip-system-certs
     CD $CurrentDirectory
     ```
@@ -110,7 +110,7 @@ The **Microsoft.DocumentDB** resource provider in Azure Resource Manager makes i
 
 1. (Optional) ***If no Resource Group was created for you***, choose a Resource Group name and create it. *Be aware that some lab envrionments might be locked down and you will need an administrator to create the Resource Group for you.*
 
-    i. Get the your location name closet to you from this list
+    i. Get the location name closest to you from this list
 
     ```
     az account list-locations --query "sort_by([].{YOURLOCATION:name, DisplayName:regionalDisplayName}, &YOURLOCATION)" --output table
