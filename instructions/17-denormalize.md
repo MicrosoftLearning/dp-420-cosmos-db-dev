@@ -42,6 +42,8 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
     > &#128161; If you ran the **Measure performance for customer entities** lab first, and didn't remove the Azure resources created by that lab, close the integrated terminal, ignore the following step and move to the next section. Note that if you already have the resources created by the **Measure performance for customer entities** lab, and you try to run the script below, the script will fail.
 
+    > &#128221; If you are using the Free Tier of Cosmos DB for this lab, you will need to update the ***azuredeploy.json*** file and change the throughput from 4000 to 1000 for all databases and containers.
+
 1. In the **Git Bash terminal**, run the following commands. The commands run a script that creates a new Azure Cosmos DB account, and then build and start the app you use to populate the database and complete the exercises. *Once you have entered the provided credential for the azure account, the build may take 15-20 minutes to complete, so it might be a good time to get some coffee or tea*.
 
     ```
