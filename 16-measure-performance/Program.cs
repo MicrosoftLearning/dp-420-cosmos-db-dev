@@ -194,11 +194,12 @@ public class Program
 
         FeedIterator<CustomerV2> resultSet = container.GetItemQueryIterator<CustomerV2>(
             new QueryDefinition(sql)
-            .WithParameter("@id", customerId),
-            requestOptions: new QueryRequestOptions()
-            {
-                PartitionKey = new PartitionKey(customerId)
-            });
+            .WithParameter("@id", customerId)
+            //,requestOptions: new QueryRequestOptions()
+            //{
+            //    PartitionKey = new PartitionKey(customerId)
+            //}
+            );
 
         Console.WriteLine("Query for a single customer\n");
         while (resultSet.HasMoreResults)
@@ -227,8 +228,9 @@ public class Program
 
         //Get a customer with a point read
         ItemResponse<CustomerV2> response = await container.ReadItemAsync<CustomerV2>(
-            id: customerId,
-            partitionKey: new PartitionKey(customerId));
+            id: customerId
+            //,partitionKey: new PartitionKey(customerId)
+        );
 
         Print(response.Resource);
 
@@ -246,11 +248,12 @@ public class Program
         string sql = $"SELECT * FROM c WHERE c.type = 'category'";
 
         FeedIterator<ProductCategory> resultSet = container.GetItemQueryIterator<ProductCategory>(
-            new QueryDefinition(sql),
-            requestOptions: new QueryRequestOptions()
-            {
-                PartitionKey = new PartitionKey("category")
-            });
+            new QueryDefinition(sql)
+            //,requestOptions: new QueryRequestOptions()
+            //{
+            //    PartitionKey = new PartitionKey("category")
+            //}
+        );
 
         while (resultSet.HasMoreResults)
         {
@@ -280,11 +283,12 @@ public class Program
 
         FeedIterator<Product> resultSet = container.GetItemQueryIterator<Product>(
             new QueryDefinition(sql)
-            .WithParameter("@categoryId", categoryId),
-            requestOptions: new QueryRequestOptions()
-            {
-                PartitionKey = new PartitionKey(categoryId)
-            });
+            .WithParameter("@categoryId", categoryId)
+            //,requestOptions: new QueryRequestOptions()
+            //{
+            //    PartitionKey = new PartitionKey(categoryId)
+            //}
+        );
 
         while (resultSet.HasMoreResults)
         {
@@ -315,11 +319,12 @@ public class Program
             "GROUP BY c.categoryName";
 
         FeedIterator<dynamic> resultSet = container.GetItemQueryIterator<dynamic>(
-            new QueryDefinition(sql),
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey(categoryId)
-            });
+            new QueryDefinition(sql)
+            //,requestOptions: new QueryRequestOptions
+            //{
+            //    PartitionKey = new PartitionKey(categoryId)
+            //}
+        );
 
         Console.WriteLine("Print out category name and number of products in that category\n");
         while (resultSet.HasMoreResults)
@@ -351,7 +356,7 @@ public class Program
         };
 
         await container.ReplaceItemAsync(
-            partitionKey: new PartitionKey("category"),
+            //partitionKey: new PartitionKey("category"),
             id: categoryId,
             item: updatedProductCategory);
 
@@ -374,7 +379,7 @@ public class Program
         Console.WriteLine("Change category name back to original");
 
         await container.ReplaceItemAsync(
-            partitionKey: new PartitionKey("category"),
+            //partitionKey: new PartitionKey("category"),
             id: categoryId,
             item: updatedProductCategory);
 
@@ -393,11 +398,12 @@ public class Program
 
         FeedIterator<SalesOrder> resultSet = container.GetItemQueryIterator<SalesOrder>(
             new QueryDefinition(sql)
-            .WithParameter("@customerId", customerId),
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey(customerId)
-            });
+            .WithParameter("@customerId", customerId)
+            //,requestOptions: new QueryRequestOptions
+            //{
+            //    PartitionKey = new PartitionKey(customerId)
+            //}
+        );
 
         Console.WriteLine("Print out orders for this customer\n");
         while (resultSet.HasMoreResults)
@@ -424,11 +430,12 @@ public class Program
 
         FeedIterator<dynamic> resultSet = container.GetItemQueryIterator<dynamic>(
             new QueryDefinition(sql)
-            .WithParameter("@customerId", customerId),
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey(customerId)
-            });
+            .WithParameter("@customerId", customerId)
+            //,requestOptions: new QueryRequestOptions
+            //{
+            //    PartitionKey = new PartitionKey(customerId)
+            //}
+        );
 
         CustomerV4 customer = new CustomerV4();
         List<SalesOrder> orders = new List<SalesOrder>();
@@ -475,8 +482,8 @@ public class Program
         string customerId = "FFD0DD37-1F0E-4E2E-8FAC-EAF45B0E9447";
         //Get the customer
         ItemResponse<CustomerV4> response = await container.ReadItemAsync<CustomerV4>(
-            id: customerId,
-            partitionKey: new PartitionKey(customerId)
+            id: customerId
+            //,partitionKey: new PartitionKey(customerId)
             );
         CustomerV4 customer = response.Resource;
 
@@ -529,8 +536,8 @@ public class Program
         string orderId = "5350ce31-ea50-4df9-9a48-faff97675ac5";
 
         ItemResponse<CustomerV4> response = await container.ReadItemAsync<CustomerV4>(
-            id: customerId,
-            partitionKey: new PartitionKey(customerId)
+            id: customerId
+            //,partitionKey: new PartitionKey(customerId)
         );
         CustomerV4 customer = response.Resource;
 
@@ -539,7 +546,8 @@ public class Program
 
         //Submit both as a transactional batch
         TransactionalBatchResponse txBatchResponse = await container.CreateTransactionalBatch(
-            new PartitionKey(customerId))
+            //new PartitionKey(customerId)
+            )
             .DeleteItem(orderId)
             .ReplaceItem<CustomerV4>(customer.id, customer)
             .ExecuteAsync();
@@ -625,11 +633,12 @@ public class Program
         string sql = $"SELECT * FROM c WHERE c.categoryId = '{categoryId}'";
 
         FeedIterator<Product> resultSet = productContainer.GetItemQueryIterator<Product>(
-            new QueryDefinition(sql),
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey(categoryId)
-            });
+            new QueryDefinition(sql)
+            //,requestOptions: new QueryRequestOptions
+            //{
+            //    PartitionKey = new PartitionKey(categoryId)
+            //}
+        );
 
         int productCount = 0;
 
