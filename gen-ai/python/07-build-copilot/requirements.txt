@@ -1,0 +1,11 @@
+azure-cosmos==4.9.0
+azure-identity==1.19.0
+fastapi==0.115.5
+openai==1.55.2
+pydantic==2.10.2
+requests==2.32.3
+streamlit==1.41.1
+uvicorn==0.32.1
+httpx==0.27.2
+aiohttp==3.11.9
+asyncio==3.4.3
