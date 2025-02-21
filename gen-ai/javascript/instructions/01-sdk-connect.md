@@ -1,11 +1,7 @@
 ---
-title: '01 - Connect to Azure Cosmos DB for NoSQL with the SDK'
 lab:
     title: '01 - Connect to Azure Cosmos DB for NoSQL with the SDK'
     module: 'Use the Azure Cosmos DB for NoSQL SDK'
-layout: default
-nav_order: 4
-parent: 'JavaScript SDK labs'
 ---
 
 # Connect to Azure Cosmos DB for NoSQL with the SDK
