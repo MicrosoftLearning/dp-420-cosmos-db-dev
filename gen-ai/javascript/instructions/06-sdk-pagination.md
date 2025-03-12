@@ -1,11 +1,7 @@
 ---
-title: '06 - Paginate cross-product query results with the Azure Cosmos DB for NoSQL SDK'
 lab:
     title: '06 - Paginate cross-product query results with the Azure Cosmos DB for NoSQL SDK'
     module: 'Author complex queries with the Azure Cosmos DB for NoSQL'
-layout: default
-nav_order: 9
-parent: 'JavaScript SDK labs'
 ---
 
 # Paginate cross-product query results with the Azure Cosmos DB for NoSQL SDK

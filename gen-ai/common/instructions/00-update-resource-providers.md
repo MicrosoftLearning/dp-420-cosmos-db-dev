@@ -1,11 +1,7 @@
 ---
-title: 'Enable resource providers'
 lab:
     title: 'Enable resource providers'
     module: 'Setup'
-layout: default
-nav_order: 2
-parent: 'Common setup instructions'
 ---
 
 # Enable Azure resource providers

@@ -1,11 +1,7 @@
 ---
-title: 'Setup Azure Cosmos DB'
 lab:
     title: 'Setup Azure Cosmos DB'
     module: 'Setup'
-layout: default
-nav_order: 3
-parent: 'Common setup instructions'
 ---
 
 # Setup Azure Cosmos DB

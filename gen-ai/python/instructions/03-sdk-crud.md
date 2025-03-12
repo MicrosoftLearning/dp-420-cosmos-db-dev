@@ -1,11 +1,7 @@
 ---
-title: '03 - Create and update documents with the Azure Cosmos DB for NoSQL SDK'
 lab:
     title: '03 - Create and update documents with the Azure Cosmos DB for NoSQL SDK'
     module: 'Implement Azure Cosmos DB for NoSQL point operations'
-layout: default
-nav_order: 6
-parent: 'Python SDK labs'
 ---
 
 # Create and update documents with the Azure Cosmos DB for NoSQL SDK

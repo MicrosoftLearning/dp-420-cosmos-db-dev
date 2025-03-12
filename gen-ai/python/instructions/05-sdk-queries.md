@@ -1,11 +1,7 @@
 ---
-title: '05 - Execute a query with the Azure Cosmos DB for NoSQL SDK'
 lab:
     title: '05 - Execute a query with the Azure Cosmos DB for NoSQL SDK'
     module: 'Query the Azure Cosmos DB for NoSQL'
-layout: default
-nav_order: 8
-parent: 'Python SDK labs'
 ---
 
 # Execute a query with the Azure Cosmos DB for NoSQL SDK

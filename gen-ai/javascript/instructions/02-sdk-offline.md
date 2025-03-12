@@ -1,11 +1,7 @@
 ---
-title: '02 - Configure the Azure Cosmos DB JavaScript SDK for Offline Development'
 lab:
     title: '02 - Configure the Azure Cosmos DB JavaScript SDK for Offline Development'
     module: 'Configure the Azure Cosmos DB for NoSQL SDK'
-layout: default
-nav_order: 5
-parent: 'JavaScript SDK labs'
 ---
 
 # Configure the Azure Cosmos DB JavaScript SDK for Offline Development

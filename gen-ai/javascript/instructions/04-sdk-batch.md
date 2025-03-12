@@ -1,11 +1,7 @@
 ---
-title: '04 - Batch multiple point operations together with the Azure Cosmos DB for NoSQL SDK'
 lab:
     title: '04 - Batch multiple point operations together with the Azure Cosmos DB for NoSQL SDK'
     module: 'Perform cross-document transactional operations with the Azure Cosmos DB for NoSQL'
-layout: default
-nav_order: 7
-parent: 'JavaScript SDK labs'
 ---
 
 # Batch multiple point operations together with the Azure Cosmos DB for NoSQL SDK

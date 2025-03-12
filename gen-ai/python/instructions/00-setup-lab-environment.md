@@ -1,11 +1,7 @@
 ---
-title: 'Setup lab environment'
 lab:
-    title: 'Setup lab environment'
+    title: 'Setup lab environment''
     module: 'Setup'
-layout: default
-nav_order: 2
-parent: 'Python SDK labs'
 ---
 
 # Setup local lab environment
