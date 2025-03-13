@@ -18,8 +18,6 @@ There are some resource providers that must be registered in your Azure subscrip
 
 1. Select your Azure subscription.
 
-    > &#128221; If you have multiple subscriptions, select the one you created by redeeming your Azure Pass.
-
 1. In the blade for your subscription, in the **Settings** section, select **Resource providers**.
 
 1. In the list of resource providers, ensure the following providers are registered:
