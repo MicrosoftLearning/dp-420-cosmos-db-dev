@@ -30,6 +30,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | --: | :-- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | **Use your existing Azure subscription.** *All resources must belong to a resource group. Every resource group must belong to a subscription.* |
     | **Resource Group** | **Use existing or create a new resource group.** *All resources must belong to a resource group.* |
     | **Account Name** | **Enter any globally unique name.** *The globally unique account name. This name will be used as part of the DNS address for requests.  The portal will check the name in real time.* |
@@ -84,7 +85,7 @@ The Data Explorer also includes a suite of features to query, create, and manage
     }
     ```
 
-1. Select **Save** from the command bar to add the first JSON item:
+1. Select **Save** from the command bar to add the first JSON item.
 
 1. Back in the **Items** tab, select **New Item** from the command bar. In the editor, replace the placeholder JSON item with the following content:
 
@@ -98,7 +99,7 @@ The Data Explorer also includes a suite of features to query, create, and manage
     }
     ```
 
-1. Select **Save** from the command bar to add the second JSON item:
+1. Select **Save** from the command bar to add the second JSON item.
 
 1. In the **Items** tab, observe the two new items in the **Items** pane.
 
