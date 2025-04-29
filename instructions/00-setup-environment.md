@@ -24,7 +24,7 @@ Ideally, you should complete these labs in a hosted lab environment. If you want
 
 ### .NET 8 SDK
 
-1. Download and install the SDK (not runtime) from [dotnet.microsoft.com/download/dotnet/8.0].
+1. Download and install the SDK (not runtime) from [dotnet.microsoft.com/download/dotnet/8.0](https://dotnet.microsoft.com/en-us/download/dotnet/8.0).
 
 ### PowerShell 7
 
