@@ -36,6 +36,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | ---: | :--- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | *Your existing Azure subscription* |
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
@@ -191,7 +192,7 @@ Just like with any other indexing policy, you can use the Data Explorer to view 
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
-1. Within the **products** container node of the **NOSQL API** navigation tree, select **Scale & Settings**.
+1. Within the **products** container node of the **NOSQL API** navigation tree, select **Settings**.
 
 1. Observe the indexing policy within the **Indexing Policy** section:
 

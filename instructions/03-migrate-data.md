@@ -24,6 +24,7 @@ To accompany the products container, you will create a **flatproducts** containe
 
     | **Setting** | **Value** |
     | ---: | :--- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | *Your existing Azure subscription* |
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
@@ -40,9 +41,7 @@ To accompany the products container, you will create a **flatproducts** containe
 
 1. This pane contains the connection details and credentials necessary to connect to the account from the SDK. Specifically:
 
-    1. Notice the **URI** field. You will use this **endpoint** value later in this exercise.
-
-    1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
+    1. Notice the **PRIMARY CONNECTION STRING** field. You will use this **connection string** value later in this exercise.
 
 1. Keep the browser tab open, as we will return to it later.
 
@@ -54,8 +53,8 @@ To accompany the products container, you will create a **flatproducts** containe
 
 1. Install the [cosmicworks][nuget.org/packages/cosmicworks] command-line tool for global use on your machine.
 
-    ```
-    dotnet tool install cosmicworks --global --version 1.*
+    ```powershell
+    dotnet tool install --global CosmicWorks --version 2.3.1
     ```
 
     > &#128161; This command may take a couple of minutes to complete. This command will output the warning message (*Tool 'cosmicworks' is already installed') if you have already installed the latest version of this tool in the past.
@@ -64,16 +63,15 @@ To accompany the products container, you will create a **flatproducts** containe
 
     | **Option** | **Value** |
     | ---: | :--- |
-    | **--endpoint** | *The endpoint value you checked earlier in this lab* |
-    | **--key** | *The key value you checked earlier in this lab* |
-    | **--datasets** | *product* |
+    | **-c** | *The connection string value you checked earlier in this lab* |
+    | **--number-of-employees** | *The cosmicworks command populates your database with both employees and products containers with 1000 and 200 items respectively, unless specified otherwise* |
 
-    ```
-    cosmicworks --endpoint <cosmos-endpoint> --key <cosmos-key> --datasets product
+    ```powershell
+    cosmicworks -c "connection-string" --number-of-employees 0
     ```
 
     > &#128221; For example, if your endpoint is: **https&shy;://dp420.documents.azure.com:443/** and your key is: **fDR2ci9QgkdkvERTQ==**, then the command would be:
-    > ``cosmicworks --endpoint https://dp420.documents.azure.com:443/ --key fDR2ci9QgkdkvERTQ== --datasets product``
+    > ``cosmicworks -c "AccountEndpoint=https://dp420.documents.azure.com:443/;AccountKey=fDR2ci9QgkdkvERTQ==" --number-of-employees 0``
 
 1. Wait for the **cosmicworks** command to finish populating the account with a database, container, and items.
 
@@ -89,7 +87,7 @@ To accompany the products container, you will create a **flatproducts** containe
 
 1. Observe and select the various JSON items in the **products** container. These are the items created by the command-line tool used in previous steps.
 
-1. Select the **Scale & Settings** node. In the **Scale & Settings** tab, select **Manual**, update the **required throughput** setting from **4000 RU/s** to **400 RU/s** and then **Save** your changes**.
+1. Select the **Scale** node. In the **Scale** tab, select **Manual**, update the **required throughput** setting from **4000 RU/s** to **400 RU/s** and then **Save** your changes**.
 
 1. In the **Data Explorer** pane, select **New Container**.
 
@@ -100,8 +98,6 @@ To accompany the products container, you will create a **flatproducts** containe
     | **Database id** | *Use existing* &vert; *cosmicworks* |
     | **Container id** | *`flatproducts`* |
     | **Partition key** | *`/category`* |
-    | **Container throughput (autoscale)** | *Manual* |
-    | **RU/s** | *`400`* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **flatproducts** container node within the hierarchy.
 
@@ -120,7 +116,6 @@ Now that the Azure Cosmos DB for NoSQL resources are in place, you will create a
     | **Name** | *Enter a globally unique name* |
     | **Region** | *Choose any available region* |
     | **Version** | *V2* |
-    | **Git configuration** | *Configure Git later* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
