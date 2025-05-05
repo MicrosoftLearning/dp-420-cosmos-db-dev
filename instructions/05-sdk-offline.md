@@ -132,10 +132,10 @@ Creating a new container is similar to the pattern used to create a new database
 
 1. Open the **script.cs** code file within the **05-sdk-offline** folder again.
 
-1. Asynchronously invoke the [CreateContainerIfNotExistsAsync][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.database.createcontainerifnotexistsasync] method of the **database** variable passing in the name of the new container (**products**), the partition key path (**/categoryId**), and the throughput (**400**) you would like to create within the **cosmicworks** database and storing the result in a variable of type [Container][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container]:
+1. Asynchronously invoke the [CreateContainerIfNotExistsAsync][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.database.createcontainerifnotexistsasync] method of the **database** variable passing in the name of the new container (**products**), the partition key path (**/category/name**), and the throughput (**400**) you would like to create within the **cosmicworks** database and storing the result in a variable of type [Container][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container]:
 
     ```
-    Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId", 400);
+    Container container = await database.CreateContainerIfNotExistsAsync("products", "/category/name", 400);
     ```
 
 1. Use the built-in **Console.WriteLine** static method to print the [Id][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.container.id] property of the Container class with a header titled **New Container**:
@@ -157,7 +157,7 @@ Creating a new container is similar to the pattern used to create a new database
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
     Console.WriteLine($"New Database:\tId: {database.Id}");
     
-    Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId", 400);
+    Container container = await database.CreateContainerIfNotExistsAsync("products", "/category/name", 400);
     Console.WriteLine($"New Container:\tId: {container.Id}");
     ```
 

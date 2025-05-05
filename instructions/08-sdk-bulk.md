@@ -96,7 +96,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
 
     > &#128221; This command will open the terminal with the starting directory already set to the **08-sdk-bulk** folder.
 
-1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1] package from NuGet using the following command:
+1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.49.0] package from NuGet using the following command:
 
     ```
     dotnet add package Microsoft.Azure.Cosmos --version 3.49.0

@@ -65,7 +65,7 @@ Let’s start simple by creating a serverless account. There’s not much to con
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
     | **Container id** | *`products`* |
-    | **Partition key** | *`/categoryId`* |
+    | **Partition key** | *`/category/name`* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 

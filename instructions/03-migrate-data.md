@@ -67,11 +67,11 @@ To accompany the products container, you will create a **flatproducts** containe
     | **--number-of-employees** | *The cosmicworks command populates your database with both employees and products containers with 1000 and 200 items respectively, unless specified otherwise* |
 
     ```powershell
-    cosmicworks -c "connection-string" --number-of-employees 0
+    cosmicworks -c "connection-string" --number-of-employees 0 --disable-hierarchical-partition-keys
     ```
 
     > &#128221; For example, if your endpoint is: **https&shy;://dp420.documents.azure.com:443/** and your key is: **fDR2ci9QgkdkvERTQ==**, then the command would be:
-    > ``cosmicworks -c "AccountEndpoint=https://dp420.documents.azure.com:443/;AccountKey=fDR2ci9QgkdkvERTQ==" --number-of-employees 0``
+    > ``cosmicworks -c "AccountEndpoint=https://dp420.documents.azure.com:443/;AccountKey=fDR2ci9QgkdkvERTQ==" --number-of-employees 0 --disable-hierarchical-partition-keys``
 
 1. Wait for the **cosmicworks** command to finish populating the account with a database, container, and items.
 
