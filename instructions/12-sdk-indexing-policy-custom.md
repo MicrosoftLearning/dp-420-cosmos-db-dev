@@ -113,7 +113,7 @@ The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.
 1. Create a new variable of type [ContainerProperties][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerproperties] named **options** passing in the values ``products`` and ``/categoryId`` as constructor parameters:
 
     ```
-    ContainerProperties options = new ("products", "/categoryId");
+    ContainerProperties options = new ("products", "/category/name");
     ```
 
 1. Assign the **policy** variable to the [IndexingPolicy][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerproperties.indexingpolicy] property of the **options** variable:
@@ -157,7 +157,7 @@ The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.
         new IncludedPath{ Path = "/name/?" }
     );
 
-    ContainerProperties options = new ("products", "/categoryId");
+    ContainerProperties options = new ("products", "/category/name");
     options.IndexingPolicy = policy;
 
     Container container = await database.CreateContainerIfNotExistsAsync(options);
