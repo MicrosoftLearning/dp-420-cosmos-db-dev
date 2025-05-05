@@ -166,7 +166,7 @@ You will now use an asynchronous stream to create a simple-to-understand foreach
 
     Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
 
-    Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId");
+    Container container = await database.CreateContainerIfNotExistsAsync("products", "/category/name");
 
     string sql = "SELECT * FROM products p";
     QueryDefinition query = new (sql);
