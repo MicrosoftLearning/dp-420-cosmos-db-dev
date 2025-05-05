@@ -9,4 +9,4 @@ CosmosClient client = new CosmosClient(endpoint, key);
 
 Database database = await client.CreateDatabaseIfNotExistsAsync("cosmicworks");
 
-Container container = await database.CreateContainerIfNotExistsAsync("products", "/categoryId");
+Container container = await database.CreateContainerIfNotExistsAsync("products", "/category/name");
