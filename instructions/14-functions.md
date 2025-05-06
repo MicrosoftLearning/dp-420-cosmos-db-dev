@@ -27,7 +27,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
-    | **Capacity mode** | *Serverless* |
+    | **Capacity mode** | *Provisioned throughput* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
@@ -48,6 +49,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *``cosmicworks``* |
+    | **Provision throughput** | enabled |
+    | **Database throughput** | **Manual** |
+    | **Database Required RU/s** | ``1000`` |
 
 1. Back in the **Data Explorer** pane, observe the **cosmicworks** database node within the hierarchy.
 
@@ -59,7 +63,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
     | **Container id** | *``products``* |
-    | **Partition key** | *``/categoryId``* |
+    | **Partition key** | *``/category/name``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -257,11 +261,11 @@ You will use a command-line utility that creates a **cosmicworks** database and 
     | **--number-of-employees** | *The cosmicworks command populates your database with both employees and products containers with 1000 and 200 items respectively, unless specified otherwise* |
 
     ```powershell
-    cosmicworks -c "connection-string" --number-of-employees 0
+    cosmicworks -c "connection-string" --number-of-employees 0 --disable-hierarchical-partition-keys
     ```
 
     > &#128221; For example, if your endpoint is: **https&shy;://dp420.documents.azure.com:443/** and your key is: **fDR2ci9QgkdkvERTQ==**, then the command would be:
-    > ``cosmicworks -c "AccountEndpoint=https://dp420.documents.azure.com:443/;AccountKey=fDR2ci9QgkdkvERTQ==" --number-of-employees 0``
+    > ``cosmicworks -c "AccountEndpoint=https://dp420.documents.azure.com:443/;AccountKey=fDR2ci9QgkdkvERTQ==" --number-of-employees 0 --disable-hierarchical-partition-keys``
 
 1. Wait for the **cosmicworks** command to finish populating the account with a database, container, and items.
 
