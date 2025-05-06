@@ -41,7 +41,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
-    | **Capacity mode** | *Serverless* |
+    | **Capacity mode** | *Provisioned throughput* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
@@ -66,6 +67,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *``cosmicworks``* |
+    | **Provision throughput** | enabled |
+    | **Database throughput** | **Manual** |
+    | **Database Required RU/s** | ``1000`` |
 
 1. Back in the **Data Explorer** pane, observe the **cosmicworks** database node within the hierarchy.
 
