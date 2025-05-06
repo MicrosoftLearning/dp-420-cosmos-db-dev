@@ -36,6 +36,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | ---: | :--- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | *Your existing Azure subscription* |
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
@@ -120,16 +121,16 @@ We'll create a webapp that will connect to the Azure Cosmos DB account and creat
 
 The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotnet-add-package] command to import packages from a pre-configured package feed. A .NET installation uses NuGet as its default package feed.
 
-1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1] package from NuGet using the following command:
+1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.49.0] package from NuGet using the following command:
 
     ```
-    dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
+    dotnet add package Microsoft.Azure.Cosmos --version 3.49.0
     ```
 
-1. Add the [Newtonsoft.Json][nuget.org/packages/Newtonsoft.Json/13.0.1] package from NuGet using the following command:
+1. Add the [Newtonsoft.Json][nuget.org/packages/Newtonsoft.Json/13.0.3] package from NuGet using the following command:
 
     ```
-    dotnet add package Newtonsoft.Json --version 13.0.1
+    dotnet add package Newtonsoft.Json --version 13.0.3
     ```
 
 1. Add the [Microsoft.Azure.KeyVault][nuget.org/packages/Microsoft.Azure.KeyVault] package from NuGet using the following command:

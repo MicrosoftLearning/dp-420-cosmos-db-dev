@@ -37,7 +37,7 @@ If you have not already cloned the lab code repository for **DP-420** to the env
     ```
     "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\python.exe" -m pip install pip-system-certs
     az login
-    dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
+    dotnet add package Microsoft.Azure.Cosmos --version 3.49.0
     ```
 
     > &#128161; If you ran the **Measure performance for customer entities** lab first, and didn't remove the Azure resources created by that lab, close the integrated terminal, ignore the following step and move to the next section. Note that if you already have the resources created by the **Measure performance for customer entities** lab, and you try to run the script below, the script will fail.

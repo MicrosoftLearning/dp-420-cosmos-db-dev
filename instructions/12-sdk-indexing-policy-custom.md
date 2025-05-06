@@ -36,6 +36,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | ---: | :--- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | *Your existing Azure subscription* |
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
@@ -112,7 +113,7 @@ The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.
 1. Create a new variable of type [ContainerProperties][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerproperties] named **options** passing in the values ``products`` and ``/categoryId`` as constructor parameters:
 
     ```
-    ContainerProperties options = new ("products", "/categoryId");
+    ContainerProperties options = new ("products", "/category/name");
     ```
 
 1. Assign the **policy** variable to the [IndexingPolicy][docs.microsoft.com/dotnet/api/microsoft.azure.cosmos.containerproperties.indexingpolicy] property of the **options** variable:
@@ -156,7 +157,7 @@ The .NET SDK contains a suite of classes related to the parent [Microsoft.Azure.
         new IncludedPath{ Path = "/name/?" }
     );
 
-    ContainerProperties options = new ("products", "/categoryId");
+    ContainerProperties options = new ("products", "/category/name");
     options.IndexingPolicy = policy;
 
     Container container = await database.CreateContainerIfNotExistsAsync(options);
@@ -191,7 +192,7 @@ Just like with any other indexing policy, you can use the Data Explorer to view 
 
 1. In the **Data Explorer**, expand the **cosmicworks** database node, then observe the new **products** container node within the **NOSQL API** navigation tree.
 
-1. Within the **products** container node of the **NOSQL API** navigation tree, select **Scale & Settings**.
+1. Within the **products** container node of the **NOSQL API** navigation tree, select **Settings**.
 
 1. Observe the indexing policy within the **Indexing Policy** section:
 

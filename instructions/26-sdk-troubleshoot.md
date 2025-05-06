@@ -8,7 +8,7 @@ lab:
 
 Azure Cosmos DB offers an extensive set of response codes, which help us easily troubleshoot issues that could arise with our different operation types. The catch is to make sure we program proper error handling when creating apps for Azure Cosmos DB.
 
-In this lab, we'll create a menu driven program that will allow us to insert or delete one of two documents. The main purpose of this lab is to introduce us to how to use some of the most common response codes and how to use them in our app's error handling code.  While we'll code error handling for multiple response codes, we'll only trigger two different types of conditions.  Additionally the error handling won't do anything complex, depending on the response code, it will either display a message to the screen or wait 10 seconds and retry the operation one more time. 
+In this lab, we'll create a menu driven program that will allow us to insert or delete one of two documents. The main purpose of this lab is to introduce us to how to use some of the most common response codes and how to use them in our app's error handling code.  While we'll code error handling for multiple response codes, we'll only trigger two different types of conditions.  Additionally the error handling won't do anything complex, depending on the response code, it will either display a message to the screen or wait 10 seconds and retry the operation one more time.
 
 ## Prepare your development environment
 
@@ -36,6 +36,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | ---: | :--- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | *Your existing Azure subscription* |
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
@@ -68,10 +69,10 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
 
     > &#128221; This command will open the terminal with the starting directory already set to the **26-sdk-troubleshoot** folder.
 
-1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.22.1] package from NuGet using the following command:
+1. Add the [Microsoft.Azure.Cosmos][nuget.org/packages/microsoft.azure.cosmos/3.49.0] package from NuGet using the following command:
 
     ```
-    dotnet add package Microsoft.Azure.Cosmos --version 3.22.1
+    dotnet add package Microsoft.Azure.Cosmos --version 3.49.0
     ```
 
 ## Run a script to create menu-driven options to insert and delete documents.
