@@ -27,7 +27,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
-    | **Capacity mode** | *Serverless* |
+    | **Capacity mode** | *Provisioned throughput* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
@@ -35,15 +36,28 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
 1. Go to the newly created **Azure Cosmos DB** account resource and navigate to the **Data Explorer** pane.
 
+1. In the **Data Explorer** pane, expand **New Container** and then select **New Database**.
+
+1. In the **New Database** popup, enter the following values for each setting, and then select **OK**:
+
+    | **Setting** | **Value** |
+    | --: | :-- |
+    | **Database id** | *``cosmicworks``* |
+    | **Provision throughput** | enabled |
+    | **Database throughput** | **Manual** |
+    | **Database Required RU/s** | ``1000`` |
+
+1. Back in the **Data Explorer** pane, observe the **cosmicworks** database node within the hierarchy.
+
 1. In the **Data Explorer** pane, select **New Container**.
 
 1. In the **New Container** popup, enter the following values for each setting, and then select **OK**:
 
     | **Setting** | **Value** |
     | --: | :-- |
-    | **Database id** | *Create new* &vert; *``cosmicworks``* |
+    | **Database id** | *Use existing* &vert; *cosmicworks* |
     | **Container id** | *``products``* |
-    | **Partition key** | *``/categoryId``* |
+    | **Partition key** | *``/category/name``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -77,11 +91,11 @@ You will use a command-line utility that creates a **cosmicworks** database and 
     | **--number-of-employees** | *The cosmicworks command populates your database with both employees and products containers with 1000 and 200 items respectively, unless specified otherwise* |
 
     ```powershell
-    cosmicworks -c "connection-string" --number-of-employees 0
+    cosmicworks -c "connection-string" --number-of-employees 0 --disable-hierarchical-partition-keys
     ```
 
     > &#128221; For example, if your endpoint is: **https&shy;://dp420.documents.azure.com:443/** and your key is: **fDR2ci9QgkdkvERTQ==**, then the command would be:
-    > ``cosmicworks -c "AccountEndpoint=https://dp420.documents.azure.com:443/;AccountKey=fDR2ci9QgkdkvERTQ==" --number-of-employees 0``
+    > ``cosmicworks -c "AccountEndpoint=https://dp420.documents.azure.com:443/;AccountKey=fDR2ci9QgkdkvERTQ==" --number-of-employees 0 --disable-hierarchical-partition-keys``
 
 1. Wait for the **cosmicworks** command to finish populating the account with a database, container, and items.
 
@@ -112,7 +126,7 @@ Before you modify the indexing policy, first, you will run a few sample SQL quer
     ```
     SELECT 
         p.name,
-        p.categoryName,
+        p.category,
         p.price
     FROM
         products p    
@@ -129,12 +143,12 @@ Before you modify the indexing policy, first, you will run a few sample SQL quer
     ```
     SELECT 
         p.name,
-        p.categoryName,
+        p.category,
         p.price
     FROM
         products p
     ORDER BY
-        p.categoryName DESC
+        p.category DESC
     ```
 
 1. Select **Execute Query**.
@@ -149,17 +163,17 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will order the results by the **categoryName** in descending order first, and then by the **price** in ascending order:
+1. Create a new SQL query that will order the results by the **category** in descending order first, and then by the **price** in ascending order:
 
     ```
     SELECT 
         p.name,
-        p.categoryName,
+        p.category,
         p.price
     FROM
         products p
     ORDER BY
-        p.categoryName DESC,
+        p.category DESC,
         p.price ASC
     ```
 
@@ -205,7 +219,7 @@ Now, you will need to create a composite index if you sort your items using mult
       "compositeIndexes": [
         [
           {
-            "path": "/categoryName",
+            "path": "/category",
             "order": "descending"
           },
           {
@@ -226,12 +240,12 @@ Now, you will need to create a composite index if you sort your items using mult
     ```
     SELECT 
         p.name,
-        p.categoryName,
+        p.category,
         p.price
     FROM
         products p
     ORDER BY
-        p.categoryName DESC,
+        p.category DESC,
         p.price ASC
     ```
 
@@ -241,17 +255,17 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will order the results by the **categoryName** in descending order first, then by **name** in ascending order, and then finally by the **price** in ascending order:
+1. Create a new SQL query that will order the results by the **category** in descending order first, then by **name** in ascending order, and then finally by the **price** in ascending order:
 
     ```
     SELECT 
         p.name,
-        p.categoryName,
+        p.category,
         p.price
     FROM
         products p
     ORDER BY
-        p.categoryName DESC,
+        p.category DESC,
         p.name ASC,
         p.price ASC
     ```
@@ -279,7 +293,7 @@ Now, you will need to create a composite index if you sort your items using mult
       "compositeIndexes": [
         [
           {
-            "path": "/categoryName",
+            "path": "/category",
             "order": "descending"
           },
           {
@@ -289,7 +303,7 @@ Now, you will need to create a composite index if you sort your items using mult
         ],
         [
           {
-            "path": "/categoryName",
+            "path": "/category",
             "order": "descending"
           },
           {
@@ -309,17 +323,17 @@ Now, you will need to create a composite index if you sort your items using mult
 
 1. Delete the contents of the editor area.
 
-1. Create a new SQL query that will order the results by the **categoryName** in descending order first, then by **name** in ascending order, and then finally by the **price** in ascending order:
+1. Create a new SQL query that will order the results by the **category** in descending order first, then by **name** in ascending order, and then finally by the **price** in ascending order:
 
     ```
     SELECT 
         p.name,
-        p.categoryName,
+        p.category,
         p.price
     FROM
         products p
     ORDER BY
-        p.categoryName DESC,
+        p.category DESC,
         p.name ASC,
         p.price ASC
     ```
