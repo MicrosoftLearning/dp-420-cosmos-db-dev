@@ -36,11 +36,13 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     | **Setting** | **Value** |
     | ---: | :--- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | *Your existing Azure subscription* |
     | **Resource group** | *Select an existing or create a new resource group* |
     | **Account Name** | *Enter a globally unique name* |
     | **Location** | *Choose any available region* |
-    | **Capacity mode** | *Serverless* |
+    | **Capacity mode** | *Provisioned throughput* |
+    | **Apply Free Tier Discount** | *Do Not Apply* |
 
     > &#128221; Your lab environments may have restrictions preventing you from creating a new resource group. If that is the case, use the existing pre-created resource group.
 
@@ -54,6 +56,8 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
 
     1. Notice the **PRIMARY KEY** field. You will use this **key** value later in this exercise.
 
+    1. Notice the **PRIMARY CONNECTION STRING** field. You will use this **connection string** value later in this exercise.
+
 1. Select **Data Explorer** from the resource menu.
 
 1. In the **Data Explorer** pane, expand **New Container** and then select **New Database**.
@@ -63,6 +67,9 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | **Setting** | **Value** |
     | --: | :-- |
     | **Database id** | *``cosmicworks``* |
+    | **Provision throughput** | enabled |
+    | **Database throughput** | **Manual** |
+    | **Database Required RU/s** | ``1000`` |
 
 1. Back in the **Data Explorer** pane, observe the **cosmicworks** database node within the hierarchy.
 
@@ -74,7 +81,7 @@ Azure Cosmos DB is a cloud-based NoSQL database service that supports multiple A
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
     | **Container id** | *``products``* |
-    | **Partition key** | *``/categoryId``* |
+    | **Partition key** | *``/category/name``* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -276,7 +283,7 @@ You will use a command-line utility that creates a **cosmicworks** database and 
 1. Install the [cosmicworks][nuget.org/packages/cosmicworks] command-line tool for global use on your machine.
 
     ```
-    dotnet tool install cosmicworks --global --version 1.*
+    dotnet tool install --global CosmicWorks --version 2.3.1
     ```
 
     > &#128161; This command may take a couple of minutes to complete. This command will output the warning message (*Tool 'cosmicworks' is already installed') if you have already installed the latest version of this tool in the past.
@@ -285,16 +292,15 @@ You will use a command-line utility that creates a **cosmicworks** database and 
 
     | **Option** | **Value** |
     | ---: | :--- |
-    | **--endpoint** | *The endpoint value you copied earlier in this lab* |
-    | **--key** | *The key value you coped earlier in this lab* |
-    | **--datasets** | *product* |
+    | **-c** | *The connection string value you checked earlier in this lab* |
+    | **--number-of-employees** | *The cosmicworks command populates your database with both employees and products containers with 1000 and 200 items respectively, unless specified otherwise* |
 
-    ```
-    cosmicworks --endpoint <cosmos-endpoint> --key <cosmos-key> --datasets product
+    ```powershell
+    cosmicworks -c "connection-string" --number-of-employees 0 --disable-hierarchical-partition-keys
     ```
 
     > &#128221; For example, if your endpoint is: **https&shy;://dp420.documents.azure.com:443/** and your key is: **fDR2ci9QgkdkvERTQ==**, then the command would be:
-    > ``cosmicworks --endpoint https://dp420.documents.azure.com:443/ --key fDR2ci9QgkdkvERTQ== --datasets product``
+    > ``cosmicworks -c "AccountEndpoint=https://dp420.documents.azure.com:443/;AccountKey=fDR2ci9QgkdkvERTQ==" --number-of-employees 0 --disable-hierarchical-partition-keys``
 
 1. Wait for the **cosmicworks** command to finish populating the account with a database, container, and items.
 

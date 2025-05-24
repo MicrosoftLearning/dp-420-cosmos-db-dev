@@ -30,6 +30,7 @@ Let’s start simple by creating a serverless account. There’s not much to con
 
     | **Setting** | **Value** |
     | --: | :-- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | **Use your existing Azure subscription.** *All resources must belong to a resource group. Every resource group must belong to a subscription.* |
     | **Resource Group** | **Use existing or create a new resource group.** *All resources must belong to a resource group.*|
     | **Account Name** |  **Enter any globally unique name.** *The globally unique account name. This name will be used as part of the DNS address for requests.  The portal will check the name in real time.* |
@@ -64,7 +65,7 @@ Let’s start simple by creating a serverless account. There’s not much to con
     | --: | :-- |
     | **Database id** | *Use existing* &vert; *cosmicworks* |
     | **Container id** | *`products`* |
-    | **Partition key** | *`/categoryId`* |
+    | **Partition key** | *`/category/name`* |
 
 1. Back in the **Data Explorer** pane, expand the **cosmicworks** database node and then observe the **products** container node within the hierarchy.
 
@@ -86,6 +87,7 @@ Now, we are going to create a provisioned throughput account with more tradition
 
     | **Setting** | **Value** |
     | --: | :-- |
+    | **Workload Type** | **Learning** |
     | **Subscription** | **Use your existing Azure subscription.** *All resources must belong to a resource group. Every resource group must belong to a subscription.* |
     | **Resource Group** | **Use existing or create a new resource group.** *All resources must belong to a resource group.*|
     | **Account Name** |  **Enter any globally unique name.** *The globally unique account name. This name will be used as part of the DNS address for requests.  The portal will check the name in real time.* |
