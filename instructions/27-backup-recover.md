@@ -250,7 +250,7 @@ Let's add some documents to those containers.
 
 1. Delete the **customer** container.
 
-## Restore the database to the point before you deleted the salesOrder document
+## Restore the database to the point before you deleted the customer container
 
 1. On the Azure portal, navigate to your Azure Cosmos DB account page.
 
