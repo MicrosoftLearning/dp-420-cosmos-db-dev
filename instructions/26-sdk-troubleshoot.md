@@ -75,6 +75,12 @@ The .NET CLI includes an [add package][docs.microsoft.com/dotnet/core/tools/dotn
     dotnet add package Microsoft.Azure.Cosmos --version 3.49.0
     ```
 
+1. Add the [Newtonsoft.Json][nuget.org/packages/Newtonsoft.Json/13.0.3] package from NuGet using the following command:
+
+    ```
+    dotnet add package Newtonsoft.Json --version 13.0.3
+    ```
+
 ## Run a script to create menu-driven options to insert and delete documents.
 
 Before we can run our application, we need to connect it to our Azure Cosmos DB account. 
