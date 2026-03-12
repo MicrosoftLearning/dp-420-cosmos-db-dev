@@ -1,7 +1,14 @@
 ---
 lab:
-    title: 'Review the default index policy for an Azure Cosmos DB for NoSQL container with the portal'
-    module: 'Module 6 - Define and implement an indexing strategy for Azure Cosmos DB for NoSQL'
+  title: Review the default index policy for an Azure Cosmos DB for NoSQL container with the portal
+  module: Module 6 - Define and implement an indexing strategy for Azure Cosmos DB for NoSQL
+  description: In this lab, you'll observe and manipulate the default index policy for a few containers using the Data Explorer.
+  duration: 96 minutes
+  level: 400
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Review the default index policy for an Azure Cosmos DB for NoSQL container with the portal
