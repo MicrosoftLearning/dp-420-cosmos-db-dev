@@ -1,7 +1,14 @@
 ---
 lab:
-    title: 'Configure the Azure Cosmos DB for NoSQL SDK for offline development'
-    module: 'Module 3 - Connect to Azure Cosmos DB for NoSQL with the SDK'
+  title: Configure the Azure Cosmos DB for NoSQL SDK for offline development
+  module: Module 3 - Connect to Azure Cosmos DB for NoSQL with the SDK
+  description: Now that you have created a new database in the Azure Cosmos DB emulator, you will use the online Data Explorer to observe the new NoSQL API database within the emulator.
+  duration: 100 minutes
+  level: 200
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Configure the Azure Cosmos DB for NoSQL SDK for offline development
