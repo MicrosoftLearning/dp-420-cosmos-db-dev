@@ -1,7 +1,14 @@
 ---
 lab:
-    title: 'Execute a query with the Azure Cosmos DB for NoSQL SDK'
-    module: 'Module 5 - Execute queries in Azure Cosmos DB for NoSQL'
+  title: Execute a query with the Azure Cosmos DB for NoSQL SDK
+  module: Module 5 - Execute queries in Azure Cosmos DB for NoSQL
+  description: You will now use an asynchronous stream to create a simple-to-understand foreach loop over paginated results from Azure Cosmos DB. Behind the scenes, the SDK will manage the feed iterator and making sure subsequent requests are invoked correctly.
+  duration: 86 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Execute a query with the Azure Cosmos DB for NoSQL SDK
