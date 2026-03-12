@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Configure throughput for Azure Cosmos DB For NoSQL with the Azure portal'
-    module: 'Module 2 - Plan and implement Azure Cosmos DB for NoSQL'
+  title: Configure throughput for Azure Cosmos DB For NoSQL with the Azure portal
+  module: Module 2 - Plan and implement Azure Cosmos DB for NoSQL
+  description: Let’s start simple by creating a serverless account. There’s not much to configure here since everything is serverless. When we create our database and container, we don’t have to provision throughput at all. You will see all of that as we step into creating this account.
+  duration: 15 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
+    - Azure Portal
 ---
 
 # Configure throughput for Azure Cosmos DB for NoSQL with the Azure portal
