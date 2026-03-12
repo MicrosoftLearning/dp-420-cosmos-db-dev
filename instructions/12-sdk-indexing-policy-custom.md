@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Configure an Azure Cosmos DB for NoSQL container''s index policy using the SDK'
-    module: 'Module 6 - Define and implement an indexing strategy for Azure Cosmos DB for NoSQL'
+  title: Configure an Azure Cosmos DB for NoSQL container's index policy using the SDK
+  module: Module 6 - Define and implement an indexing strategy for Azure Cosmos DB for NoSQL
+  description: In this lab, you'll create a custom indexing policy for a container using the .NET SDK
+  duration: 90 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - .NET
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Configure an Azure Cosmos DB for NoSQL container's index policy using the SDK
