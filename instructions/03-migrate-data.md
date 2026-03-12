@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Migrate existing data using Azure Data Factory'
-    module: 'Module 2 - Plan and implement Azure Cosmos DB for NoSQL'
+  title: Migrate existing data using Azure Data Factory
+  module: Module 2 - Plan and implement Azure Cosmos DB for NoSQL
+  description: Now that the Azure Cosmos DB for NoSQL resources are in place, you will create an Azure Data Factory resource and configure all of the necessary components and connections to perform a one-time data movement from one NoSQL API container to another to extract data, transform it, and load it to another NoSQL API container.
+  duration: 116 minutes
+  level: 400
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
+    - Azure Data Factory
 ---
 
 # Migrate existing data using Azure Data Factory
