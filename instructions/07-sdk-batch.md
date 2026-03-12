@@ -1,7 +1,14 @@
 ---
 lab:
-    title: 'Batch multiple point operations together with the Azure Cosmos DB for NoSQL SDK'
-    module: 'Module 4 - Access and manage data with the Azure Cosmos DB for NoSQL SDKs'
+  title: Batch multiple point operations together with the Azure Cosmos DB for NoSQL SDK
+  module: Module 4 - Access and manage data with the Azure Cosmos DB for NoSQL SDKs
+  description: In this lab, you’ll use the SDK, to perform two dual-item operations where you attempt to create two items as a single logical unit.
+  duration: 116 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Batch multiple point operations together with the Azure Cosmos DB for NoSQL SDK
