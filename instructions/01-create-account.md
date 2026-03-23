@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Create an Azure Cosmos DB for NoSQL account'
-    module: 'Module 1 - Get started with Azure Cosmos DB for NoSQL'
+  title: Create an Azure Cosmos DB for NoSQL account
+  module: Module 1 - Get started with Azure Cosmos DB for NoSQL
+  description: The Data Explorer will be your primary tool to manage the Azure Cosmos DB for NoSQL database and containers in the Azure portal. You will create a basic database and container to use in this lab.
+  duration: 15 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
+    - Azure Portal
 ---
 
 # Create an Azure Cosmos DB for NoSQL account

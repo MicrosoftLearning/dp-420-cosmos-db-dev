@@ -1,7 +1,14 @@
 ---
 lab:
-    title: 'Search data using Azure AI Search and Azure Cosmos DB for NoSQL'
-    module: 'Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services'
+  title: Search data using Azure AI Search and Azure Cosmos DB for NoSQL
+  module: Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services
+  description: You will create an indexer that indexes a subset of data in a specific Azure Cosmos DB for NoSQL container on an hourly basis.
+  duration: 130 minutes
+  level: 400
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Search data using Azure AI Search and Azure Cosmos DB for NoSQL

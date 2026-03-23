@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Process Azure Cosmos DB for NoSQL data using Azure Functions'
-    module: 'Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services'
+  title: Process Azure Cosmos DB for NoSQL data using Azure Functions
+  module: Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services
+  description: Before you can begin writing code, you will need to create the Azure Functions resource and its dependent resources (Application Insights, Storage) using the creation wizard.
+  duration: 124 minutes
+  level: 400
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
+    - Azure Functions
 ---
 
 # Process Azure Cosmos DB for NoSQL data using Azure Functions

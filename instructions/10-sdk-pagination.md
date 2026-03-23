@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Paginate cross-product query results with the Azure Cosmos DB for NoSQL SDK'
-    module: 'Module 5 - Execute queries in Azure Cosmos DB for NoSQL'
+  title: Paginate cross-product query results with the Azure Cosmos DB for NoSQL SDK
+  module: Module 5 - Execute queries in Azure Cosmos DB for NoSQL
+  description: The [cosmicworks][nuget.org/packages/cosmicworks] command-line tool deploys sample data to any Azure Cosmos DB for NoSQL account. The tool is open-source and available through NuGet. You will install this tool to the Azure Cloud Shell and then use it to seed your database.
+  duration: 98 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cloud Shell
+    - Azure Cosmos DB
 ---
 
 # Paginate cross-product query results with the Azure Cosmos DB for NoSQL SDK

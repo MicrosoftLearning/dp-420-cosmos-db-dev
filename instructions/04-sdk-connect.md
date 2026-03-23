@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Connect to Azure Cosmos DB for NoSQL with the SDK'
-    module: 'Module 3 - Connect to Azure Cosmos DB for NoSQL with the SDK'
+  title: Connect to Azure Cosmos DB for NoSQL with the SDK
+  module: Module 3 - Connect to Azure Cosmos DB for NoSQL with the SDK
+  description: In this lab, you'll connect to an Azure Cosmos DB for NoSQL account using the Azure SDK for .NET.
+  duration: 98 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - .NET
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Connect to Azure Cosmos DB for NoSQL with the SDK

@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Create and update documents with the Azure Cosmos DB for NoSQL SDK'
-    module: 'Module 4 - Access and manage data with the Azure Cosmos DB for NoSQL SDKs'
+  title: Create and update documents with the Azure Cosmos DB for NoSQL SDK
+  module: Module 4 - Access and manage data with the Azure Cosmos DB for NoSQL SDKs
+  description: Using the credentials from the newly created account, you will connect with the SDK classes and create a new database and container instance. Then, you will use the Data Explorer to validate that the instances exist in the Azure portal.
+  duration: 140 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
+    - Azure Portal
 ---
 
 # Create and update documents with the Azure Cosmos DB for NoSQL SDK

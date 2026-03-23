@@ -1,7 +1,15 @@
 ---
 lab:
-    title: 'Process change feed events using the Azure Cosmos DB for NoSQL SDK'
-    module: 'Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services'
+  title: Process change feed events using the Azure Cosmos DB for NoSQL SDK
+  module: Module 7 - Integrate Azure Cosmos DB for NoSQL with Azure services
+  description: In this lab, you will use the change feed processor functionality in the .NET SDK to create an application that is notified with a create or update operation is performed on an item in the specified container.
+  duration: 126 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - .NET
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Process change feed events using the Azure Cosmos DB for NoSQL SDK

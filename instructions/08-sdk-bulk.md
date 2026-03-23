@@ -1,7 +1,14 @@
 ---
 lab:
-    title: 'Move multiple documents in bulk with the Azure Cosmos DB for NoSQL SDK'
-    module: 'Module 4 - Access and manage data with the Azure Cosmos DB for NoSQL SDKs'
+  title: Move multiple documents in bulk with the Azure Cosmos DB for NoSQL SDK
+  module: Module 4 - Access and manage data with the Azure Cosmos DB for NoSQL SDKs
+  description: In this lab, you'll use the [Bogus][nuget.org/packages/bogus/33.1.1] library from NuGet to generate fictional data and place that into an Azure Cosmos DB account.
+  duration: 5 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
 ---
 
 # Move multiple documents in bulk with the Azure Cosmos DB for NoSQL SDK

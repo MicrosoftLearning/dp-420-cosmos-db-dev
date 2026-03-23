@@ -1,7 +1,11 @@
 ---
 lab:
-    title: 'Measure performance for customer entities'
-    module: 'Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB for NoSQL'
+  title: Measure performance for customer entities
+  module: Module 8 - Implement a data modeling and partitioning strategy for Azure Cosmos DB for NoSQL
+  description: In this exercise, you'll measure the difference for customer entities when you model entities as separate containers versus when you model for a NoSQL database by embedding entities in a single document.
+  duration: 20 minutes
+  level: 300
+  islab: true
 ---
 
 # Measure performance for customer entities
