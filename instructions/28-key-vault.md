@@ -104,10 +104,10 @@ We'll create a webapp that will connect to the Azure Cosmos DB account and creat
 
     > &#128221; This command will open the terminal with the starting directory already set to the **28-key-vault** folder.
 
-1. Let's create an MVC webapp shell. We will replace a couple of the generated files in a moment. Run the following command to create the webapp:
+1. Let's create an MVC webapp shell. We will replace a couple of the generated files in a moment. Run the following command to create the webapp, taking care to match the same .NET version as you will use for the app service later:
 
     ```
-    dotnet new mvc
+    dotnet new mvc -f net8.0
     ```
 
 
@@ -230,8 +230,11 @@ The rest of the code is straight forward, get the connection string, connect to 
 1. Select **Skip for now** for the Application Insights.
 
 1. The deployment should now be running with a status bar in the lower right-hand corner. 
+    > &#128221; If the deploy operation fails to create the app service plan with the error message `Operation cannot be completed without additional quota`, then that means that the region you chose for the app service cannot currently support more app service plans, so repeat all the steps for adding an app service, but choose a different region this time.
 
 1. Select **Deploy** when prompted.
+
+1. **If the Deploy prompt did not appear**, then go back to the command palette, search for  ***Azure App Service: Deploy to Web App***, and follow the prompts including adding the missing config. Then, skip the next two steps.
 
 1. Select **Browse** and you should be inside the **28-key-vault** folder, Select that folder.
 
