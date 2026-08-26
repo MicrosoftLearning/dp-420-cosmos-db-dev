@@ -28,6 +28,10 @@
 .PARAMETER SkipSeed
     Provision the databases and containers, but do not load any data.
 
+.PARAMETER SeedConcurrency
+    How many seed writes to issue at once. Set to 1 to load serially when
+    troubleshooting a seeding failure.
+
 .EXAMPLE
     ./setup.ps1 -ResourceGroup dp420 -Location eastus -NamePrefix dp420lab02
 
@@ -49,6 +53,9 @@ param(
 
     [string]$Location = 'eastus',
 
+    [ValidateRange(1, 32)]
+    [int]$SeedConcurrency = 8,
+
     [switch]$SkipSeed
 )
 
@@ -57,6 +64,9 @@ $ProgressPreference = 'SilentlyContinue'
 
 $DataRoot = 'https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data'
 $DataContributorRoleId = '00000000-0000-0000-0000-000000000002'
+
+# 2.61 is the first release whose behavior these commands rely on.
+$MinimumCliVersion = [version]'2.61.0'
 
 # Container copy jobs run in the account's write region and are unavailable elsewhere.
 # The change-feed exercise fails at its final task if the account sits outside this list.
@@ -101,7 +111,21 @@ function Write-Log {
     "[{0:HH:mm:ss}] {1}" -f (Get-Date), $Message | Add-Content -LiteralPath $script:LogPath -Encoding utf8
 }
 
+function Format-Duration {
+    param([TimeSpan]$Duration)
+
+    if ($Duration.TotalHours -ge 1) {
+        return '{0}h {1}m {2}s' -f [int]$Duration.TotalHours, $Duration.Minutes, $Duration.Seconds
+    }
+    if ($Duration.TotalMinutes -ge 1) {
+        return '{0}m {1}s' -f [int]$Duration.TotalMinutes, $Duration.Seconds
+    }
+    return '{0:0.0}s' -f $Duration.TotalSeconds
+}
+
 function Initialize-Log {
+    $script:StartTime = Get-Date
+
     $root = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
     $directory = Join-Path $root 'logs'
 
@@ -109,10 +133,11 @@ function Initialize-Log {
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
     }
 
-    $script:LogPath = Join-Path $directory ('setup-{0:yyyyMMdd-HHmmss}.log' -f (Get-Date))
+    $script:LogPath = Join-Path $directory ('setup-{0:yyyyMMdd-HHmmss}.log' -f $script:StartTime)
     Write-Host "Logging to $script:LogPath" -ForegroundColor DarkGray
 
     Write-Log 'setup.ps1'
+    Write-Log "Started        : $($script:StartTime.ToString('yyyy-MM-dd HH:mm:ss'))"
     Write-Log "ResourceGroup  : $ResourceGroup"
     Write-Log "AccountName    : $(if ($AccountName) { $AccountName } else { '(generated)' })"
     Write-Log "NamePrefix     : $NamePrefix"
@@ -135,6 +160,10 @@ function Invoke-Az {
     $command = "az $($Arguments -join ' ')"
     Write-Log "RUN  $command"
 
+    # --only-show-errors drops CLI warnings that are noise to a learner, such as the
+    # enable_pbe attribute warning az cosmosdb create emits.
+    $arguments = @($Arguments) + '--only-show-errors'
+
     # Capture stderr to a file rather than merging it into stdout. Merging corrupts
     # every caller that parses the result as JSON or TSV.
     $errorFile = [System.IO.Path]::GetTempFileName()
@@ -143,7 +172,7 @@ function Invoke-Az {
     try {
         # Some PowerShell 7 builds turn redirected native stderr into a terminating error.
         $ErrorActionPreference = 'Continue'
-        $output = & az @Arguments 2>$errorFile
+        $output = & az @arguments 2>$errorFile
         $exitCode = $LASTEXITCODE
         $stderr = (Get-Content -LiteralPath $errorFile -Raw)
     }
@@ -168,6 +197,10 @@ function Invoke-Az {
 }
 
 function Assert-Prerequisites {
+    if ($PSVersionTable.PSVersion.Major -lt 7) {
+        throw "This script requires PowerShell 7 or later. You are running $($PSVersionTable.PSVersion). See https://learn.microsoft.com/powershell/scripting/install/installing-powershell."
+    }
+
     if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
         throw 'The Azure CLI is not installed. See https://learn.microsoft.com/cli/azure/install-azure-cli.'
     }
@@ -175,12 +208,26 @@ function Assert-Prerequisites {
     $azPaths = @(Get-Command az -All | ForEach-Object { $_.Source })
     Write-Log "az on PATH     : $($azPaths -join ' | ')"
 
-    if ($azPaths.Count -gt 1) {
-        Write-Warning "More than one 'az' is on PATH. The first one wins: $($azPaths[0])"
-    }
-
     $version = & az version --output json 2>$null | ConvertFrom-Json
     Write-Log "az version     : $($version.'azure-cli')"
+
+    $cliVersion = $null
+    [void][version]::TryParse($version.'azure-cli', [ref]$cliVersion)
+
+    if ($cliVersion -and $cliVersion -lt $MinimumCliVersion) {
+        $message = "The Azure CLI is $cliVersion, but this script needs $MinimumCliVersion or later. See https://learn.microsoft.com/cli/azure/install-azure-cli."
+
+        # A stale CLI winning a PATH race is the usual cause, so name the winner.
+        if ($azPaths.Count -gt 1) {
+            $message += " More than one 'az' is on PATH and this one wins: $($azPaths[0]). Remove it or reorder PATH, then open a new terminal."
+        }
+
+        throw $message
+    }
+
+    if ($azPaths.Count -gt 1) {
+        Write-Log "NOTE more than one 'az' is on PATH. Using $($azPaths[0])."
+    }
 
     $account = & az account show --output json 2>$null | ConvertFrom-Json
     if (-not $account) {
@@ -363,47 +410,83 @@ function Add-SeedData {
     $token = Get-CosmosToken -Endpoint $Endpoint
     $partitionKeyProperty = $Container.PartitionKey.TrimStart('/')
     $uri = "$($Endpoint.TrimEnd('/'))/dbs/$Database/colls/$($Container.Name)/docs"
-    $written = 0
+    $authorization = [uri]::EscapeDataString("type=aad&ver=1.0&sig=$token")
+    $total = @($items).Count
 
-    Write-Log "SEED POST $uri ($(@($items).Count) items, partition key property '$partitionKeyProperty')"
+    Write-Log "SEED POST $uri ($total items, partition key property '$partitionKeyProperty', concurrency $SeedConcurrency)"
+    # Enough to diagnose a rejected header without writing the bearer token to disk.
+    Write-Log "SEED Authorization prefix '$($authorization.Substring(0, 24))...' length $($authorization.Length)"
 
-    foreach ($item in $items) {
-        $partitionKeyValue = $item.$partitionKeyProperty
+    $outcomes = $items | ForEach-Object -ThrottleLimit $SeedConcurrency -Parallel {
+        $item = $_
+        $uri = $using:uri
+        $authorization = $using:authorization
+        $partitionKeyProperty = $using:partitionKeyProperty
 
         # The header must be a JSON array. ConvertTo-Json unwraps a single-element
         # array, so build the brackets by hand and let it escape only the value.
-        $partitionKeyHeader = '[' + ($partitionKeyValue | ConvertTo-Json -Compress) + ']'
-
-        $headers = @{
-            'Authorization'                 = [uri]::EscapeDataString("type=aad&ver=1.0&sig=$token")
-            'x-ms-version'                  = '2018-12-31'
-            'x-ms-date'                     = [DateTime]::UtcNow.ToString('r')
-            'x-ms-documentdb-partitionkey'  = $partitionKeyHeader
-            'x-ms-documentdb-is-upsert'     = 'true'
-        }
-
-        if ($written -eq 0) {
-            # Enough of the first request to diagnose an auth or partition key rejection,
-            # without writing the bearer token to disk.
-            Write-Log "SEED first item id '$($item.id)', partition key header $partitionKeyHeader"
-            Write-Log "SEED Authorization prefix '$(($headers.Authorization).Substring(0, 24))...' length $($headers.Authorization.Length)"
-        }
-
+        $partitionKeyHeader = '[' + ($item.$partitionKeyProperty | ConvertTo-Json -Compress) + ']'
         $body = [System.Text.Encoding]::UTF8.GetBytes(($item | ConvertTo-Json -Depth 20 -Compress))
 
-        try {
-            Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Body $body -ContentType 'application/json' | Out-Null
-            $written++
-        }
-        catch {
-            $status = $_.Exception.Response.StatusCode.value__
-            Write-Log "SEED FAILED after $written items. HTTP $status. $($_.ErrorDetails.Message)"
+        $maxAttempts = 6
 
-            if ($status -eq 401 -or $status -eq 403) {
-                throw "Authorization failed writing to $($Container.Name) (HTTP $status). A new role assignment can take a few minutes to propagate. Wait, then re-run this script."
+        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            $headers = @{
+                'Authorization'                = $authorization
+                'x-ms-version'                 = '2018-12-31'
+                'x-ms-date'                    = [DateTime]::UtcNow.ToString('r')
+                'x-ms-documentdb-partitionkey' = $partitionKeyHeader
+                'x-ms-documentdb-is-upsert'    = 'true'
             }
-            throw "Failed writing an item to $($Container.Name): $_"
+
+            try {
+                Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Body $body -ContentType 'application/json' | Out-Null
+                [pscustomobject]@{ Id = $item.id; Status = 'ok'; Detail = $null; Retries = $attempt - 1 }
+                break
+            }
+            catch {
+                $response = $_.Exception.Response
+                $status = if ($response) { [int]$response.StatusCode } else { 0 }
+
+                # A raw REST client gets none of the automatic 429 handling the SDKs provide.
+                if ($status -eq 429 -and $attempt -lt $maxAttempts) {
+                    $waitMs = 1000
+                    $values = $null
+                    if ($response.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$values)) {
+                        $waitMs = [int]($values | Select-Object -First 1)
+                    }
+                    Start-Sleep -Milliseconds ([Math]::Max($waitMs, 100))
+                    continue
+                }
+
+                [pscustomobject]@{
+                    Id      = $item.id
+                    Status  = $status
+                    Detail  = $_.ErrorDetails.Message
+                    Retries = $attempt - 1
+                }
+                break
+            }
         }
+    }
+
+    $written = @($outcomes | Where-Object { $_.Status -eq 'ok' }).Count
+    $throttled = @($outcomes | Where-Object { $_.Retries -gt 0 }).Count
+    $failures = @($outcomes | Where-Object { $_.Status -ne 'ok' })
+
+    if ($throttled -gt 0) {
+        Write-Log "SEED $throttled item(s) were retried after throttling (429). Consider a lower -SeedConcurrency."
+    }
+
+    if ($failures.Count -gt 0) {
+        $first = $failures[0]
+        Write-Log "SEED FAILED $($failures.Count) of $total. First: id '$($first.Id)' HTTP $($first.Status). $($first.Detail)"
+
+        if ($first.Status -eq 401 -or $first.Status -eq 403) {
+            throw "Authorization failed writing to $($Container.Name) (HTTP $($first.Status)). A new role assignment can take a few minutes to propagate. Wait, then re-run this script."
+        }
+
+        throw "Failed writing $($failures.Count) of $total items to $($Container.Name). The first failure was HTTP $($first.Status)."
     }
 
     Write-Log "SEED loaded $written items into $($Container.Name)."
@@ -437,11 +520,14 @@ function Get-ModelingLayout {
 Initialize-Log
 
 trap {
+    $elapsed = Format-Duration ((Get-Date) - $script:StartTime)
+
     Write-Log "FAIL $($_.Exception.Message)"
     if ($_.ScriptStackTrace) { Write-Log $_.ScriptStackTrace }
+    Write-Log "Failed after   : $elapsed"
 
     Write-Host ''
-    Write-Host 'Setup failed. Include this log file when you ask for help:' -ForegroundColor Red
+    Write-Host "Setup failed after $elapsed. Include this log file when you ask for help:" -ForegroundColor Red
     Write-Host "  $script:LogPath" -ForegroundColor Yellow
     break
 }
@@ -494,6 +580,12 @@ foreach ($database in $databases) {
     }
 }
 
+$endTime = Get-Date
+$totalElapsed = Format-Duration ($endTime - $script:StartTime)
+
+Write-Log "Finished       : $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))"
+Write-Log "Total run time : $totalElapsed"
+
 Write-Host ''
 Write-Host 'Setup complete. Record these two values.' -ForegroundColor Green
 Write-Host ''
@@ -503,6 +595,9 @@ Write-Host ''
 Write-Host "  Resource group   : $ResourceGroup"
 Write-Host "  Location         : $Location"
 Write-Host "  Lab profile      : $LabProfile"
+Write-Host "  Started          : $($script:StartTime.ToString('HH:mm:ss'))"
+Write-Host "  Finished         : $($endTime.ToString('HH:mm:ss'))"
+Write-Host "  Total run time   : $totalElapsed"
 Write-Host "  Log file         : $script:LogPath"
 Write-Host ''
 Write-Host 'Every exercise in this course asks for the account endpoint.'
