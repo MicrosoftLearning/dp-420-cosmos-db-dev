@@ -94,17 +94,76 @@ $Profiles = @{
     }
 }
 
+function Write-Log {
+    param([string]$Message)
+
+    if (-not $script:LogPath) { return }
+    "[{0:HH:mm:ss}] {1}" -f (Get-Date), $Message | Add-Content -LiteralPath $script:LogPath -Encoding utf8
+}
+
+function Initialize-Log {
+    $root = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+    $directory = Join-Path $root 'logs'
+
+    if (-not (Test-Path -LiteralPath $directory)) {
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
+
+    $script:LogPath = Join-Path $directory ('setup-{0:yyyyMMdd-HHmmss}.log' -f (Get-Date))
+    Write-Host "Logging to $script:LogPath" -ForegroundColor DarkGray
+
+    Write-Log 'setup.ps1'
+    Write-Log "ResourceGroup  : $ResourceGroup"
+    Write-Log "AccountName    : $(if ($AccountName) { $AccountName } else { '(generated)' })"
+    Write-Log "NamePrefix     : $NamePrefix"
+    Write-Log "LabProfile     : $LabProfile"
+    Write-Log "Location       : $Location"
+    Write-Log "SkipSeed       : $SkipSeed"
+    Write-Log "PSVersion      : $($PSVersionTable.PSVersion)"
+    Write-Log "OS             : $([System.Environment]::OSVersion.VersionString)"
+}
+
 function Write-Step {
     param([string]$Message)
     Write-Host "==> $Message" -ForegroundColor Cyan
+    Write-Log "STEP $Message"
 }
 
 function Invoke-Az {
     param([string[]]$Arguments)
-    $output = & az @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "az $($Arguments -join ' ') failed:`n$output"
+
+    $command = "az $($Arguments -join ' ')"
+    Write-Log "RUN  $command"
+
+    # Capture stderr to a file rather than merging it into stdout. Merging corrupts
+    # every caller that parses the result as JSON or TSV.
+    $errorFile = [System.IO.Path]::GetTempFileName()
+    $previousPreference = $ErrorActionPreference
+
+    try {
+        # Some PowerShell 7 builds turn redirected native stderr into a terminating error.
+        $ErrorActionPreference = 'Continue'
+        $output = & az @Arguments 2>$errorFile
+        $exitCode = $LASTEXITCODE
+        $stderr = (Get-Content -LiteralPath $errorFile -Raw)
     }
+    finally {
+        $ErrorActionPreference = $previousPreference
+        Remove-Item -LiteralPath $errorFile -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Log "EXIT $exitCode"
+    if ($output) { Write-Log "OUT  $($output -join [Environment]::NewLine)" }
+
+    if ($stderr) {
+        Write-Log "ERR  $($stderr.TrimEnd())"
+        Write-Host $stderr.TrimEnd() -ForegroundColor DarkYellow
+    }
+
+    if ($exitCode -ne 0) {
+        throw "$command failed with exit code $exitCode."
+    }
+
     return $output
 }
 
@@ -112,6 +171,16 @@ function Assert-Prerequisites {
     if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
         throw 'The Azure CLI is not installed. See https://learn.microsoft.com/cli/azure/install-azure-cli.'
     }
+
+    $azPaths = @(Get-Command az -All | ForEach-Object { $_.Source })
+    Write-Log "az on PATH     : $($azPaths -join ' | ')"
+
+    if ($azPaths.Count -gt 1) {
+        Write-Warning "More than one 'az' is on PATH. The first one wins: $($azPaths[0])"
+    }
+
+    $version = & az version --output json 2>$null | ConvertFrom-Json
+    Write-Log "az version     : $($version.'azure-cli')"
 
     $account = & az account show --output json 2>$null | ConvertFrom-Json
     if (-not $account) {
@@ -272,7 +341,10 @@ function New-LabContainer {
 function Get-CosmosToken {
     param([string]$Endpoint)
 
-    $resource = $Endpoint.TrimEnd('/')
+    # documentEndpoint carries an explicit ':443', but the token audience is the bare
+    # host, which is what the Cosmos DB SDKs request. Leaving the port on produces a
+    # token the service rejects with a 401.
+    $resource = 'https://{0}' -f ([Uri]$Endpoint).Host
     return (Invoke-Az @('account', 'get-access-token', '--resource', $resource, '--query', 'accessToken', '--output', 'tsv')).Trim()
 }
 
@@ -293,6 +365,8 @@ function Add-SeedData {
     $uri = "$($Endpoint.TrimEnd('/'))/dbs/$Database/colls/$($Container.Name)/docs"
     $written = 0
 
+    Write-Log "SEED POST $uri ($(@($items).Count) items, partition key property '$partitionKeyProperty')"
+
     foreach ($item in $items) {
         $partitionKeyValue = $item.$partitionKeyProperty
 
@@ -308,6 +382,13 @@ function Add-SeedData {
             'x-ms-documentdb-is-upsert'     = 'true'
         }
 
+        if ($written -eq 0) {
+            # Enough of the first request to diagnose an auth or partition key rejection,
+            # without writing the bearer token to disk.
+            Write-Log "SEED first item id '$($item.id)', partition key header $partitionKeyHeader"
+            Write-Log "SEED Authorization prefix '$(($headers.Authorization).Substring(0, 24))...' length $($headers.Authorization.Length)"
+        }
+
         $body = [System.Text.Encoding]::UTF8.GetBytes(($item | ConvertTo-Json -Depth 20 -Compress))
 
         try {
@@ -316,6 +397,8 @@ function Add-SeedData {
         }
         catch {
             $status = $_.Exception.Response.StatusCode.value__
+            Write-Log "SEED FAILED after $written items. HTTP $status. $($_.ErrorDetails.Message)"
+
             if ($status -eq 401 -or $status -eq 403) {
                 throw "Authorization failed writing to $($Container.Name) (HTTP $status). A new role assignment can take a few minutes to propagate. Wait, then re-run this script."
             }
@@ -323,6 +406,7 @@ function Add-SeedData {
         }
     }
 
+    Write-Log "SEED loaded $written items into $($Container.Name)."
     Write-Host "    Loaded $written items into $($Container.Name)." -ForegroundColor Green
 }
 
@@ -350,6 +434,18 @@ function Get-ModelingLayout {
     return $layout
 }
 
+Initialize-Log
+
+trap {
+    Write-Log "FAIL $($_.Exception.Message)"
+    if ($_.ScriptStackTrace) { Write-Log $_.ScriptStackTrace }
+
+    Write-Host ''
+    Write-Host 'Setup failed. Include this log file when you ask for help:' -ForegroundColor Red
+    Write-Host "  $script:LogPath" -ForegroundColor Yellow
+    break
+}
+
 Assert-Prerequisites
 Initialize-Subscription
 
@@ -359,8 +455,20 @@ if ($AccountName) {
     }
 }
 else {
-    $AccountName = New-AccountName -Prefix $NamePrefix
-    Write-Step "Generated account name '$AccountName'."
+    # Re-use an account this script created earlier. Without this, a re-run after a
+    # mid-script failure generates a fresh name and leaves a second billable account behind.
+    $existing = @(& az cosmosdb list --resource-group $ResourceGroup `
+            --query "[?starts_with(name, '$NamePrefix')].name" --output tsv 2>$null |
+        Where-Object { $_ })
+
+    if ($existing.Count -gt 0) {
+        $AccountName = $existing[0].Trim()
+        Write-Step "Reusing the existing account '$AccountName' in '$ResourceGroup'."
+    }
+    else {
+        $AccountName = New-AccountName -Prefix $NamePrefix
+        Write-Step "Generated account name '$AccountName'."
+    }
 }
 
 $endpoint = New-LabAccount
@@ -395,5 +503,6 @@ Write-Host ''
 Write-Host "  Resource group   : $ResourceGroup"
 Write-Host "  Location         : $Location"
 Write-Host "  Lab profile      : $LabProfile"
+Write-Host "  Log file         : $script:LogPath"
 Write-Host ''
 Write-Host 'Every exercise in this course asks for the account endpoint.'
