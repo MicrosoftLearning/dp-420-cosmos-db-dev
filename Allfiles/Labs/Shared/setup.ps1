@@ -51,7 +51,7 @@ param(
     [ValidateSet('core', 'modeling')]
     [string]$LabProfile = 'core',
 
-    [string]$Location = 'eastus',
+    [string]$Location = 'westus2',
 
     [ValidateRange(1, 32)]
     [int]$SeedConcurrency = 8,
