@@ -62,6 +62,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
+#region Configuration
+
 $DataRoot = 'https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data'
 $DataContributorRoleId = '00000000-0000-0000-0000-000000000002'
 
@@ -92,6 +94,7 @@ $Profiles = @{
                     @{ Name = 'product';     PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/product" }
                     @{ Name = 'productMeta'; PartitionKey = '/type';       MaxThroughput = 1000; Seed = "$DataRoot/database-v4/productMeta" }
                     @{ Name = 'leases';      PartitionKey = '/id';         Throughput    = 400 }
+                    @{ Name = 'operations';  PartitionKey = '/categoryId'; MaxThroughput = 1000 }
                     @{ Name = 'bulkload';    PartitionKey = '/categoryId'; MaxThroughput = 1000 }
                 )
             }
@@ -104,6 +107,11 @@ $Profiles = @{
     }
 }
 
+#endregion
+
+#region Logging
+
+# Appends one timestamped line to the run log. Never writes to the console.
 function Write-Log {
     param([string]$Message)
 
@@ -111,6 +119,7 @@ function Write-Log {
     "[{0:HH:mm:ss}] {1}" -f (Get-Date), $Message | Add-Content -LiteralPath $script:LogPath -Encoding utf8
 }
 
+# Renders an elapsed TimeSpan as a short string, for example '9m 42s'.
 function Format-Duration {
     param([TimeSpan]$Duration)
 
@@ -123,6 +132,8 @@ function Format-Duration {
     return '{0:0.0}s' -f $Duration.TotalSeconds
 }
 
+# Opens a log file for this run and records the parameters and environment that
+# shaped it. Learners are asked to attach this file when reporting a failure.
 function Initialize-Log {
     $script:StartTime = Get-Date
 
@@ -148,12 +159,19 @@ function Initialize-Log {
     Write-Log "OS             : $([System.Environment]::OSVersion.VersionString)"
 }
 
+# Reports progress to the learner and mirrors it into the log.
 function Write-Step {
     param([string]$Message)
     Write-Host "==> $Message" -ForegroundColor Cyan
     Write-Log "STEP $Message"
 }
 
+#endregion
+
+#region Azure CLI
+
+# Runs one Azure CLI command, records it in the log, and throws when it fails.
+# Every CLI call in this script goes through here so the log stays complete.
 function Invoke-Az {
     param([string[]]$Arguments)
 
@@ -196,6 +214,8 @@ function Invoke-Az {
     return $output
 }
 
+# Fails early on the three things that break this script most often: an old
+# PowerShell, an old or shadowed Azure CLI, and a missing sign-in.
 function Assert-Prerequisites {
     if ($PSVersionTable.PSVersion.Major -lt 7) {
         throw "This script requires PowerShell 7 or later. You are running $($PSVersionTable.PSVersion). See https://learn.microsoft.com/powershell/scripting/install/installing-powershell."
@@ -241,6 +261,12 @@ function Assert-Prerequisites {
     }
 }
 
+#endregion
+
+#region Provisioning
+
+# Finds a free account name by appending random characters to the prefix.
+# Account names are globally unique across all of Azure, not just this subscription.
 function New-AccountName {
     param([string]$Prefix)
 
@@ -262,6 +288,8 @@ function New-AccountName {
     throw "Could not find an available account name after 10 attempts. Try a different -NamePrefix."
 }
 
+# Registers the resource provider and makes sure the resource group exists.
+# A lab environment often supplies the group already, so an existing one is reused.
 function Initialize-Subscription {
     Write-Step "Registering the Microsoft.DocumentDB resource provider."
     Invoke-Az @('provider', 'register', '--namespace', 'Microsoft.DocumentDB', '--wait') | Out-Null
@@ -283,6 +311,7 @@ function Initialize-Subscription {
     Invoke-Az @('group', 'create', '--name', $ResourceGroup, '--location', $Location) | Out-Null
 }
 
+# Creates the account when it is missing and returns its document endpoint.
 function New-LabAccount {
     $existing = & az cosmosdb show --name $AccountName --resource-group $ResourceGroup --output json 2>$null
     if ($existing) {
@@ -304,6 +333,8 @@ function New-LabAccount {
     return ($created | ConvertFrom-Json).documentEndpoint
 }
 
+# Gives the signed-in user read and write access to data in the account.
+# The account has key authentication disabled, so without this nothing can read or write.
 function Grant-DataPlaneAccess {
     Write-Step 'Assigning the Cosmos DB Built-in Data Contributor role to the signed-in user.'
 
@@ -331,6 +362,7 @@ function Grant-DataPlaneAccess {
     ) | Out-Null
 }
 
+# Creates a database when it is missing.
 function New-LabDatabase {
     param([string]$Name)
 
@@ -348,6 +380,8 @@ function New-LabDatabase {
     ) | Out-Null
 }
 
+# Creates a container from a profile entry, using autoscale when the entry sets
+# MaxThroughput and manual throughput otherwise.
 function New-LabContainer {
     param(
         [string]$Database,
@@ -385,6 +419,11 @@ function New-LabContainer {
     Invoke-Az $arguments | Out-Null
 }
 
+#endregion
+
+#region Seeding
+
+# Gets a Microsoft Entra ID access token for this account's data plane.
 function Get-CosmosToken {
     param([string]$Endpoint)
 
@@ -395,6 +434,9 @@ function Get-CosmosToken {
     return (Invoke-Az @('account', 'get-access-token', '--resource', $resource, '--query', 'accessToken', '--output', 'tsv')).Trim()
 }
 
+# Downloads a CosmicWorks dataset and upserts every item into the container.
+# Writes go over the REST API because this script deliberately takes no SDK dependency:
+# it runs before the learner has installed .NET or Python.
 function Add-SeedData {
     param(
         [string]$Endpoint,
@@ -493,6 +535,7 @@ function Add-SeedData {
     Write-Host "    Loaded $written items into $($Container.Name)." -ForegroundColor Green
 }
 
+# Builds the modeling profile's container list by reading the CosmicWorks repository.
 function Get-ModelingLayout {
     # Each file in a CosmicWorks database folder is one container, named after the file.
     # Partition keys change between modeling stages, so read them from the items themselves.
@@ -516,6 +559,10 @@ function Get-ModelingLayout {
 
     return $layout
 }
+
+#endregion
+
+#region Main
 
 Initialize-Log
 
@@ -601,3 +648,5 @@ Write-Host "  Total run time   : $totalElapsed"
 Write-Host "  Log file         : $script:LogPath"
 Write-Host ''
 Write-Host 'Every exercise in this course asks for the account endpoint.'
+
+#endregion
