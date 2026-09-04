@@ -101,9 +101,52 @@ $Profiles = @{
         )
     }
     modeling = @{
-        # Container names and partition keys are discovered from the CosmicWorks
-        # repository at run time, because they differ at every modeling stage.
-        Discover = @('database-v1', 'database-v2', 'database-v3', 'database-v4')
+        # Four stages of the same e-commerce data. Partition keys differ per stage,
+        # so each container is declared explicitly rather than discovered.
+        Databases = @(
+            @{
+                Name       = 'database-v1'
+                Containers = @(
+                    @{ Name = 'customer';         PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/customer" }
+                    @{ Name = 'customerAddress';  PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/customerAddress" }
+                    @{ Name = 'customerPassword'; PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/customerPassword" }
+                    @{ Name = 'product';          PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/product" }
+                    @{ Name = 'productCategory';  PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/productCategory" }
+                    @{ Name = 'productTag';       PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/productTag" }
+                    @{ Name = 'productTags';      PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/productTags" }
+                    @{ Name = 'salesOrder';       PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/salesOrder" }
+                    @{ Name = 'salesOrderDetail'; PartitionKey = '/id'; MaxThroughput = 1000; Seed = "$DataRoot/database-v1/salesOrderDetail" }
+                )
+            }
+            @{
+                Name       = 'database-v2'
+                Containers = @(
+                    @{ Name = 'customer';        PartitionKey = '/id';         MaxThroughput = 1000; Seed = "$DataRoot/database-v2/customer" }
+                    @{ Name = 'product';         PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v2/product" }
+                    @{ Name = 'productCategory'; PartitionKey = '/type';       MaxThroughput = 1000; Seed = "$DataRoot/database-v2/productCategory" }
+                    @{ Name = 'productTag';      PartitionKey = '/type';       MaxThroughput = 1000; Seed = "$DataRoot/database-v2/productTag" }
+                    @{ Name = 'salesOrder';      PartitionKey = '/customerId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v2/salesOrder" }
+                )
+            }
+            @{
+                Name       = 'database-v3'
+                Containers = @(
+                    @{ Name = 'customer';        PartitionKey = '/id';         MaxThroughput = 1000; Seed = "$DataRoot/database-v3/customer" }
+                    @{ Name = 'product';         PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v3/product" }
+                    @{ Name = 'productCategory'; PartitionKey = '/type';       MaxThroughput = 1000; Seed = "$DataRoot/database-v3/productCategory" }
+                    @{ Name = 'productTag';      PartitionKey = '/type';       MaxThroughput = 1000; Seed = "$DataRoot/database-v3/productTag" }
+                    @{ Name = 'salesOrder';      PartitionKey = '/customerId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v3/salesOrder" }
+                )
+            }
+            @{
+                Name       = 'database-v4'
+                Containers = @(
+                    @{ Name = 'customer';    PartitionKey = '/customerId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/customer" }
+                    @{ Name = 'product';     PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/product" }
+                    @{ Name = 'productMeta'; PartitionKey = '/type';       MaxThroughput = 1000; Seed = "$DataRoot/database-v4/productMeta" }
+                )
+            }
+        )
     }
 }
 
@@ -535,31 +578,6 @@ function Add-SeedData {
     Write-Host "    Loaded $written items into $($Container.Name)." -ForegroundColor Green
 }
 
-# Builds the modeling profile's container list by reading the CosmicWorks repository.
-function Get-ModelingLayout {
-    # Each file in a CosmicWorks database folder is one container, named after the file.
-    # Partition keys change between modeling stages, so read them from the items themselves.
-    $layout = @()
-
-    foreach ($database in $Profiles.modeling.Discover) {
-        $listing = Invoke-RestMethod -Uri "https://api.github.com/repos/AzureCosmosDB/CosmicWorks/contents/data/$database" `
-            -Headers @{ 'User-Agent' = 'dp-420-lab-setup' }
-
-        $containers = foreach ($file in $listing | Where-Object { $_.type -eq 'file' }) {
-            @{
-                Name          = $file.name
-                PartitionKey  = '/id'
-                MaxThroughput = 1000
-                Seed          = "$DataRoot/$database/$($file.name)"
-            }
-        }
-
-        $layout += @{ Name = $database; Containers = $containers }
-    }
-
-    return $layout
-}
-
 #endregion
 
 #region Main
@@ -607,13 +625,7 @@ else {
 $endpoint = New-LabAccount
 Grant-DataPlaneAccess
 
-if ($LabProfile -eq 'modeling') {
-    Write-Warning 'The modeling profile discovers containers from the CosmicWorks repository and provisions every one on /id. Partition keys for database-v2 through database-v4 still need to be confirmed against the dataset before this profile is used in a published exercise.'
-    $databases = Get-ModelingLayout
-}
-else {
-    $databases = $Profiles[$LabProfile].Databases
-}
+$databases = $Profiles[$LabProfile].Databases
 
 foreach ($database in $databases) {
     New-LabDatabase -Name $database.Name
