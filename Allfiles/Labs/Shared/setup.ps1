@@ -16,10 +16,40 @@
                AI-assisted tools exercises.
     modeling - database-v1 through database-v4, for the data modeling and
                partitioning exercise.
+    security - A disposable account for the security exercise. Serverless, with an
+               empty cosmicworks/product container and no data-plane role for the
+               signed-in user, because that exercise grants scoped roles to a hosted
+               managed identity instead. Use a resource group of its own.
+    backup   - A disposable account for the backup and restore exercise, created with
+               continuous backup at the Continuous7Days tier and an empty
+               cosmicworks/product container. Use a resource group of its own.
+    multiregion - A disposable account for the multi-region availability and failover
+               exercise, created in two regions with a seeded cosmicworks/product
+               container. That exercise changes the write region and then takes a
+               region offline, so use a resource group of its own.
+    indexing - A disposable account for the indexing strategy exercise, created with
+               continuous backup because global secondary indexes require it, and a
+               seeded cosmicworks/product container on autoscale. Use a resource group
+               of its own.
+    monitoring - A disposable account for the monitoring and troubleshooting exercise,
+               with a seeded cosmicworks/product container on 400 RU/s manual
+               throughput so the exercise can drive it into rate limiting. That
+               exercise attaches a diagnostic setting and an alert rule, then deletes
+               the whole group, so use a resource group of its own.
+    fleet    - Two disposable accounts for the fleets exercise, created with an
+               identical single-region configuration so they can share one
+               fleetspace throughput pool, each with a seeded cosmicworks/product
+               container. That exercise deletes the whole group, so use a resource
+               group of its own.
 
 .PARAMETER AccountName
     Optional. Target an account that already exists. When omitted, the script
-    generates a globally unique name from NamePrefix and reports it.
+    generates a globally unique name from NamePrefix and reports it. Profiles that
+    create more than one account don't accept this parameter.
+
+.PARAMETER SecondaryLocation
+    Second Azure region for the multiregion profile. When omitted, the script picks
+    a nearby region for the chosen Location. Ignored by every other profile.
 
 .PARAMETER NamePrefix
     Prefix for a generated account name. The script appends six random
@@ -48,10 +78,12 @@ param(
     [ValidatePattern('^[a-z0-9][a-z0-9-]{1,30}$')]
     [string]$NamePrefix = 'dp420lab',
 
-    [ValidateSet('core', 'modeling')]
+    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'fleet')]
     [string]$LabProfile = 'core',
 
     [string]$Location = 'westus2',
+
+    [string]$SecondaryLocation,
 
     [ValidateRange(1, 32)]
     [int]$SeedConcurrency = 8,
@@ -82,6 +114,37 @@ $ContainerCopyRegions = @(
     'switzerlandnorth', 'switzerlandwest', 'uaecentral', 'uksouth', 'ukwest',
     'westcentralus', 'westeurope', 'westindia', 'westus', 'westus2'
 )
+
+# Azure Cosmos DB replicates between any two regions, so these are convenience
+# defaults for the multiregion profile rather than a required pairing.
+$DefaultSecondaryLocation = @{
+    australiaeast      = 'australiasoutheast'
+    brazilsouth        = 'southcentralus'
+    canadacentral      = 'canadaeast'
+    centralindia       = 'southindia'
+    centralus          = 'eastus2'
+    eastasia           = 'southeastasia'
+    eastus             = 'westus'
+    eastus2            = 'centralus'
+    francecentral      = 'westeurope'
+    germanywestcentral = 'northeurope'
+    japaneast          = 'japanwest'
+    koreacentral       = 'koreasouth'
+    northcentralus     = 'southcentralus'
+    northeurope        = 'westeurope'
+    southafricanorth   = 'northeurope'
+    southcentralus     = 'northcentralus'
+    southeastasia      = 'eastasia'
+    swedencentral      = 'northeurope'
+    switzerlandnorth   = 'westeurope'
+    uksouth            = 'ukwest'
+    ukwest             = 'uksouth'
+    westcentralus      = 'westus2'
+    westeurope         = 'northeurope'
+    westus             = 'eastus'
+    westus2            = 'westcentralus'
+    westus3            = 'eastus'
+}
 
 # Autoscale maxima. The billed floor is 10% of the maximum, so 1000 keeps an
 # abandoned lab account at a 100 RU/s baseline.
@@ -148,6 +211,119 @@ $Profiles = @{
             }
         )
     }
+    security = @{
+        # The exercise disables public network access on this account and then deletes
+        # the whole resource group, so it must never share either with the rest of the course.
+        Account   = @{
+            Dedicated            = $true
+            Providers            = @('Microsoft.ContainerInstance')
+            Serverless           = $true
+            PublicNetworkAccess  = 'ENABLED'
+            GrantDataPlaneAccess = $false
+        }
+        Databases = @(
+            @{
+                Name       = 'cosmicworks'
+                # Left empty on purpose. Loading the catalog through the hosted managed
+                # identity is the first thing the exercise proves.
+                Containers = @(
+                    @{ Name = 'product'; PartitionKey = '/categoryId' }
+                )
+            }
+        )
+    }
+    multiregion = @{
+        # The exercise changes the write region and then takes a region offline. A
+        # region that has been taken offline stays offline until Microsoft restores
+        # it, so this account must never be the shared course account.
+        Account   = @{
+            Dedicated  = $true
+            RegionCount = 2
+        }
+        Databases = @(
+            @{
+                Name       = 'cosmicworks'
+                Containers = @(
+                    @{ Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/product" }
+                )
+            }
+        )
+    }
+    indexing = @{
+        # Global secondary indexes require continuous backup on the account, and
+        # continuous backup can only be chosen at account creation, so this exercise
+        # gets an account and a resource group of its own.
+        Account   = @{
+            Dedicated      = $true
+            BackupPolicy   = 'Continuous'
+            ContinuousTier = 'Continuous7Days'
+        }
+        Databases = @(
+            @{
+                Name       = 'cosmicworks'
+                Containers = @(
+                    @{ Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/product" }
+                )
+            }
+        )
+    }
+    monitoring = @{
+        # The exercise attaches a diagnostic setting to this account and then deletes
+        # the resource group. A diagnostic setting has to be removed before its target
+        # resource is deleted or renamed, so keeping both in a group of their own means
+        # one delete cleans up everything.
+        Account   = @{
+            Dedicated = $true
+        }
+        Databases = @(
+            @{
+                Name       = 'cosmicworks'
+                # Manual 400 RU/s rather than autoscale. The exercise has to reach rate
+                # limiting inside a lab time budget, and an autoscale maximum would let
+                # the container absorb the load instead of returning 429 responses.
+                Containers = @(
+                    @{ Name = 'product'; PartitionKey = '/categoryId'; Throughput = 400; Seed = "$DataRoot/database-v4/product" }
+                )
+            }
+        )
+    }
+    fleet    = @{
+        # A fleet groups accounts, so this profile creates two of them. Both are
+        # created with the same single region and the same single-region write
+        # configuration, because accounts can share a fleetspace throughput pool
+        # only when their regions and their service tier match.
+        Account   = @{
+            Dedicated    = $true
+            AccountCount = 2
+        }
+        Databases = @(
+            @{
+                Name       = 'cosmicworks'
+                Containers = @(
+                    @{ Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/product" }
+                )
+            }
+        )
+    }
+    backup   = @{
+        # Continuous backup can only be chosen when the account is created, and the
+        # exercise deletes the container it restores, so this account stands alone too.
+        Account   = @{
+            Dedicated      = $true
+            BackupPolicy   = 'Continuous'
+            ContinuousTier = 'Continuous7Days'
+        }
+        Databases = @(
+            @{
+                Name       = 'cosmicworks'
+                # Left empty on purpose. The exercise loads the catalog itself so that
+                # the restore point it captures sits after a write it performed.
+                Containers = @(
+                    @{ Name = 'product'; PartitionKey = '/categoryId'; Throughput = 400 }
+                )
+            }
+        )
+    }
 }
 
 #endregion
@@ -197,6 +373,7 @@ function Initialize-Log {
     Write-Log "NamePrefix     : $NamePrefix"
     Write-Log "LabProfile     : $LabProfile"
     Write-Log "Location       : $Location"
+    Write-Log "Secondary      : $(if ($script:SecondLocation) { $script:SecondLocation } else { '(none)' })"
     Write-Log "SkipSeed       : $SkipSeed"
     Write-Log "PSVersion      : $($PSVersionTable.PSVersion)"
     Write-Log "OS             : $([System.Environment]::OSVersion.VersionString)"
@@ -299,7 +476,7 @@ function Assert-Prerequisites {
 
     Write-Step "Signed in as $($account.user.name) on subscription '$($account.name)'."
 
-    if ($Location -notin $ContainerCopyRegions) {
+    if ($LabProfile -eq 'core' -and $Location -notin $ContainerCopyRegions) {
         Write-Warning "Region '$Location' does not support container copy jobs. The change feed exercise cannot complete its final task in this region."
     }
 }
@@ -331,11 +508,15 @@ function New-AccountName {
     throw "Could not find an available account name after 10 attempts. Try a different -NamePrefix."
 }
 
-# Registers the resource provider and makes sure the resource group exists.
+# Registers the resource providers and makes sure the resource group exists.
 # A lab environment often supplies the group already, so an existing one is reused.
 function Initialize-Subscription {
-    Write-Step "Registering the Microsoft.DocumentDB resource provider."
-    Invoke-Az @('provider', 'register', '--namespace', 'Microsoft.DocumentDB', '--wait') | Out-Null
+    $providers = @('Microsoft.DocumentDB') + @($Profiles[$LabProfile].Account.Providers | Where-Object { $_ })
+
+    foreach ($provider in $providers) {
+        Write-Step "Registering the $provider resource provider."
+        Invoke-Az @('provider', 'register', '--namespace', $provider, '--wait') | Out-Null
+    }
 
     $existingGroup = & az group show --name $ResourceGroup --output json 2>$null | ConvertFrom-Json
 
@@ -356,22 +537,46 @@ function Initialize-Subscription {
 
 # Creates the account when it is missing and returns its document endpoint.
 function New-LabAccount {
+    $options = $Profiles[$LabProfile].Account
+
     $existing = & az cosmosdb show --name $AccountName --resource-group $ResourceGroup --output json 2>$null
     if ($existing) {
+        $account = $existing | ConvertFrom-Json
+
+        # Backup policy and capacity mode are fixed at creation, so a reused account
+        # that was created for a different profile can't be corrected here.
+        if ($options.BackupPolicy -and $account.backupPolicy.type -ne $options.BackupPolicy) {
+            throw "Account '$AccountName' uses $($account.backupPolicy.type) backup, but the '$LabProfile' profile needs $($options.BackupPolicy) backup, which can only be chosen when the account is created. Use a different -NamePrefix or an empty resource group."
+        }
+
         Write-Step "Account '$AccountName' already exists. Skipping creation."
-        return ($existing | ConvertFrom-Json).documentEndpoint
+        return $account.documentEndpoint
     }
 
     Write-Step "Creating account '$AccountName'. This takes 5-10 minutes."
-    $created = Invoke-Az @(
+    $arguments = @(
         'cosmosdb', 'create',
         '--name', $AccountName,
         '--resource-group', $ResourceGroup,
-        '--locations', "regionName=$Location", 'failoverPriority=0', 'isZoneRedundant=False',
-        '--default-consistency-level', 'Session',
-        '--disable-local-auth', 'true',
-        '--output', 'json'
+        '--locations', "regionName=$Location", 'failoverPriority=0', 'isZoneRedundant=False'
     )
+
+    if ($script:SecondLocation) {
+        Write-Step "Adding '$($script:SecondLocation)' as a second region. Creating both at once is much faster than adding one later."
+        $arguments += @('--locations', "regionName=$($script:SecondLocation)", 'failoverPriority=1', 'isZoneRedundant=False')
+    }
+
+    $arguments += @(
+        '--default-consistency-level', 'Session',
+        '--disable-local-auth', 'true'
+    )
+
+    if ($options.Serverless) { $arguments += @('--capabilities', 'EnableServerless') }
+    if ($options.PublicNetworkAccess) { $arguments += @('--public-network-access', $options.PublicNetworkAccess) }
+    if ($options.BackupPolicy) { $arguments += @('--backup-policy-type', $options.BackupPolicy) }
+    if ($options.ContinuousTier) { $arguments += @('--continuous-tier', $options.ContinuousTier) }
+
+    $created = Invoke-Az ($arguments + @('--output', 'json'))
 
     return ($created | ConvertFrom-Json).documentEndpoint
 }
@@ -449,7 +654,11 @@ function New-LabContainer {
         '--partition-key-path', $Container.PartitionKey
     )
 
-    if ($Container.MaxThroughput) {
+    if ($Profiles[$LabProfile].Account.Serverless) {
+        # Serverless containers take no throughput argument at all.
+        $sizing = 'serverless'
+    }
+    elseif ($Container.MaxThroughput) {
         $arguments += @('--max-throughput', $Container.MaxThroughput)
         $sizing = "autoscale to $($Container.MaxThroughput) RU/s"
     }
@@ -582,6 +791,18 @@ function Add-SeedData {
 
 #region Main
 
+if ($Profiles[$LabProfile].Account.RegionCount -eq 2) {
+    $script:SecondLocation = if ($SecondaryLocation) { $SecondaryLocation.ToLowerInvariant() } else { $DefaultSecondaryLocation[$Location.ToLowerInvariant()] }
+
+    if (-not $script:SecondLocation) {
+        throw "The '$LabProfile' profile needs two regions and this script has no default second region for '$Location'. Pass -SecondaryLocation with an Azure region that supports Azure Cosmos DB."
+    }
+
+    if ($script:SecondLocation -eq $Location.ToLowerInvariant()) {
+        throw "-SecondaryLocation must differ from -Location. Both are '$Location'."
+    }
+}
+
 Initialize-Log
 
 trap {
@@ -598,45 +819,75 @@ trap {
 }
 
 Assert-Prerequisites
+
+if ($Profiles[$LabProfile].Account.Dedicated) {
+    Write-Warning "The '$LabProfile' profile creates a disposable account that its exercise reconfigures and then deletes. Run it against a resource group of its own, not the one holding your shared course account."
+}
+
 Initialize-Subscription
 
+$accountCount = if ($Profiles[$LabProfile].Account.AccountCount) { $Profiles[$LabProfile].Account.AccountCount } else { 1 }
+
 if ($AccountName) {
+    if ($accountCount -gt 1) {
+        throw "The '$LabProfile' profile creates $accountCount accounts, so it can't target a named account. Omit -AccountName and pass -NamePrefix instead."
+    }
+
     if ($AccountName -notmatch '^[a-z0-9][a-z0-9-]{1,42}[a-z0-9]$') {
         throw "'$AccountName' isn't a valid Azure Cosmos DB account name. Use 3-44 lowercase letters, numbers, and hyphens."
     }
+
+    $accountNames = @($AccountName)
 }
 else {
-    # Re-use an account this script created earlier. Without this, a re-run after a
-    # mid-script failure generates a fresh name and leaves a second billable account behind.
+    # Re-use accounts this script created earlier. Without this, a re-run after a
+    # mid-script failure generates fresh names and leaves extra billable accounts behind.
     $existing = @(& az cosmosdb list --resource-group $ResourceGroup `
             --query "[?starts_with(name, '$NamePrefix')].name" --output tsv 2>$null |
-        Where-Object { $_ })
+        Where-Object { $_ } | ForEach-Object { $_.Trim() } | Sort-Object)
 
-    if ($existing.Count -gt 0) {
-        $AccountName = $existing[0].Trim()
-        Write-Step "Reusing the existing account '$AccountName' in '$ResourceGroup'."
+    $accountNames = @($existing | Select-Object -First $accountCount)
+
+    foreach ($name in $accountNames) {
+        Write-Step "Reusing the existing account '$name' in '$ResourceGroup'."
     }
-    else {
-        $AccountName = New-AccountName -Prefix $NamePrefix
-        Write-Step "Generated account name '$AccountName'."
+
+    while ($accountNames.Count -lt $accountCount) {
+        $generated = New-AccountName -Prefix $NamePrefix
+        Write-Step "Generated account name '$generated'."
+        $accountNames += $generated
     }
 }
 
-$endpoint = New-LabAccount
-Grant-DataPlaneAccess
-
+$provisioned = @()
 $databases = $Profiles[$LabProfile].Databases
 
-foreach ($database in $databases) {
-    New-LabDatabase -Name $database.Name
+foreach ($name in $accountNames) {
+    # The provisioning and seeding functions read $AccountName from this scope.
+    $AccountName = $name
 
-    foreach ($container in $database.Containers) {
-        New-LabContainer -Database $database.Name -Container $container
+    $endpoint = New-LabAccount
 
-        if (-not $SkipSeed) {
-            Add-SeedData -Endpoint $endpoint -Database $database.Name -Container $container
+    if ($Profiles[$LabProfile].Account.GrantDataPlaneAccess -eq $false) {
+        Write-Step 'This profile grants no data-plane role to the signed-in user. The exercise assigns scoped roles itself.'
+    }
+    else {
+        Grant-DataPlaneAccess
+    }
+
+    foreach ($database in $databases) {
+        New-LabDatabase -Name $database.Name
+
+        foreach ($container in $database.Containers) {
+            New-LabContainer -Database $database.Name -Container $container
+
+            if (-not $SkipSeed) {
+                Add-SeedData -Endpoint $endpoint -Database $database.Name -Container $container
+            }
         }
     }
+
+    $provisioned += [pscustomobject]@{ Name = $name; Endpoint = $endpoint }
 }
 
 $endTime = Get-Date
@@ -646,13 +897,16 @@ Write-Log "Finished       : $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))"
 Write-Log "Total run time : $totalElapsed"
 
 Write-Host ''
-Write-Host 'Setup complete. Record these two values.' -ForegroundColor Green
+Write-Host "Setup complete. Record $(if ($provisioned.Count -gt 1) { 'these values' } else { 'these two values' })." -ForegroundColor Green
 Write-Host ''
-Write-Host "  Account name     : $AccountName" -ForegroundColor Yellow
-Write-Host "  Account endpoint : $endpoint" -ForegroundColor Yellow
-Write-Host ''
+foreach ($account in $provisioned) {
+    Write-Host "  Account name     : $($account.Name)" -ForegroundColor Yellow
+    Write-Host "  Account endpoint : $($account.Endpoint)" -ForegroundColor Yellow
+    Write-Host ''
+}
 Write-Host "  Resource group   : $ResourceGroup"
 Write-Host "  Location         : $Location"
+if ($script:SecondLocation) { Write-Host "  Second region    : $($script:SecondLocation)" }
 Write-Host "  Lab profile      : $LabProfile"
 Write-Host "  Started          : $($script:StartTime.ToString('HH:mm:ss'))"
 Write-Host "  Finished         : $($endTime.ToString('HH:mm:ss'))"
