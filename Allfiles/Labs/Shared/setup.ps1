@@ -78,7 +78,7 @@ param(
     [ValidatePattern('^[a-z0-9][a-z0-9-]{1,30}$')]
     [string]$NamePrefix = 'dp420lab',
 
-    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'fleet')]
+    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'mirroring', 'fleet', 'search', 'agentmemory')]
     [string]$LabProfile = 'core',
 
     [string]$Location = 'westus2',
@@ -287,6 +287,29 @@ $Profiles = @{
             }
         )
     }
+    mirroring = @{
+        # Microsoft Fabric mirroring requires continuous backup on the account, and
+        # continuous backup can only be chosen at account creation and can never be
+        # turned off again, so this exercise gets an account and a resource group of
+        # its own rather than altering the shared course account.
+        Account   = @{
+            Dedicated      = $true
+            BackupPolicy   = 'Continuous'
+            ContinuousTier = 'Continuous7Days'
+        }
+        Databases = @(
+            @{
+                Name       = 'cosmicworks'
+                # Two containers, seeded, because the exercise reads the mirrored data as
+                # warehouse tables. The customer container holds two document types in one
+                # container, which is what makes mirroring's union schema observable.
+                Containers = @(
+                    @{ Name = 'product';  PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/product" }
+                    @{ Name = 'customer'; PartitionKey = '/customerId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/customer" }
+                )
+            }
+        )
+    }
     fleet    = @{
         # A fleet groups accounts, so this profile creates two of them. Both are
         # created with the same single region and the same single-region write
@@ -301,6 +324,118 @@ $Profiles = @{
                 Name       = 'cosmicworks'
                 Containers = @(
                     @{ Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/product" }
+                )
+            }
+        )
+    }
+    search   = @{
+        # Vector search is an account capability that can never be turned off, and the
+        # search container's vector policy is fixed at creation, so this exercise gets
+        # an account and a resource group of its own rather than altering the shared one.
+        Account   = @{
+            Dedicated    = $true
+            Capabilities = @('EnableNoSQLVectorSearch')
+        }
+        Databases = @(
+            @{
+                Name       = 'cosmicworks'
+                Containers = @(
+                    # Left empty on purpose. The exercise builds the searchable text and
+                    # calls the embedding model itself, so seeding here would store items
+                    # with no vector at the path the vector index covers.
+                    @{
+                        Name          = 'productSearch'
+                        PartitionKey  = '/categoryId'
+                        MaxThroughput = 1000
+                        FullTextPolicy = @{
+                            defaultLanguage = 'en-US'
+                            fullTextPaths   = @(
+                                @{ path = '/searchText'; language = 'en-US' }
+                            )
+                        }
+                        VectorEmbeddings = @{
+                            vectorEmbeddings = @(
+                                @{
+                                    path             = '/embedding'
+                                    dataType         = 'float32'
+                                    distanceFunction = 'cosine'
+                                    dimensions       = 1536
+                                }
+                            )
+                        }
+                        IndexingPolicy = @{
+                            indexingMode   = 'consistent'
+                            automatic      = $true
+                            includedPaths  = @(@{ path = '/*' })
+                            excludedPaths  = @(
+                                @{ path = '/"_etag"/?' }
+                                @{ path = '/embedding/*' }
+                            )
+                            fullTextIndexes = @(@{ path = '/searchText' })
+                            vectorIndexes   = @(@{ path = '/embedding'; type = 'diskANN' })
+                        }
+                    }
+                )
+            }
+        )
+    }
+    agentmemory = @{
+        # Vector search is an account capability that can never be turned off, so this
+        # exercise gets an account and a resource group of its own rather than altering
+        # the shared one. The two containers hold the module's two memory tiers.
+        Account   = @{
+            Dedicated    = $true
+            Capabilities = @('EnableNoSQLVectorSearch')
+        }
+        Databases = @(
+            @{
+                Name       = 'agentmemory'
+                Containers = @(
+                    @{
+                        # Short-term conversation state. Turns expire 30 days after their
+                        # last write, so the log clears itself without a cleanup job.
+                        Name          = 'conversation'
+                        PartitionKey  = '/threadId'
+                        MaxThroughput = 1000
+                        DefaultTtl    = 2592000
+                    }
+                    @{
+                        # Long-term derived memory, partitioned on the user because recall
+                        # crosses every thread that user ever opened. DefaultTtl -1 enables
+                        # time to live while expiring nothing by default, so an individual
+                        # memory expires only when it carries its own 'ttl'.
+                        Name           = 'memory'
+                        PartitionKey   = '/userId'
+                        MaxThroughput  = 1000
+                        DefaultTtl     = -1
+                        FullTextPolicy = @{
+                            defaultLanguage = 'en-US'
+                            fullTextPaths   = @(
+                                @{ path = '/content'; language = 'en-US' }
+                            )
+                        }
+                        VectorEmbeddings = @{
+                            vectorEmbeddings = @(
+                                @{
+                                    path             = '/embedding'
+                                    dataType         = 'float32'
+                                    distanceFunction = 'cosine'
+                                    dimensions       = 1536
+                                }
+                            )
+                        }
+                        IndexingPolicy = @{
+                            indexingMode    = 'consistent'
+                            automatic       = $true
+                            includedPaths   = @(@{ path = '/*' })
+                            excludedPaths   = @(
+                                @{ path = '/"_etag"/?' }
+                                @{ path = '/embedding/*' }
+                            )
+                            fullTextIndexes = @(@{ path = '/content' })
+                            vectorIndexes   = @(@{ path = '/embedding'; type = 'quantizedFlat' })
+                        }
+                    }
                 )
             }
         )
@@ -572,6 +707,11 @@ function New-LabAccount {
     )
 
     if ($options.Serverless) { $arguments += @('--capabilities', 'EnableServerless') }
+    # Vector search is an account capability, and it can't be turned off once it is on,
+    # which is why the profile that needs it also creates an account of its own.
+    foreach ($capability in @($options.Capabilities)) {
+        if ($capability) { $arguments += @('--capabilities', $capability) }
+    }
     if ($options.PublicNetworkAccess) { $arguments += @('--public-network-access', $options.PublicNetworkAccess) }
     if ($options.BackupPolicy) { $arguments += @('--backup-policy-type', $options.BackupPolicy) }
     if ($options.ContinuousTier) { $arguments += @('--continuous-tier', $options.ContinuousTier) }
@@ -654,6 +794,12 @@ function New-LabContainer {
         '--partition-key-path', $Container.PartitionKey
     )
 
+    # Time to live has to be enabled on the container before an item's own 'ttl'
+    # property does anything, so a profile that relies on per-item expiry sets this.
+    if ($null -ne $Container.DefaultTtl) {
+        $arguments += @('--ttl', $Container.DefaultTtl)
+    }
+
     if ($Profiles[$LabProfile].Account.Serverless) {
         # Serverless containers take no throughput argument at all.
         $sizing = 'serverless'
@@ -667,8 +813,30 @@ function New-LabContainer {
         $sizing = "$($Container.Throughput) RU/s manual"
     }
 
+    # PowerShell strips the quotation marks out of an inline JSON argument before the
+    # Azure CLI sees it, so every policy is written to a file and passed with the
+    # documented '@<file>' convention instead.
+    $policyFiles = @()
+    foreach ($policy in @(
+            @{ Key = 'IndexingPolicy'; Argument = '--idx' },
+            @{ Key = 'VectorEmbeddings'; Argument = '--vector-embeddings' },
+            @{ Key = 'FullTextPolicy'; Argument = '--full-text-policy' })) {
+
+        if (-not $Container[$policy.Key]) { continue }
+
+        $path = Join-Path ([IO.Path]::GetTempPath()) ('dp420-{0}-{1}.json' -f $Container.Name, $policy.Key)
+        $Container[$policy.Key] | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $path -Encoding utf8
+        $arguments += @($policy.Argument, "@$path")
+        $policyFiles += $path
+    }
+
     Write-Step "Creating container '$Database/$($Container.Name)' on $($Container.PartitionKey), $sizing."
-    Invoke-Az $arguments | Out-Null
+    try {
+        Invoke-Az $arguments | Out-Null
+    }
+    finally {
+        $policyFiles | ForEach-Object { Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue }
+    }
 }
 
 #endregion

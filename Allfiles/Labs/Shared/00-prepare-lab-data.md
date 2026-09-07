@@ -120,6 +120,23 @@ It creates an account holding a `cosmicworks` database with one `product` contai
 
 Manual throughput is deliberate. The exercise has to reach rate limiting inside its time budget, and an autoscale maximum would let the container absorb the load instead of returning 429 responses.
 
+## The mirroring profile
+
+Serves the operational analytics exercise. Microsoft Fabric mirroring requires continuous backup on the source account, continuous backup can only be chosen when an account is created, and it can never be turned off again, so this profile creates its own account. Give it a resource group of its own.
+
+```powershell
+./setup.ps1 -ResourceGroup "dp420-mirroring" -Location $location -NamePrefix dp420lab20 -LabProfile mirroring
+```
+
+It creates an account with a `Continuous` backup policy at the `Continuous7Days` tier, holding a `cosmicworks` database with two containers, both at an autoscale maximum of 1000 RU/s:
+
+- `product`, partitioned on `/categoryId`, seeded with the 295 CosmicWorks products.
+- `customer`, partitioned on `/customerId`, seeded with the 282 CosmicWorks customer documents.
+
+Both containers are seeded, unlike most disposable profiles, because the exercise reads the mirrored copy of this data rather than writing it. The `customer` container is included for a specific reason: it holds two document types in one container, 10 customers and 272 sales orders, discriminated by a `type` property. Nine properties appear only on the customer documents and three only on the sales order documents, so the mirrored warehouse table is the union of both shapes and every row is null in the other type's columns. That is what makes mirroring's schema handling observable rather than theoretical.
+
+The 7-day continuous tier is chosen because it is the free tier, and mirroring works the same on either tier.
+
 ## The fleet profile
 
 Serves the fleets exercise. A fleet groups accounts, so this is the only profile that creates more than one, and the exercise deletes the whole resource group when it finishes. Give it a resource group of its own.
@@ -133,6 +150,41 @@ It creates **two** accounts, each holding a `cosmicworks` database with one `pro
 Both accounts are created in the same single region with the same single-region write configuration on purpose. Accounts can share a fleetspace throughput pool only when their regions and their service tier match, so two accounts that differ in either respect can't be enrolled in the same fleetspace. Because this profile creates more than one account, it doesn't accept `-AccountName`.
 
 This profile takes roughly twice as long to run as the others, because the accounts are created one after the other.
+
+## The search profile
+
+Serves the full-text and vector search exercise. Give it a resource group of its own.
+
+```powershell
+./setup.ps1 -ResourceGroup "dp420-search" -Location $location -NamePrefix dp420lab16 -LabProfile search
+```
+
+It creates an account with the `EnableNoSQLVectorSearch` capability, a `cosmicworks` database, and a `productSearch` container partitioned on `/categoryId` at an autoscale maximum of 1000 RU/s. The container carries a full-text policy and full-text index on `/searchText`, a vector policy on `/embedding` (`float32`, 1536 dimensions, cosine), a `diskANN` vector index on the same path, and `/embedding/*` in the excluded paths.
+
+The account is disposable for two reasons. Vector search is an account capability that can't be turned off once it's enabled, and a container's vector policy is fixed at creation, so neither can be added to the shared course account without changing it permanently.
+
+The container is left empty on purpose. The exercise builds the `searchText` property and calls an embedding model itself, so seeding here would store items with no vector at the path the vector index covers.
+
+The `EnableNoSQLVectorSearch` capability can take up to 15 minutes to take effect after the account is created. Full-text search is enabled separately, from the **Features** pane of the account in the Azure portal.
+
+## The agentmemory profile
+
+Serves the agent memory exercise. Give it a resource group of its own.
+
+```powershell
+./setup.ps1 -ResourceGroup "dp420-agentmemory" -Location $location -NamePrefix dp420lab19 -LabProfile agentmemory
+```
+
+It creates an account with the `EnableNoSQLVectorSearch` capability, an `agentmemory` database, and two containers, both at an autoscale maximum of 1000 RU/s:
+
+- `conversation`, partitioned on `/threadId`, with a default time to live of 2,592,000 seconds. Conversation turns clear themselves 30 days after their last write.
+- `memory`, partitioned on `/userId`, with a default time to live of `-1`. That value enables time to live on the container while expiring nothing by default, so a memory expires only when the item carries its own `ttl`. The container also carries a full-text policy and index on `/content`, a vector policy on `/embedding` (`float32`, 1536 dimensions, cosine), a `quantizedFlat` vector index on the same path, and `/embedding/*` in the excluded paths.
+
+The two containers differ in partition key on purpose. Conversation state is read one thread at a time, and long-term memory is read across every thread one person ever opened.
+
+The account is disposable for the same reason as the `search` profile: vector search is an account capability that can't be turned off once it's enabled, and a container's vector policy is fixed at creation.
+
+Both containers are left empty. The exercise writes the turns and distills the memories itself.
 
 ## Verify the result
 

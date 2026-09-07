@@ -30,7 +30,7 @@ param(
     [Parameter(Mandatory)]
     [string]$AccountName,
 
-    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'fleet')]
+    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'mirroring', 'fleet', 'search', 'agentmemory')]
     [string]$LabProfile = 'core'
 )
 
@@ -145,11 +145,39 @@ $Expectations = @{
             @{ Database = 'cosmicworks'; Name = 'product'; PartitionKey = '/categoryId'; Throughput = 400; MinItems = 295 }
         )
     }
+    mirroring   = @{
+        # Fabric mirroring requires continuous backup on the account.
+        Account       = @{ BackupPolicy = 'Continuous'; ContinuousTier = 'Continuous7Days' }
+        SeededProduct = $true
+        Containers    = @(
+            @{ Database = 'cosmicworks'; Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; MinItems = 295 }
+            @{ Database = 'cosmicworks'; Name = 'customer'; PartitionKey = '/customerId'; MaxThroughput = 1000; MinItems = 282 }
+        )
+    }
     fleet       = @{
         Account       = @{ AccountCount = 2 }
         SeededProduct = $true
         Containers    = @(
             @{ Database = 'cosmicworks'; Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; MinItems = 295 }
+        )
+    }
+    search      = @{
+        # The exercise builds the searchable text and calls the embedding model itself,
+        # so the container starts empty and there is no cosmicworks/product to read.
+        Account       = @{ Capabilities = @('EnableNoSQLVectorSearch') }
+        SeededProduct = $false
+        Containers    = @(
+            @{ Database = 'cosmicworks'; Name = 'productSearch'; PartitionKey = '/categoryId'; MaxThroughput = 1000 }
+        )
+    }
+    agentmemory = @{
+        # Both containers start empty. The exercise writes the turns and distills the
+        # memories itself, so there is no cosmicworks/product to read here either.
+        Account       = @{ Capabilities = @('EnableNoSQLVectorSearch') }
+        SeededProduct = $false
+        Containers    = @(
+            @{ Database = 'agentmemory'; Name = 'conversation'; PartitionKey = '/threadId'; MaxThroughput = 1000 }
+            @{ Database = 'agentmemory'; Name = 'memory'; PartitionKey = '/userId'; MaxThroughput = 1000 }
         )
     }
 }
@@ -235,6 +263,13 @@ if ($accountExpected.RegionCount) {
     Test-Condition -Name "Account spans $($accountExpected.RegionCount) regions" `
         -Passed ($regions.Count -eq $accountExpected.RegionCount) `
         -Detail "Found $($regions.Count): $(($regions.locationName) -join ', ')."
+}
+
+foreach ($capability in @($accountExpected.Capabilities)) {
+    if (-not $capability) { continue }
+    Test-Condition -Name "Account capability '$capability' is enabled" `
+        -Passed (@($account.capabilities.name) -contains $capability) `
+        -Detail "Found: $((@($account.capabilities.name) -join ', ')). This capability can take up to 15 minutes to appear after it is requested."
 }
 
 $endpoint = $account.documentEndpoint

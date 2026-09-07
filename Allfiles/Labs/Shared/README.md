@@ -28,12 +28,14 @@ Environment preparation shared by every DP-420 exercise. Complete these once, th
 | Analyze and tune query performance | `core` | Needs the seeded `product` container |
 | Monitor and troubleshoot Azure Cosmos DB | `monitoring` | Disposable account, own resource group. `product` at 400 RU/s manual |
 | Manage Azure Cosmos DB at scale with fleets | `fleet` | **Two** disposable accounts, own resource group. Identical single-region configuration |
+| Implement full-text and vector search | `search` | Disposable account, own resource group. Vector search capability, empty `productSearch` container with full-text and vector policies. Also needs an embedding model deployment |
+| Design and implement agent memory stores | `agentmemory` | Disposable account, own resource group. Vector search capability, empty `conversation` and `memory` containers. Also needs embedding and chat model deployments |
 
 ## Shared account or disposable account
 
 The `core` and `modeling` profiles target the **one account** the course reuses from exercise to exercise. Run setup once, keep the endpoint, and delete the resource group at the end of the course.
 
-The `security`, `backup`, `multiregion`, `indexing`, `monitoring`, and `fleet` profiles create **disposable** accounts instead, and their exercises delete them when they finish. Each needs an account setting or an account-level change the shared account can't carry: the security exercise switches public network access off and back on, continuous backup can only be chosen when an account is created, the multi-region exercise takes a region offline, the monitoring exercise attaches a diagnostic setting that has to be removed before its target resource is deleted, and the fleets exercise needs two accounts with matching configurations to enroll in one fleetspace. Give each of those runs a resource group of its own, so the cleanup step can delete the group without taking the shared account with it.
+The `security`, `backup`, `multiregion`, `indexing`, `monitoring`, `fleet`, `search`, and `agentmemory` profiles create **disposable** accounts instead, and their exercises delete them when they finish. Each needs an account setting or an account-level change the shared account can't carry: the security exercise switches public network access off and back on, continuous backup can only be chosen when an account is created, the multi-region exercise takes a region offline, the monitoring exercise attaches a diagnostic setting that has to be removed before its target resource is deleted, the fleets exercise needs two accounts with matching configurations to enroll in one fleetspace, and vector search is an account capability that can never be turned off once it is on. Give each of those runs a resource group of its own, so the cleanup step can delete the group without taking the shared account with it.
 
 ## Design notes
 
