@@ -38,10 +38,10 @@ It creates a `cosmicworks` database holding five containers:
 Serves the data modeling and partitioning exercise, which compares the cost of the same query against four progressively different models of the same data.
 
 ```powershell
-./setup.ps1 -ResourceGroup $resourceGroup -Location $location -LabProfile modeling
+./setup.ps1 -ResourceGroup "dp420-modeling" -Location $location -NamePrefix dp420lab06 -LabProfile modeling
 ```
 
-It creates four databases:
+Use a dedicated resource group, not the core account's group, because the exercise removes its modeling resources when you finish. It creates four databases:
 
 | Database | Model |
 | :--- | :--- |
@@ -156,10 +156,17 @@ This profile takes roughly twice as long to run as the others, because the accou
 Serves the full-text and vector search exercise. Give it a resource group of its own.
 
 ```powershell
-./setup.ps1 -ResourceGroup "dp420-search" -Location $location -NamePrefix dp420lab16 -LabProfile search
+./setup.ps1 -ResourceGroup "dp420-search" -Location $location -NamePrefix dp420lab16 -LabProfile search -AccountOnly
 ```
 
-It creates an account with the `EnableNoSQLVectorSearch` capability, a `cosmicworks` database, and a `productSearch` container partitioned on `/categoryId` at an autoscale maximum of 1000 RU/s. The container carries a full-text policy and full-text index on `/searchText`, a vector policy on `/embedding` (`float32`, 1536 dimensions, cosine), a `diskANN` vector index on the same path, and `/embedding/*` in the excluded paths.
+Record the account name. In its portal **Features** pane, enable **Full Text & Hybrid Search for NoSQL API** and confirm **Vector Search for NoSQL API** is enabled. Allow up to 15 minutes for enrollment. Only after both are enabled, complete setup against that account:
+
+```powershell
+$accountName = "<account-name-from-stage-one>"
+./setup.ps1 -ResourceGroup "dp420-search" -Location $location -AccountName $accountName -LabProfile search -SearchFeaturesReady
+```
+
+The confirmation switch records your portal check and doesn't enable the features. The completed setup creates an account with the `EnableNoSQLVectorSearch` capability, a `cosmicworks` database, and a `productSearch` container partitioned on `/categoryId` at an autoscale maximum of 1000 RU/s. The container carries a full-text policy and full-text index on `/searchText`, a vector policy on `/embedding` (`float32`, 1536 dimensions, cosine), a `diskANN` vector index on the same path, and `/embedding/*` in the excluded paths.
 
 The account is disposable for two reasons. Vector search is an account capability that can't be turned off once it's enabled, and a container's vector policy is fixed at creation, so neither can be added to the shared course account without changing it permanently.
 
@@ -172,10 +179,17 @@ The `EnableNoSQLVectorSearch` capability can take up to 15 minutes to take effec
 Serves the agent memory exercise. Give it a resource group of its own.
 
 ```powershell
-./setup.ps1 -ResourceGroup "dp420-agentmemory" -Location $location -NamePrefix dp420lab19 -LabProfile agentmemory
+./setup.ps1 -ResourceGroup "dp420-agentmemory" -Location $location -NamePrefix dp420lab19 -LabProfile agentmemory -AccountOnly
 ```
 
-It creates an account with the `EnableNoSQLVectorSearch` capability, an `agentmemory` database, and two containers, both at an autoscale maximum of 1000 RU/s:
+Complete the same portal enrollment checks as for `search`, then resume against the recorded account:
+
+```powershell
+$accountName = "<account-name-from-stage-one>"
+./setup.ps1 -ResourceGroup "dp420-agentmemory" -Location $location -AccountName $accountName -LabProfile agentmemory -SearchFeaturesReady
+```
+
+The completed setup creates an account with the `EnableNoSQLVectorSearch` capability, an `agentmemory` database, and two containers, both at an autoscale maximum of 1000 RU/s:
 
 - `conversation`, partitioned on `/threadId`, with a default time to live of 2,592,000 seconds. Conversation turns clear themselves 30 days after their last write.
 - `memory`, partitioned on `/userId`, with a default time to live of `-1`. That value enables time to live on the container while expiring nothing by default, so a memory expires only when the item carries its own `ttl`. The container also carries a full-text policy and index on `/content`, a vector policy on `/embedding` (`float32`, 1536 dimensions, cosine), a `quantizedFlat` vector index on the same path, and `/embedding/*` in the excluded paths.

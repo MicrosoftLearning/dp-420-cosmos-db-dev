@@ -33,7 +33,11 @@ Environment preparation shared by every DP-420 exercise. Complete these once, th
 
 ## Shared account or disposable account
 
-The `core` and `modeling` profiles target the **one account** the course reuses from exercise to exercise. Run setup once, keep the endpoint, and delete the resource group at the end of the course.
+The `core` profile supplies the account reused by the core exercises. Keep its resource group, account name, and endpoint. Before reuse, run `verify.ps1` with `-LabProfile core` against that named account and confirm the catalog counts in Data Explorer: 295 products and 237 product metadata items. The two-item account from the first portal exercise isn't this baseline.
+
+When adding missing core resources to an existing lab account, pass `-AccountName` explicitly. The module-specific name prefix selects only accounts with that prefix, not every course account. Setup upserts seed records but doesn't delete extra items or reset existing container policies. Resolve verification failures and restore the exercise's stated starting configuration before continuing; don't delete or reset data automatically.
+
+The `modeling` profile uses a separate account in `dp420-modeling`. Its cleanup runs immediately after the exercise, so never put it in the core account's resource group.
 
 The `security`, `backup`, `multiregion`, `indexing`, `monitoring`, `fleet`, `search`, and `agentmemory` profiles create **disposable** accounts instead, and their exercises delete them when they finish. Each needs an account setting or an account-level change the shared account can't carry: the security exercise switches public network access off and back on, continuous backup can only be chosen when an account is created, the multi-region exercise takes a region offline, the monitoring exercise attaches a diagnostic setting that has to be removed before its target resource is deleted, the fleets exercise needs two accounts with matching configurations to enroll in one fleetspace, and vector search is an account capability that can never be turned off once it is on. Give each of those runs a resource group of its own, so the cleanup step can delete the group without taking the shared account with it.
 
@@ -48,6 +52,8 @@ The `security`, `backup`, `multiregion`, `indexing`, `monitoring`, `fleet`, `sea
 **The `security` profile grants no data-plane role to the signed-in user.** Watching a hosted managed identity gain, then lose, write access is what that exercise measures, so handing your own identity account-wide access up front would hide the result. It also registers `Microsoft.ContainerInstance` alongside `Microsoft.DocumentDB`.
 
 ## Status
+
+For `search` and `agentmemory`, run setup with `-AccountOnly` first. In the account's **Features** pane, enable full-text search and confirm vector search is enabled. Allow enrollment to complete, then rerun with the same resource group, explicit `-AccountName`, profile, and `-SearchFeaturesReady`. The confirmation switch records the learner's check, not an automated readiness test. Only this second stage provisions containers and roles. Run verification after it succeeds.
 
 Seed data is validated against the live CosmicWorks dataset: `product` holds 295 items with no missing `categoryId`, and `productMeta` holds 237 items (37 `category`, 200 `tag`) with no missing `type`.
 

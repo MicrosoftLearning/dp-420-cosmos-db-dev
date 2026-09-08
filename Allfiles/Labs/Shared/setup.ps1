@@ -58,6 +58,14 @@
 .PARAMETER SkipSeed
     Provision the databases and containers, but do not load any data.
 
+.PARAMETER AccountOnly
+    Create or locate the account without provisioning databases, roles, or data.
+    Use this first for search and agentmemory, then enroll features in the portal.
+
+.PARAMETER SearchFeaturesReady
+    Confirm that vector and full-text enrollment is complete in the portal.
+    Requires AccountName so the second stage targets the enrolled account.
+
 .PARAMETER SeedConcurrency
     How many seed writes to issue at once. Set to 1 to load serially when
     troubleshooting a seeding failure.
@@ -88,7 +96,11 @@ param(
     [ValidateRange(1, 32)]
     [int]$SeedConcurrency = 8,
 
-    [switch]$SkipSeed
+    [switch]$SkipSeed,
+
+    [switch]$AccountOnly,
+
+    [switch]$SearchFeaturesReady
 )
 
 $ErrorActionPreference = 'Stop'
@@ -164,6 +176,7 @@ $Profiles = @{
         )
     }
     modeling = @{
+        Account = @{ Dedicated = $true }
         # Four stages of the same e-commerce data. Partition keys differ per stage,
         # so each container is declared explicitly rather than discovered.
         Databases = @(
@@ -530,6 +543,8 @@ function Write-Step {
 function Invoke-Az {
     param([string[]]$Arguments)
 
+    $sensitiveOutput = $Arguments.Count -ge 2 -and
+        $Arguments[0] -eq 'account' -and $Arguments[1] -eq 'get-access-token'
     $command = "az $($Arguments -join ' ')"
     Write-Log "RUN  $command"
 
@@ -555,9 +570,12 @@ function Invoke-Az {
     }
 
     Write-Log "EXIT $exitCode"
-    if ($output) { Write-Log "OUT  $($output -join [Environment]::NewLine)" }
+    if ($sensitiveOutput) {
+        Write-Log 'OUT/ERR suppressed for token acquisition.'
+    }
+    elseif ($output) { Write-Log "OUT  $($output -join [Environment]::NewLine)" }
 
-    if ($stderr) {
+    if ($stderr -and -not $sensitiveOutput) {
         Write-Log "ERR  $($stderr.TrimEnd())"
         Write-Host $stderr.TrimEnd() -ForegroundColor DarkYellow
     }
@@ -686,6 +704,10 @@ function New-LabAccount {
 
         Write-Step "Account '$AccountName' already exists. Skipping creation."
         return $account.documentEndpoint
+    }
+
+    if ($SearchFeaturesReady) {
+        throw "Enrolled account '$AccountName' was not found. Check -AccountName and -ResourceGroup; this run does not create a replacement account."
     }
 
     Write-Step "Creating account '$AccountName'. This takes 5-10 minutes."
@@ -959,6 +981,15 @@ function Add-SeedData {
 
 #region Main
 
+if ($AccountOnly -and $SearchFeaturesReady) {
+    throw 'Choose -AccountOnly for stage one or -SearchFeaturesReady for stage two, not both.'
+}
+if ($LabProfile -in @('search', 'agentmemory') -and -not $AccountOnly) {
+    if (-not $SearchFeaturesReady -or -not $AccountName) {
+        throw 'First run with -AccountOnly. Enable vector and full-text search in the account Features pane and wait for enrollment to complete. Then rerun with -AccountName and -SearchFeaturesReady. No databases or containers have been created by this run.'
+    }
+}
+
 if ($Profiles[$LabProfile].Account.RegionCount -eq 2) {
     $script:SecondLocation = if ($SecondaryLocation) { $SecondaryLocation.ToLowerInvariant() } else { $DefaultSecondaryLocation[$Location.ToLowerInvariant()] }
 
@@ -1036,6 +1067,11 @@ foreach ($name in $accountNames) {
 
     $endpoint = New-LabAccount
 
+    if ($AccountOnly) {
+        $provisioned += [pscustomobject]@{ Name = $name; Endpoint = $endpoint }
+        continue
+    }
+
     if ($Profiles[$LabProfile].Account.GrantDataPlaneAccess -eq $false) {
         Write-Step 'This profile grants no data-plane role to the signed-in user. The exercise assigns scoped roles itself.'
     }
@@ -1065,7 +1101,13 @@ Write-Log "Finished       : $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))"
 Write-Log "Total run time : $totalElapsed"
 
 Write-Host ''
-Write-Host "Setup complete. Record $(if ($provisioned.Count -gt 1) { 'these values' } else { 'these two values' })." -ForegroundColor Green
+if ($AccountOnly) {
+    Write-Host 'Account stage complete. Databases, containers, roles, and seed data are not provisioned yet.' -ForegroundColor Yellow
+    Write-Host 'Complete feature enrollment in the portal, then rerun with this AccountName and -SearchFeaturesReady.' -ForegroundColor Yellow
+}
+else {
+    Write-Host "Setup complete. Record $(if ($provisioned.Count -gt 1) { 'these values' } else { 'these two values' })." -ForegroundColor Green
+}
 Write-Host ''
 foreach ($account in $provisioned) {
     Write-Host "  Account name     : $($account.Name)" -ForegroundColor Yellow
