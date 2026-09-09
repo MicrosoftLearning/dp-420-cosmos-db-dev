@@ -1,8 +1,6 @@
 TEST LAB....
 
-In this exercise, you apply the three levers from this module. Provision autoscale throughput for the Contoso workload's bursty traffic. Set an account default consistency level, then relax an individual read below it when needed. Configure time to live so temporary records expire on their own, without a cleanup job. Use a disposable container for the container-wide expiration test to protect the shared product catalog. Along the way, you read the actual request-unit charge of an operation, which is the measurement that turns a throughput estimate into a real number.
-
-This exercise takes approximately **30** minutes to complete.
+In this exercise, you set up an Azure Cosmos DB SDK project, connect to the local emulator, validate the connection, add a logging handler to observe SDK traffic, and then point the same app at a cloud account by changing nothing but the connection.
 
 ## Before you start
 
@@ -22,7 +20,11 @@ You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed
 
 ::: zone-end
 
+You also need the **Azure Cosmos DB emulator** installed locally. Follow [Use the Azure Cosmos DB emulator for local development](/azure/cosmos-db/how-to-develop-emulator) to install either the Windows emulator or the legacy Linux container image on an x64 host. These steps use their default endpoint and Data Explorer. The vNext image described in the emulator unit uses a different Data Explorer endpoint. Task 2 starts the emulator.
+
 ## Set up your Azure Cosmos DB resources
+
+Most of this exercise runs against the local emulator. The final task uses the verified core account described below.
 
 The core exercises reuse an account prepared with the `core` profile, not the two-item account from the first portal exercise. Before skipping setup, open **Allfiles/Labs/Shared** in PowerShell, sign in with `az login`, and set `$resourceGroup`, `$location`, and `$accountName` to your recorded values. Run `./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile core` and continue only when it succeeds. In Data Explorer, confirm 295 items in `cosmicworks/product` and 237 in `cosmicworks/productMeta` with `SELECT VALUE COUNT(1) FROM c`.
 
@@ -58,348 +60,474 @@ If you have no verified core account, follow the setup steps below. To add missi
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab02 -LabProfile core
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab03 -LabProfile core
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab02a7f3k9`.
+    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab03a7f3k9`.
 
 1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
 
-1. Record the **Account name** and **Account endpoint** values the script prints. You need the endpoint later in this exercise, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
+1. Record the **Account name** and **Account endpoint** values the script prints. You need the endpoint in the final task, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
 
 The script creates the following resources:
 
 | Resource | Configuration |
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
-| `cosmicworks` database | Holds the containers for the `core` lab profile |
+| `cosmicworks` database | Holds every container this learning path uses |
 | `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, loaded with 295 CosmicWorks products |
-| `productMeta` container | Partitioned on `/type`, autoscale up to 1,000 RU/s, loaded with 237 metadata items |
-| `leases` container | Partitioned on `/id`, manual throughput of 400 RU/s |
-| `operations` and `bulkload` containers | Each partitioned on `/categoryId`, with its own autoscale maximum of 1,000 RU/s |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
-Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
+Because key-based authentication is disabled, this exercise doesn't use a cloud account key or connection string. The public emulator key is used only for local development. Every operation against the cloud account uses `AzureCliCredential` to authenticate with the identity from your `az login` session.
 
 > [!NOTE]
 > A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
-## Review the autoscale range
+---
 
-Autoscale scales between 10 percent of the maximum you set and that maximum. Confirm that range in the portal.
-
-1. In a web browser, open the [Azure portal](https://portal.azure.com), sign in, and go to your Azure Cosmos DB account.
-
-1. In the resource menu, select **Data Explorer**.
-
-1. In the **Data Explorer** pane, expand the **`cosmicworks`** database, select the **product** container, and then select **Scale and Settings**.
-
-1. Review the **Scale** section. The **Autoscale** option is selected, and the maximum throughput is **1,000 RU/s**.
-
-    Note the description of the scaling range. The container scales between **100 RU/s** and **1,000 RU/s** based on real-time demand. Billing uses the highest throughput reached during each hour, with a minimum charge for 100 RU/s even when idle. With dynamic scaling, the bill combines the hourly peaks for each physical partition and region.
-
-1. Change **Container Max RU/s** to `4000` and select **Save**.
-
-    The minimum rises to 400 RU/s. Raising the ceiling raises the floor, which is why a high autoscale maximum increases your baseline cost.
-
-1. Set **Container Max RU/s** back to `1000` and select **Save**.
-
-1. Select **product** and run the following query to confirm the loaded count was 295:
-
-    ```sql
-    SELECT COUNT(1) AS itemCount
-    FROM c
-    ```
-   
-## Set the account default consistency level
-
-The account default applies to every read unless a client or request relaxes it. Set it to **strong** so you can observe the cost difference when you relax it.
-
-1. In the **Settings** menu, select **Default consistency**.
-
-1. Select **Strong**, and then select **Save**.
-
-1. Wait for the change to apply before continuing.
-
-    > [!NOTE]
-    > Strong consistency requires a read from more than one replica to guarantee the latest write. That extra work shows up directly in the request charge you measure next.
-
-## Measure the request charge at each consistency level
-
-Now connect from code and compare the request charge of the same read at strong and eventual consistency.
+## Task 1: Set up the project and install the SDK
 
 ::: zone pivot="csharp"
 
-1. In a terminal, create a console project and add the required packages:
+1. Open a terminal and create a new console project:
 
     ```bash
-    dotnet new console -o throughput-lab
-    cd throughput-lab
+    dotnet new console -n cosmos-connect-exercise
+    cd cosmos-connect-exercise
+    ```
+
+1. Add the Azure Cosmos DB SDK, the Newtonsoft.Json dependency it requires, and the Azure Identity library:
+
+    ```bash
     dotnet add package Microsoft.Azure.Cosmos
-    dotnet add package Newtonsoft.Json
+    dotnet add package Newtonsoft.Json --version 13.0.4
     dotnet add package Azure.Identity
     ```
 
-1. Open the folder in Visual Studio Code and replace the contents of **Program.cs** with the following code. Replace `<cosmos-endpoint>` with the account endpoint the setup script printed:
+1. Open **Program.cs** and replace its contents with the following using directives:
 
     ```csharp
-    using Microsoft.Azure.Cosmos;
     using Azure.Identity;
-
-    string endpoint = "<cosmos-endpoint>";
-
-    CosmosClient client = new(endpoint, new DefaultAzureCredential());
-    Container container = client.GetContainer("cosmicworks", "product");
-
-    string id = "0A7E57DA-C73F-467F-954F-17B7AFD6227E";
-    PartitionKey partitionKey = new("4F34E180-384D-42FC-AC10-FEC30227577F");
-
-    ItemResponse<dynamic> strongResponse =
-        await container.ReadItemAsync<dynamic>(id, partitionKey);
-
-    Console.WriteLine($"STRONG request charge:\t{strongResponse.RequestCharge:0.00} RUs");
+    using Microsoft.Azure.Cosmos;
+    using Microsoft.Azure.Cosmos.Fluent;
     ```
-
-    `DefaultAzureCredential` picks up the identity you signed in with through the Azure CLI, so no key appears in the code. The `RequestCharge` property reports the exact RU cost of the read.
-
-1. Run the application:
-
-    ```bash
-    dotnet run
-    ```
-
-1. Review the output. The charge reflects strong consistency:
-
-    ```output
-    STRONG request charge:  2.00 RUs
-    ```
-
-1. Now relax the consistency level for this single request. Add the following code to the end of **Program.cs**:
-
-    ```csharp
-    ItemRequestOptions options = new()
-    {
-        ConsistencyLevel = ConsistencyLevel.Eventual
-    };
-
-    ItemResponse<dynamic> eventualResponse =
-        await container.ReadItemAsync<dynamic>(id, partitionKey, requestOptions: options);
-
-    Console.WriteLine($"EVENTUAL request charge:\t{eventualResponse.RequestCharge:0.00} RUs");
-    ```
-
-    Passing `ItemRequestOptions` with a weaker `ConsistencyLevel` relaxes this consistency one read below the account default.
-
-1. Run the application again:
-
-    ```bash
-    dotnet run
-    ```
-
-1. Compare the two charges:
-
-    ```output
-    STRONG request charge:    2.00 RUs
-    EVENTUAL request charge:  1.00 RUs
-    ```
-
-    Your exact values might differ slightly, but the strong read costs about twice the eventual one. The eventual read is served from a single replica instead of requiring agreement across replicas. On a read-heavy workload running thousands of operations per second, relaxing the reads that tolerate staleness is a direct and substantial cost reduction.
-
-1. The `ConsistencyLevel` override works in one direction only: setting it above the account default isn't supported. When using this override, set the account default to the strongest level required and relax the other reads instead. The separate preview `ReadConsistencyStrategy` API discussed earlier has different behavior.
 
 ::: zone-end
 
 ::: zone pivot="python"
 
-1. In a terminal, create a project folder and set up a virtual environment:
+1. Create a new directory for the project and open it in your terminal:
 
     ```bash
-    mkdir throughput-lab
-    cd throughput-lab
-    python -m venv .venv
+    mkdir cosmos-connect-exercise
+    cd cosmos-connect-exercise
     ```
 
-1. Activate the environment. On Windows:
-
-    ```powershell
-    .venv\Scripts\activate
-    ```
-
-    On macOS or Linux:
-
-    ```bash
-    source .venv/bin/activate
-    ```
-
-1. Install the required packages:
+1. Install the Azure Cosmos DB SDK and Azure Identity library:
 
     ```bash
     pip install azure-cosmos azure-identity
     ```
 
-1. In the **throughput-lab** folder, alongside the **`.venv`** folder rather than inside it, create a file named **script.py** and add the following code. Replace `<cosmos-endpoint>` with the account endpoint the setup script printed:
+1. Create a new file named **app.py** and add the following imports at the top:
 
     ```python
-    from azure.cosmos import CosmosClient
-    from azure.identity import DefaultAzureCredential
-
-    endpoint = "<cosmos-endpoint>"
-
-    client = CosmosClient(url=endpoint, credential=DefaultAzureCredential())
-    container = client.get_database_client("cosmicworks").get_container_client("product")
-
-    item_id = "0A7E57DA-C73F-467F-954F-17B7AFD6227E"
-    partition_key = "4F34E180-384D-42FC-AC10-FEC30227577F"
-
-    def print_charge(label):
-        def hook(headers, response):
-            print(f"{label} request charge:\t{headers['x-ms-request-charge']} RUs")
-        return hook
-
-    container.read_item(
-        item=item_id,
-        partition_key=partition_key,
-        response_hook=print_charge("STRONG"))
-    ```
-
-    `DefaultAzureCredential` picks up the identity you signed in with through the Azure CLI, so no key appears in the code. The `response_hook` callback receives the response headers, where `x-ms-request-charge` reports the exact RU cost of the read.
-
-1. Run the script:
-
-    ```bash
-    python script.py
-    ```
-
-1. Review the output. The charge reflects strong consistency:
-
-    ```output
-    STRONG request charge:  2 RUs
-    ```
-
-1. Now relax the consistency level. The Python SDK sets consistency at the client level, so create a second client configured for eventual consistency. Add the following code to the end of **script.py**:
-
-    ```python
-    eventual_client = CosmosClient(
-        url=endpoint,
-        credential=DefaultAzureCredential(),
-        consistency_level="Eventual")
-
-    eventual_container = (eventual_client
-        .get_database_client("cosmicworks")
-        .get_container_client("product"))
-
-    eventual_container.read_item(
-        item=item_id,
-        partition_key=partition_key,
-        response_hook=print_charge("EVENTUAL"))
-    ```
-
-    The `consistency_level` argument relaxes every read from this client below the account default.
-
-1. Run the script again:
-
-    ```bash
-    python script.py
-    ```
-
-1. Compare the two charges:
-
-    ```output
-    STRONG request charge:    2 RUs
-    EVENTUAL request charge:  1 RUs
-    ```
-
-    Your exact values might differ slightly, but the strong read costs about twice the eventual one. The eventual read is served from a single replica instead of requiring agreement across replicas. On a read-heavy workload running thousands of operations per second, relaxing the reads that tolerate staleness is a direct and substantial cost reduction.
-
-1. Relaxing works in one direction only. The account default is the strongest level a client can use, so setting `consistency_level` above it isn't supported. When an operation needs a stronger guarantee, raise the account default and relax the other reads instead.
-
-
-1. When you finish testing, deactivate the Python environment:
-
-    ```bash
-    deactivate
+    import logging
+    import sys
+    from azure.cosmos import CosmosClient, exceptions
+    from azure.identity import AzureCliCredential
     ```
 
 ::: zone-end
 
-## Restore the account default consistency
+> [!IMPORTANT]
+> You build up a single file across Tasks 2 through 6. The block that creates the client is marked with `==== CLIENT ====` comments. Type those markers along with the code. Task 6 replaces that block, changes the endpoint, and removes the emulator key. The account read, container access, logging handler, and error handling remain unchanged.
 
-*Strong* consistency roughly doubles the cost of every read, so set the account back to *Session*.
+---
 
-1. Return to the Azure portal and open your Azure Cosmos DB account.
+## Task 2: Start the emulator and read account properties
 
-1. In the **Settings** menu, select **Default consistency**.
+The emulator runs a local Azure Cosmos DB endpoint that costs nothing and needs no connection to Azure. With the default Windows or legacy Linux configuration used here, it listens on `https://localhost:8081/` and accepts the documented well-known key. The code in this task hardcodes those defaults. Custom startup settings can change the endpoint or key.
 
-1. Select **Session**, and then select **Save**.
+A key is the only credential the emulator accepts. Microsoft Entra ID isn't an option against a local endpoint. This exercise should be the only exercise in this course that uses a key and only uses that key in the local emulator. The Azure Cosmos DB Account the setup script created has key authentication disabled outright, and Task 6 switches to `AzureCliCredential` when it connects there.
 
-    Session is the default level for a new account. Wait for the change to apply, then restart any application with an existing SDK client so it picks up the new default. Each new run of the console application or Python script creates a new client.
+1. Start the emulator.
 
-## Configure time to live and observe expiry
+    On Windows, select **Azure Cosmos DB Emulator** from the **Start** menu, or run the executable directly:
 
-Finally, configure automatic data retention on the container.
+    ```powershell
+    & "$env:ProgramFiles\Azure Cosmos DB Emulator\Microsoft.Azure.Cosmos.Emulator.exe"
+    ```
 
-1. Return to the Azure portal and open the **Data Explorer**.
+    If you installed the container image instead, start it with:
 
-1. Expand the **`cosmicworks`** database, select the **`product`** container, and then select **Scale and Settings**.
+    ```bash
+    docker run --publish 8081:8081 --publish 10250-10255:10250-10255 --name cosmos-emulator --detach mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+    ```
 
-1. In the **Settings** tab, find **Time to Live** and select **On (no default)**.
+1. Give the emulator a minute or two to finish starting. It provisions its partitions on first run, and requests fail until that task finishes.
 
-    This setting corresponds to a `DefaultTimeToLive` value of `-1`. It enables the TTL mechanism without expiring existing items, which lets individual items opt in to expiration.
+1. Confirm it's running by opening the **Data Explorer** at `https://localhost:8081/_explorer/index.html`. The Windows emulator opens the web page for you once it's ready. The explorer section is empty for now, and Task 3 uses it to create the database and container.
 
-1. Select **Save**.
+    Leave the emulator running. Tasks 2 through 5 all work against it, and Task 6 switches to the cloud account.
 
-1. Select **Items**, and then select **New Item**. Add an item with a **`ttl`** property set to 60 seconds, and then select **Save**:
+To verify the connection, now point the SDK at that endpoint and read the account properties.
 
-    ```json
+::: zone pivot="csharp"
+
+1. In **Program.cs**, below the using directives, add the emulator connection constants and client initialization:
+
+    ```csharp
+    string endpoint = "https://localhost:8081/";
+    string key = "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
+
+    // ==== CLIENT ==== Task 4 replaces this section. Task 6 replaces it again.
+    CosmosClientOptions options = new()
     {
-      "id": "temp-record-001",
-      "categoryId": "4F34E180-384D-42FC-AC10-FEC30227577F",
-      "name": "Temporary record",
-      "ttl": 60
-    }
+        HttpClientFactory = () =>
+        {
+            var handler = new System.Net.Http.HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            };
+            return new System.Net.Http.HttpClient(handler);
+        },
+        ConnectionMode = ConnectionMode.Gateway
+    };
+
+    CosmosClient client = new(endpoint, key, options);
+    // ==== END CLIENT ====
     ```
 
-1. Select **New SQL Query** under the **product** container and run the following query:
-
-    ```sql
-    SELECT * FROM c WHERE c.id = "temp-record-001"
-    ```
-
-    Initially, the query returns the item you just added.
-
-1. Wait about 90 seconds, then run the query again.
-
-    The service automatically expired the item. The `temp-record-001` item is gone. The `ML Road Pedal` item remains, because it has no **`ttl`** property and the container default is `-1`.
-
-    The pattern for mixed retention in a single container is to enable Time to Live (TTL) on the container, then set `ttl` only on the items that should expire.
-
-1. In the **product** container's **Scale and Settings**, change **Time to Live** back to **Off** and select **Save**.
+    The two constants sit outside the markers because they don't change until Task 6.
 
     > [!WARNING]
-    > Don't set a positive default TTL on the shared product catalog. Expiration is measured from each item's last modification, not from when TTL is enabled. Existing items older than the default TTL can expire immediately.
+    > `DangerousAcceptAnyServerCertificateValidator` disables SSL certificate validation. ***Use this setting only for the local emulator; never use it in production code***. Alternatively, import the emulator certificate as described in [Import the emulator's TLS/SSL certificate](/azure/cosmos-db/how-to-develop-emulator#import-the-emulators-tlsssl-certificate) and omit the custom `HttpClientFactory`.
 
-1. In **Data Explorer**, create a new container named **ttl-demo** in the existing **cosmicworks** database. Use `/categoryId` as the partition key and dedicated autoscale throughput with a maximum of **1,000 RU/s**. If that name already exists, use a new, unused name for this test.
+1. To verify the connection, read account properties. These lines stay in the file for the whole exercise:
 
-1. Open the new container's **Scale and Settings**. Set **Time to Live** to **On**, enter `60` seconds, and select **Save**.
+    ```csharp
+    AccountProperties account = await client.ReadAccountAsync();
+    Console.WriteLine($"Account name:     {account.Id}");
+    Console.WriteLine($"Primary region:   {account.WritableRegions.FirstOrDefault()?.Name}");
+    Console.WriteLine($"Consistency:      {account.Consistency.DefaultConsistencyLevel}");
+    ```
 
-1. In the new container, add this item without a `ttl` property:
+1. Run the project:
 
-    ```json
+    ```bash
+    dotnet run
+    ```
+
+1. Verify that the output shows the emulator account name (typically **localhost**), the primary region, and the consistency level.
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. In **app.py**, below the imports, add the emulator connection constants and client initialization:
+
+    ```python
+    endpoint = "https://localhost:8081/"
+    key = "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
+
+    # ==== CLIENT ==== Task 6 replaces this section.
+    # connection_verify=False bypasses SSL validation for the local emulator only
+    client = CosmosClient(url=endpoint, credential=key, connection_verify=False)
+    # ==== END CLIENT ====
+    ```
+
+    The two constants sit outside the markers because they don't change until Task 6.
+
+    > [!WARNING]
+    > `connection_verify=False` disables SSL certificate validation. ***Use this setting only for the local emulator; never use it in production code***. Alternatively, import the emulator certificate and remove this parameter.
+
+1. To verify the connection, read account properties. Add the `main` function and the call to it at the bottom of the file:
+
+    ```python
+    def main():
+        account = client.get_database_account()
+        # DatabaseAccount exposes PascalCase attributes
+        print(f"Account endpoint: {endpoint}")
+        print(f"Consistency:      {account.ConsistencyPolicy}")
+
+        # ---- Tasks 3 and 5 add their code below this line, inside main() ----
+
+
+    main()
+    ```
+
+    Everything Tasks 3 and 5 add goes below that marker and stays indented four spaces, so it runs inside `main`. The `main()` call stays the last line of the file.
+
+1. Run the script:
+
+    ```bash
+    python app.py
+    ```
+
+1. Verify that the output shows the emulator endpoint and the default consistency policy.
+
+::: zone-end
+
+---
+
+## Task 3: Create the database and container, then reference them in code
+
+The emulator starts empty, so create the `cosmicworks` database and `product` container in its **Data Explorer**. The setup script already created the same pair in your cloud account.
+
+Provisioning stays out of this application on purpose. Creating a database or container requires *control plane* access. Per [Diagnose and troubleshoot forbidden exceptions](/azure/cosmos-db/troubleshoot-forbidden#nondata-operations-arent-allowed), a Microsoft Entra identity with a data-plane role can't create those resources through the data SDK's `create*` or `createIfNotExists` methods. An application can provision them through a management SDK with suitable control-plane permissions. This exercise uses the setup script for cloud provisioning and Data Explorer for local provisioning.
+
+Because the app only ever *references* resources, the code you write here's the code that runs against the cloud account in Task 6, unchanged.
+
+1. Open the emulator's **Data Explorer** at `https://localhost:8081/_explorer/index.html`.
+
+1. Select **New Container** and enter the following, then select **OK**:
+
+    | Setting | Value |
+    | :--- | :--- |
+    | Database ID | **Create new**, `cosmicworks` |
+    | Container ID | `product` |
+    | Partition key | `/categoryId` |
+    | Container throughput | Manual, `400` |
+
+::: zone pivot="csharp"
+
+1. Below the account output, add the following code to reference the database and container:
+
+    ```csharp
+    Database database = client.GetDatabase("cosmicworks");
+    Container container = client.GetContainer("cosmicworks", "product");
+
+    ContainerProperties properties = await container.ReadContainerAsync();
+
+    Console.WriteLine($"Database:         {database.Id}");
+    Console.WriteLine($"Container:        {properties.Id}");
+    ```
+
+    `GetDatabase` and `GetContainer` build client-side references without calling the service. `ReadContainerAsync` is the call that actually reaches the emulator, so it confirms the container you created is there.
+
+1. Run the project again and confirm both names appear in the output.
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. In `main`, below the marker comment you added in Task 2, add the following code. Keep the four-space indentation so the code stays inside `main`:
+
+    ```python
+        database = client.get_database_client("cosmicworks")
+        container = database.get_container_client("product")
+
+        properties = container.read()
+
+        print(f"Database:         {database.id}")
+        print(f"Container:        {properties['id']}")
+    ```
+
+    `get_database_client` and `get_container_client` build client-side references without calling the service. `container.read()` is the call that actually reaches the emulator, so it confirms the container you created is there.
+
+1. Run the script again and confirm both names appear in the output.
+
+::: zone-end
+
+---
+
+## Task 4: Add a logging handler
+
+Add logging so you can see request methods, URIs, status codes, and request-unit charges. The .NET custom handler records requests that pass through its pipeline, not every internal network attempt.
+
+::: zone pivot="csharp"
+
+1. At the **bottom** of **Program.cs**, after all top-level statements, add the following class definition:
+
+    ```csharp
+    public class LogHandler : RequestHandler
     {
-      "id": "temp-record-001",
-      "categoryId": "4F34E180-384D-42FC-AC10-FEC30227577F",
-      "name": "Temporary record"
+        public override async Task<ResponseMessage> SendAsync(
+            RequestMessage request, CancellationToken cancellationToken)
+        {
+            Console.WriteLine($"  [REQ]  {request.Method.Method} {request.RequestUri}");
+            ResponseMessage response = await base.SendAsync(request, cancellationToken);
+            Console.WriteLine($"  [RES]  {(int)response.StatusCode} {response.StatusCode}" +
+                              $"  RU: {response.Headers.RequestCharge:0.00}");
+            return response;
+        }
     }
     ```
 
-    In this disposable container, every item without its own `ttl` expires 60 seconds after its last modification.
+1. Replace everything between the `// ==== CLIENT ====` markers. The builder's fluent methods cover both settings the options object held, so the `CosmosClientOptions` block goes away and the handler gets registered in its place:
 
-1. Run `SELECT * FROM c WHERE c.id = "temp-record-001"` in the new container. Wait about 90 seconds, then run it again. The item no longer appears because it inherits the container's default TTL.
+    ```csharp
+    // ==== CLIENT ==== Task 6 replaces this section.
+    CosmosClient client = new CosmosClientBuilder(endpoint, key)
+        .WithConnectionModeGateway()
+        .WithHttpClientFactory(() =>
+        {
+            var handler = new System.Net.Http.HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            };
+            return new System.Net.Http.HttpClient(handler);
+        })
+        .AddCustomHandlers(new LogHandler())
+        .Build();
+    // ==== END CLIENT ====
+    ```
 
-1. Delete only the disposable **ttl-demo** container, or the alternative name you used, to stop its throughput charges. Keep **product** and the other shared lab containers.
+    Leave the `endpoint` and `key` lines above the marker alone.
 
-1. In **product**, confirm that **Time to Live** is **Off**, the temporary-item query returns no result, and `SELECT VALUE COUNT(1) FROM c` returns 295 before reusing this catalog.
+    > [!NOTE]
+    > `CosmosClientBuilder` is in the `Microsoft.Azure.Cosmos.Fluent` namespace, which is already included in the using directives you added in Task 1.
 
+1. Run the project again. Requests that pass through the custom handler now log their method, URI, final status code, and RU charge to the console. Internal retries and some metadata requests don't produce separate entries in this handler.
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. Between the `# ==== END CLIENT ====` marker and the `def main():` line, configure the `azure.cosmos` logger to `DEBUG`. This code is at the top level of the file, not indented inside `main`:
+
+    ```python
+    logging.basicConfig(
+        stream=sys.stdout,
+        level=logging.DEBUG,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s"
+    )
+    logging.getLogger("azure.cosmos").setLevel(logging.DEBUG)
+    ```
+
+1. Run the script again. The console now shows the HTTP requests the SDK makes, including URIs (Uniform Resource Identifiers), status codes, and headers.
+
+    > [!TIP]
+    > In production, use `logging.WARNING` or `logging.INFO` to reduce verbosity. `logging.DEBUG` is valuable for diagnosing individual operations during development.
+
+::: zone-end
+
+---
+
+## Task 5: Handle a simulated connection error
+
+Attempt to read an item that doesn't exist, then inspect the resulting exception. This exception confirms the difference between transient errors, which are worth retrying, and permanent errors, which need a code fix.
+
+::: zone pivot="csharp"
+
+1. Below the two `Console.WriteLine` lines that print the database and container names, add a `try/catch` block that attempts to read a nonexistent item:
+
+    ```csharp
+    try
+    {
+        var response = await container.ReadItemAsync<dynamic>(
+            id: "nonexistent-id",
+            partitionKey: new PartitionKey("nonexistent-category"));
+    }
+    catch (CosmosException ex)
+    {
+        Console.WriteLine($"\nCaught CosmosException:");
+        Console.WriteLine($"  Status code:    {(int)ex.StatusCode} ({ex.StatusCode})");
+        Console.WriteLine($"  Is retryable:   " +
+            $"{ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
+               ex.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable}");
+    }
+    ```
+
+1. Run the project. The output shows a **404 Not Found** exception. Observe that `Is retryable` prints `False`: a 404 means the item doesn't exist and retrying doesn't help. This exception is the basis of the write-retry pattern covered in the error-handling unit.
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. Below the two `print` lines that show the database and container names, still indented four spaces so it stays inside `main`, add a `try/except` block that attempts to read a nonexistent item:
+
+    ```python
+        try:
+            container.read_item(
+                item="nonexistent-id",
+                partition_key="nonexistent-category"
+            )
+        except exceptions.CosmosResourceNotFoundError as ex:
+            print(f"\nCaught CosmosResourceNotFoundError:")
+            print(f"  Status code:    {ex.status_code}")
+            print(f"  Is retryable:   {ex.status_code in (429, 503)}")
+        except exceptions.CosmosHttpResponseError as ex:
+            print(f"\nCaught CosmosHttpResponseError:")
+            print(f"  Status code:    {ex.status_code}")
+            print(f"  Is retryable:   {ex.status_code in (429, 503)}")
+    ```
+
+1. Run the script. The output shows a **404 Not Found** error. `Is retryable` prints `False`: a missing resource requires a code fix, not a retry.
+
+::: zone-end
+
+---
+
+## Task 6: Point the app at the cloud account
+
+Everything so far ran against the emulator. Now aim the same app at the Azure Cosmos DB account the setup script created.
+
+The connection is the only thing that changes. The account read, the database and container references, the logging handler, and the error handling are all untouched, because none of them care which endpoint they're talking to. This task illustrates the point: an app written against the SDK is portable between a developer's machine and a real account, and swapping targets is a configuration concern rather than a rewrite.
+One detail differs, and it isn't the endpoint. The emulator accepts a key; the cloud account has key authentication disabled, so the client uses `AzureCliCredential` to select your `az login` identity explicitly. Different credential type, same client, same everything after it.
+
+::: zone pivot="csharp"
+
+1. Point `endpoint` at the account the setup script printed, and delete the `key` line. Key-based authentication is disabled for this account:
+
+    ```csharp
+    string endpoint = "<cosmos-endpoint>";
+    ```
+
+1. Replace everything between the `// ==== CLIENT ====` markers with the following code:
+
+    ```csharp
+    // ==== CLIENT ====
+    CosmosClient client = new CosmosClientBuilder(endpoint, new AzureCliCredential())
+        .AddCustomHandlers(new LogHandler())
+        .Build();
+    // ==== END CLIENT ====
+    ```
+
+    `WithConnectionModeGateway` and the certificate bypass are gone. The local example uses gateway mode because its `HttpClientFactory` bypass applies to HTTPS, not direct TCP connections. The legacy emulator also supports direct mode with appropriate certificate trust. The cloud client uses normal certificate verification and defaults to direct mode, which requires the outbound ports described in the connectivity unit. `AddCustomHandlers` stays, so the logging from Task 4 keeps working.
+
+1. Run the project. Nothing below the client changed:
+
+    ```bash
+    dotnet run
+    ```
+
+1. The account name in the output is now your cloud account rather than **localhost**, and the primary region is the one you provisioned into. `ReadContainerAsync` returns the `product` container the setup script created. The 404 from Task 5 still appears, because that item doesn't exist in this account either.
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. Point `endpoint` at the account the setup script printed, and delete the `key` line. Key-based authentication is disabled for this account:
+
+    ```python
+    endpoint = "<cosmos-endpoint>"
+    ```
+
+1. Replace everything between the `# ==== CLIENT ====` markers with the following code:
+
+    ```python
+    # ==== CLIENT ====
+    client = CosmosClient(url=endpoint, credential=AzureCliCredential())
+    # ==== END CLIENT ====
+    ```
+
+    `connection_verify=False` is gone. It existed only because the emulator uses a self-signed certificate.
+
+1. Run the script. Nothing below the client changed:
+
+    ```bash
+    python app.py
+    ```
+
+1. The endpoint in the output is now your cloud account, and `container.read()` returns the `product` container the setup script created. The 404 from Task 5 still appears, because that item doesn't exist in this account either.
+
+::: zone-end
+
+---
 
 ## Clean up resources
 
@@ -415,5 +543,16 @@ If your lab environment provided the resource group, delete only the Azure Cosmo
 az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --yes
 ```
 
-You configured all three cost and performance levers: autoscale throughput sized to bursty traffic, a consistency level relaxed per request where staleness is acceptable, and time to live for automatic retention. The request-charge comparison you measured shows how consistency affects read cost; workload measurements and the billing model guide throughput sizing.
+---
+
+## Summary
+
+In this exercise you:
+
+- Set up an SDK project and installed `Microsoft.Azure.Cosmos` (.NET) or `azure-cosmos` (Python).
+- Connected to the Azure Cosmos DB emulator using the well-known endpoint and key.
+- You created the `cosmicworks` database and `product` container in the emulator's Data Explorer, and referenced them from code.
+- Added a logging handler to observe SDK HTTP traffic and request-unit charges.
+- Caught a `CosmosException` / `CosmosResourceNotFoundError` and distinguished a permanent 404 from transient retryable errors.
+- Pointed the same app at a cloud account by changing the endpoint and client construction and removing the emulator key. The data operations stayed unchanged, while provisioning remained separate from the data-plane application.
 
