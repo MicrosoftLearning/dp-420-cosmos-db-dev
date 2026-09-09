@@ -1,6 +1,6 @@
 TEST LAB....
 
-In this exercise, you set up an Azure Cosmos DB SDK project, connect to the local emulator, validate the connection, add a logging handler to observe SDK traffic, and then point the same app at a cloud account by changing nothing but the connection.
+In this exercise, you build a small data layer against an Azure Cosmos DB for NoSQL container and exercise every operation from this module. You read an item with a point read and compare its cost with the cost of an equivalent query. You then run the full set of write operations. You apply a conditional patch and protect a replace operation with an ETag. You set a time to live (TTL) value to expire an item. You commit a transactional batch. You finish with a bulk load. Throughout, you print the request charge so you can see what each choice costs.
 
 ## Before you start
 
@@ -20,11 +20,7 @@ You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed
 
 ::: zone-end
 
-You also need the **Azure Cosmos DB emulator** installed locally. Follow [Use the Azure Cosmos DB emulator for local development](/azure/cosmos-db/how-to-develop-emulator) to install either the Windows emulator or the legacy Linux container image on an x64 host. These steps use their default endpoint and Data Explorer. The vNext image described in the emulator unit uses a different Data Explorer endpoint. Task 2 starts the emulator.
-
 ## Set up your Azure Cosmos DB resources
-
-Most of this exercise runs against the local emulator. The final task uses the verified core account described below.
 
 The core exercises reuse an account prepared with the `core` profile, not the two-item account from the first portal exercise. Before skipping setup, open **Allfiles/Labs/Shared** in PowerShell, sign in with `az login`, and set `$resourceGroup`, `$location`, and `$accountName` to your recorded values. Run `./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile core` and continue only when it succeeds. In Data Explorer, confirm 295 items in `cosmicworks/product` and 237 in `cosmicworks/productMeta` with `SELECT VALUE COUNT(1) FROM c`.
 
@@ -60,472 +56,1039 @@ If you have no verified core account, follow the setup steps below. To add missi
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab03 -LabProfile core
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab04 -LabProfile core
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab03a7f3k9`.
+    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab04a7f3k9`.
 
 1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
 
-1. Record the **Account name** and **Account endpoint** values the script prints. You need the endpoint in the final task, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
+1. Record the **Account name** and **Account endpoint** values the script prints. You need the endpoint throughout this exercise, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
 
-The script creates the following resources:
+The script creates the following resources, with throughput measured in request units per second (RU/s):
 
 | Resource | Configuration |
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
 | `cosmicworks` database | Holds every container this learning path uses |
-| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, loaded with 295 CosmicWorks products |
+| `operations` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, empty. Tasks 2 through 6 work here |
+| `bulkload` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, empty. Task 7 writes to it |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
-Because key-based authentication is disabled, this exercise doesn't use a cloud account key or connection string. The public emulator key is used only for local development. Every operation against the cloud account uses `AzureCliCredential` to authenticate with the identity from your `az login` session.
+
+Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
 > [!NOTE]
 > A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ---
 
-## Task 1: Set up the project and install the SDK
+## Task 1: Set up the project and connect to the container
+
+Task 5 expires an item with time to live (TTL), so enable it on the container now. Replace <your-account-name> with your actual account name:
+
+```azurecli
+az cosmosdb sql container update `
+    --account-name <your-account-name> `
+    --resource-group $resourceGroup `
+    --database-name cosmicworks `
+    --name operations `
+    --ttl -1
+```
+
+A value of `-1` expires only the items that set their own `ttl`.
 
 ::: zone pivot="csharp"
 
 1. Open a terminal and create a new console project:
 
     ```bash
-    dotnet new console -n cosmos-connect-exercise
-    cd cosmos-connect-exercise
+    dotnet new console -n cosmos-operations-exercise
+    cd cosmos-operations-exercise
     ```
 
-1. Add the Azure Cosmos DB SDK, the Newtonsoft.Json dependency it requires, and the Azure Identity library:
+1. Add the SDK packages:
 
     ```bash
     dotnet add package Microsoft.Azure.Cosmos
-    dotnet add package Newtonsoft.Json --version 13.0.4
+    dotnet add package Newtonsoft.Json
     dotnet add package Azure.Identity
     ```
 
-1. Open **Program.cs** and replace its contents with the following using directives:
+1. Open **Program.cs** and replace its contents with the following code. Set `endpoint` to the account endpoint the setup script printed:
 
     ```csharp
+    using System.Diagnostics;
+    using System.Net;
     using Azure.Identity;
     using Microsoft.Azure.Cosmos;
-    using Microsoft.Azure.Cosmos.Fluent;
+
+    string endpoint = "<cosmos-endpoint>";
+
+    CosmosClient client = new(endpoint, new DefaultAzureCredential());
+    Container container = client.GetContainer("cosmicworks", "operations");
+
+    // ---- Each task replaces everything below this line ----
+
+    Console.WriteLine("Container ready.");
+    ```
+
+    `GetContainer` builds a client-side reference without calling the service, so it needs no control-plane permission.
+
+1. Add a second file named **Models.cs** with the item types:
+
+    ```csharp
+    public record Tag(string id, string name);
+
+    public record Product(
+        string id,
+        string categoryId,
+        string categoryName,
+        string sku,
+        string name,
+        double price,
+        Tag[] tags);
+    ```
+
+    The `Product` record mirrors the cosmicworks product document: `tags` is an array of objects, each with its own `id` and `name`, not an array of strings.
+
+    Keeping the types in their own file leaves **Program.cs** holding nothing but top-level statements, so you can append to the end of it without worrying about declaration order.
+
+    > [!IMPORTANT]
+    > Each task that follows replaces only the code **below the marker comment**. The lines above it, including your endpoint, stay put for the whole exercise. That way every run does only the work of the task you're on, instead of repeating everything before it.
+
+1. Run the project and confirm the output reads `Container ready.`:
+
+    ```bash
+    dotnet run
     ```
 
 ::: zone-end
 
 ::: zone pivot="python"
 
-1. Create a new directory for the project and open it in your terminal:
+1. Open a terminal, create a project folder, and set up a virtual environment:
 
     ```bash
-    mkdir cosmos-connect-exercise
-    cd cosmos-connect-exercise
+    mkdir cosmos-operations-exercise
+    cd cosmos-operations-exercise
+    python -m venv .venv
     ```
 
-1. Install the Azure Cosmos DB SDK and Azure Identity library:
+1. Activate the environment. On Windows:
+
+    ```powershell
+    .venv\Scripts\activate
+    ```
+
+    On macOS or Linux:
+
+    ```bash
+    source .venv/bin/activate
+    ```
+
+1. Install the SDK packages:
 
     ```bash
     pip install azure-cosmos azure-identity
     ```
 
-1. Create a new file named **app.py** and add the following imports at the top:
+1. In the **cosmos-operations-exercise** folder, alongside the **.venv** folder rather than inside it, create a file named **app.py** with the following contents. Set `endpoint` to the account endpoint the setup script printed:
 
     ```python
-    import logging
-    import sys
+    import time
+
+    from azure.core import MatchConditions
     from azure.cosmos import CosmosClient, exceptions
-    from azure.identity import AzureCliCredential
+    from azure.identity import DefaultAzureCredential
+
+    endpoint = "<cosmos-endpoint>"
+
+    client = CosmosClient(url=endpoint, credential=DefaultAzureCredential())
+    container = client.get_database_client("cosmicworks").get_container_client("operations")
+
+    # ---- Each task replaces everything below this line ----
+
+    print("Container ready.")
     ```
 
-::: zone-end
+    `get_container_client` builds a client-side reference without calling the service, so it needs no control-plane permission.
 
-> [!IMPORTANT]
-> You build up a single file across Tasks 2 through 6. The block that creates the client is marked with `==== CLIENT ====` comments. Type those markers along with the code. Task 6 replaces that block, changes the endpoint, and removes the emulator key. The account read, container access, logging handler, and error handling remain unchanged.
+    > [!IMPORTANT]
+    > Each task that follows replaces only the code **below the marker comment**. The lines above it, including your endpoint, stay put for the whole exercise. That way every run does only the work of the task you're on, instead of repeating everything before it.
 
----
-
-## Task 2: Start the emulator and read account properties
-
-The emulator runs a local Azure Cosmos DB endpoint that costs nothing and needs no connection to Azure. With the default Windows or legacy Linux configuration used here, it listens on `https://localhost:8081/` and accepts the documented well-known key. The code in this task hardcodes those defaults. Custom startup settings can change the endpoint or key.
-
-A key is the only credential the emulator accepts. Microsoft Entra ID isn't an option against a local endpoint. This exercise should be the only exercise in this course that uses a key and only uses that key in the local emulator. The Azure Cosmos DB Account the setup script created has key authentication disabled outright, and Task 6 switches to `AzureCliCredential` when it connects there.
-
-1. Start the emulator.
-
-    On Windows, select **Azure Cosmos DB Emulator** from the **Start** menu, or run the executable directly:
-
-    ```powershell
-    & "$env:ProgramFiles\Azure Cosmos DB Emulator\Microsoft.Azure.Cosmos.Emulator.exe"
-    ```
-
-    If you installed the container image instead, start it with:
-
-    ```bash
-    docker run --publish 8081:8081 --publish 10250-10255:10250-10255 --name cosmos-emulator --detach mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
-    ```
-
-1. Give the emulator a minute or two to finish starting. It provisions its partitions on first run, and requests fail until that task finishes.
-
-1. Confirm it's running by opening the **Data Explorer** at `https://localhost:8081/_explorer/index.html`. The Windows emulator opens the web page for you once it's ready. The explorer section is empty for now, and Task 3 uses it to create the database and container.
-
-    Leave the emulator running. Tasks 2 through 5 all work against it, and Task 6 switches to the cloud account.
-
-To verify the connection, now point the SDK at that endpoint and read the account properties.
-
-::: zone pivot="csharp"
-
-1. In **Program.cs**, below the using directives, add the emulator connection constants and client initialization:
-
-    ```csharp
-    string endpoint = "https://localhost:8081/";
-    string key = "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
-
-    // ==== CLIENT ==== Task 4 replaces this section. Task 6 replaces it again.
-    CosmosClientOptions options = new()
-    {
-        HttpClientFactory = () =>
-        {
-            var handler = new System.Net.Http.HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback =
-                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            };
-            return new System.Net.Http.HttpClient(handler);
-        },
-        ConnectionMode = ConnectionMode.Gateway
-    };
-
-    CosmosClient client = new(endpoint, key, options);
-    // ==== END CLIENT ====
-    ```
-
-    The two constants sit outside the markers because they don't change until Task 6.
-
-    > [!WARNING]
-    > `DangerousAcceptAnyServerCertificateValidator` disables SSL certificate validation. ***Use this setting only for the local emulator; never use it in production code***. Alternatively, import the emulator certificate as described in [Import the emulator's TLS/SSL certificate](/azure/cosmos-db/how-to-develop-emulator#import-the-emulators-tlsssl-certificate) and omit the custom `HttpClientFactory`.
-
-1. To verify the connection, read account properties. These lines stay in the file for the whole exercise:
-
-    ```csharp
-    AccountProperties account = await client.ReadAccountAsync();
-    Console.WriteLine($"Account name:     {account.Id}");
-    Console.WriteLine($"Primary region:   {account.WritableRegions.FirstOrDefault()?.Name}");
-    Console.WriteLine($"Consistency:      {account.Consistency.DefaultConsistencyLevel}");
-    ```
-
-1. Run the project:
-
-    ```bash
-    dotnet run
-    ```
-
-1. Verify that the output shows the emulator account name (typically **localhost**), the primary region, and the consistency level.
-
-::: zone-end
-
-::: zone pivot="python"
-
-1. In **app.py**, below the imports, add the emulator connection constants and client initialization:
-
-    ```python
-    endpoint = "https://localhost:8081/"
-    key = "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
-
-    # ==== CLIENT ==== Task 6 replaces this section.
-    # connection_verify=False bypasses SSL validation for the local emulator only
-    client = CosmosClient(url=endpoint, credential=key, connection_verify=False)
-    # ==== END CLIENT ====
-    ```
-
-    The two constants sit outside the markers because they don't change until Task 6.
-
-    > [!WARNING]
-    > `connection_verify=False` disables SSL certificate validation. ***Use this setting only for the local emulator; never use it in production code***. Alternatively, import the emulator certificate and remove this parameter.
-
-1. To verify the connection, read account properties. Add the `main` function and the call to it at the bottom of the file:
-
-    ```python
-    def main():
-        account = client.get_database_account()
-        # DatabaseAccount exposes PascalCase attributes
-        print(f"Account endpoint: {endpoint}")
-        print(f"Consistency:      {account.ConsistencyPolicy}")
-
-        # ---- Tasks 3 and 5 add their code below this line, inside main() ----
-
-
-    main()
-    ```
-
-    Everything Tasks 3 and 5 add goes below that marker and stays indented four spaces, so it runs inside `main`. The `main()` call stays the last line of the file.
-
-1. Run the script:
+1. Run the script and confirm the output reads `Container ready.`:
 
     ```bash
     python app.py
     ```
 
-1. Verify that the output shows the emulator endpoint and the default consistency policy.
-
 ::: zone-end
 
 ---
 
-## Task 3: Create the database and container, then reference them in code
+## Task 2: Compare a point read against a query
 
-The emulator starts empty, so create the `cosmicworks` database and `product` container in its **Data Explorer**. The setup script already created the same pair in your cloud account.
-
-Provisioning stays out of this application on purpose. Creating a database or container requires *control plane* access. Per [Diagnose and troubleshoot forbidden exceptions](/azure/cosmos-db/troubleshoot-forbidden#nondata-operations-arent-allowed), a Microsoft Entra identity with a data-plane role can't create those resources through the data SDK's `create*` or `createIfNotExists` methods. An application can provision them through a management SDK with suitable control-plane permissions. This exercise uses the setup script for cloud provisioning and Data Explorer for local provisioning.
-
-Because the app only ever *references* resources, the code you write here's the code that runs against the cloud account in Task 6, unchanged.
-
-1. Open the emulator's **Data Explorer** at `https://localhost:8081/_explorer/index.html`.
-
-1. Select **New Container** and enter the following, then select **OK**:
-
-    | Setting | Value |
-    | :--- | :--- |
-    | Database ID | **Create new**, `cosmicworks` |
-    | Container ID | `product` |
-    | Partition key | `/categoryId` |
-    | Container throughput | Manual, `400` |
+Create one item, then read it back two ways and compare the request charge.
 
 ::: zone pivot="csharp"
 
-1. Below the account output, add the following code to reference the database and container:
+1. In **Program.cs**, replace everything below the marker comment with the following code. It creates the saddle item that the rest of this exercise works with:
 
     ```csharp
-    Database database = client.GetDatabase("cosmicworks");
-    Container container = client.GetContainer("cosmicworks", "product");
+    string id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71";
+    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
+    PartitionKey partitionKey = new(categoryId);
 
-    ContainerProperties properties = await container.ReadContainerAsync();
-
-    Console.WriteLine($"Database:         {database.Id}");
-    Console.WriteLine($"Container:        {properties.Id}");
-    ```
-
-    `GetDatabase` and `GetContainer` build client-side references without calling the service. `ReadContainerAsync` is the call that actually reaches the emulator, so it confirms the container you created is there.
-
-1. Run the project again and confirm both names appear in the output.
-
-::: zone-end
-
-::: zone pivot="python"
-
-1. In `main`, below the marker comment you added in Task 2, add the following code. Keep the four-space indentation so the code stays inside `main`:
-
-    ```python
-        database = client.get_database_client("cosmicworks")
-        container = database.get_container_client("product")
-
-        properties = container.read()
-
-        print(f"Database:         {database.id}")
-        print(f"Container:        {properties['id']}")
-    ```
-
-    `get_database_client` and `get_container_client` build client-side references without calling the service. `container.read()` is the call that actually reaches the emulator, so it confirms the container you created is there.
-
-1. Run the script again and confirm both names appear in the output.
-
-::: zone-end
-
----
-
-## Task 4: Add a logging handler
-
-Add logging so you can see request methods, URIs, status codes, and request-unit charges. The .NET custom handler records requests that pass through its pipeline, not every internal network attempt.
-
-::: zone pivot="csharp"
-
-1. At the **bottom** of **Program.cs**, after all top-level statements, add the following class definition:
-
-    ```csharp
-    public class LogHandler : RequestHandler
-    {
-        public override async Task<ResponseMessage> SendAsync(
-            RequestMessage request, CancellationToken cancellationToken)
+    Product saddle = new(
+        id,
+        categoryId,
+        "Components, Saddles",
+        "SE-R581",
+        "LL Road Seat/Saddle",
+        27.12d,
+        new[]
         {
-            Console.WriteLine($"  [REQ]  {request.Method.Method} {request.RequestUri}");
-            ResponseMessage response = await base.SendAsync(request, cancellationToken);
-            Console.WriteLine($"  [RES]  {(int)response.StatusCode} {response.StatusCode}" +
-                              $"  RU: {response.Headers.RequestCharge:0.00}");
-            return response;
-        }
+            new Tag("0573D684-9140-4DEE-89AF-4E4A90E65666", "Tag-113"),
+            new Tag("6C2F05C8-1E61-4912-BE1A-C67A378429BB", "Tag-5")
+        });
+
+    try
+    {
+        await container.CreateItemAsync(saddle, partitionKey);
+        Console.WriteLine("Create:      item created");
+    }
+    catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+    {
+        Console.WriteLine("Create:      item already exists");
     }
     ```
 
-1. Replace everything between the `// ==== CLIENT ====` markers. The builder's fluent methods cover both settings the options object held, so the `CosmosClientOptions` block goes away and the handler gets registered in its place:
+1. Add the point read and print its charge:
 
     ```csharp
-    // ==== CLIENT ==== Task 6 replaces this section.
-    CosmosClient client = new CosmosClientBuilder(endpoint, key)
-        .WithConnectionModeGateway()
-        .WithHttpClientFactory(() =>
-        {
-            var handler = new System.Net.Http.HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback =
-                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            };
-            return new System.Net.Http.HttpClient(handler);
-        })
-        .AddCustomHandlers(new LogHandler())
-        .Build();
-    // ==== END CLIENT ====
+    ItemResponse<Product> readResponse = await container.ReadItemAsync<Product>(id, partitionKey);
+    Console.WriteLine($"Point read:  {readResponse.RequestCharge:0.00} RU");
     ```
 
-    Leave the `endpoint` and `key` lines above the marker alone.
+1. Add an equivalent query that filters on the same two values:
 
-    > [!NOTE]
-    > `CosmosClientBuilder` is in the `Microsoft.Azure.Cosmos.Fluent` namespace, which is already included in the using directives you added in Task 1.
+    ```csharp
+    QueryDefinition query = new QueryDefinition(
+            "SELECT * FROM c WHERE c.id = @id AND c.categoryId = @categoryId")
+        .WithParameter("@id", id)
+        .WithParameter("@categoryId", categoryId);
 
-1. Run the project again. Requests that pass through the custom handler now log their method, URI, final status code, and RU charge to the console. Internal retries and some metadata requests don't produce separate entries in this handler.
+    double queryCharge = 0;
+    using FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(
+        query,
+        requestOptions: new QueryRequestOptions { PartitionKey = partitionKey });
+
+    while (iterator.HasMoreResults)
+    {
+        FeedResponse<Product> page = await iterator.ReadNextAsync();
+        queryCharge += page.RequestCharge;
+    }
+
+    Console.WriteLine($"Query:       {queryCharge:0.00} RU");
+    ```
+
+1. Run the project and compare the two read charges:
+
+    ```bash
+    dotnet run
+    ```
+
+    ```output
+    Create:      item created
+    Point read:  1.00 RU
+    Query:       2.92 RU
+    ```
 
 ::: zone-end
 
 ::: zone pivot="python"
 
-1. Between the `# ==== END CLIENT ====` marker and the `def main():` line, configure the `azure.cosmos` logger to `DEBUG`. This code is at the top level of the file, not indented inside `main`:
+1. In **app.py**, replace everything below the marker comment with the following code. It creates the saddle item that the rest of this exercise works with:
 
     ```python
-    logging.basicConfig(
-        stream=sys.stdout,
-        level=logging.DEBUG,
-        format="%(asctime)s %(name)s %(levelname)s %(message)s"
-    )
-    logging.getLogger("azure.cosmos").setLevel(logging.DEBUG)
+    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    saddle = {
+        "id": item_id,
+        "categoryId": category_id,
+        "categoryName": "Components, Saddles",
+        "sku": "SE-R581",
+        "name": "LL Road Seat/Saddle",
+        "price": 27.12,
+        "tags": [
+            {"id": "0573D684-9140-4DEE-89AF-4E4A90E65666", "name": "Tag-113"},
+            {"id": "6C2F05C8-1E61-4912-BE1A-C67A378429BB", "name": "Tag-5"},
+        ],
+    }
+
+    try:
+        container.create_item(body=saddle)
+        print("Create:      item created")
+    except exceptions.CosmosResourceExistsError:
+        print("Create:      item already exists")
     ```
 
-1. Run the script again. The console now shows the HTTP requests the SDK makes, including URIs (Uniform Resource Identifiers), status codes, and headers.
+1. Add the point read and print its charge:
 
-    > [!TIP]
-    > In production, use `logging.WARNING` or `logging.INFO` to reduce verbosity. `logging.DEBUG` is valuable for diagnosing individual operations during development.
+    ```python
+    read_item = container.read_item(item=item_id, partition_key=category_id)
+    print(f"Point read:  {read_item.get_response_headers()['x-ms-request-charge']} RU")
+    ```
+
+1. Add an equivalent query that filters on the same two values. A `response_hook` captures the charge from each page of results:
+
+    ```python
+    query_charge = 0.0
+
+    def capture_charge(headers, results):
+        global query_charge
+        query_charge += float(headers["x-ms-request-charge"])
+
+    results = list(container.query_items(
+        query="SELECT * FROM c WHERE c.id = @id AND c.categoryId = @categoryId",
+        parameters=[
+            {"name": "@id", "value": item_id},
+            {"name": "@categoryId", "value": category_id},
+        ],
+        partition_key=category_id,
+        response_hook=capture_charge,
+    ))
+
+    print(f"Query:       {query_charge:.2f} RU")
+    ```
+
+1. Run the script and compare the two read charges:
+
+    ```bash
+    python app.py
+    ```
+
+    ```output
+    Create:      item created
+    Point read:  1.00 RU
+    Query:       2.92 RU
+    ```
 
 ::: zone-end
 
+A point read costs about 1 request unit (RU). Fetching the same item by query costs two to three times as much, because it goes through the query engine. Use a point read whenever your code already knows the `id` and the partition key.
+
 ---
 
-## Task 5: Handle a simulated connection error
+## Task 3: Run the write operations
 
-Attempt to read an item that doesn't exist, then inspect the resulting exception. This exception confirms the difference between transient errors, which are worth retrying, and permanent errors, which need a code fix.
+Replace, upsert, and delete the item, then recreate it for the tasks that follow.
 
 ::: zone pivot="csharp"
 
-1. Below the two `Console.WriteLine` lines that print the database and container names, add a `try/catch` block that attempts to read a nonexistent item:
+1. In **Program.cs**, replace everything below the marker comment with the following code. It reads the item created in Task 2 and replaces it with a new price:
+
+    ```csharp
+    string id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71";
+    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
+    PartitionKey partitionKey = new(categoryId);
+
+    Product saddle = await container.ReadItemAsync<Product>(id, partitionKey);
+
+    Product updated = saddle with { price = 32.55d };
+
+    ItemResponse<Product> replaced = await container.ReplaceItemAsync(updated, id, partitionKey);
+    Console.WriteLine($"Replace:     {replaced.RequestCharge:0.00} RU");
+    ```
+
+    `ReplaceItemAsync` takes the `id` as a separate argument, and it fails with 404 if the item no longer exists.
+
+1. Add an upsert that suppresses the response payload:
+
+    ```csharp
+    ItemRequestOptions noContent = new() { EnableContentResponseOnWrite = false };
+
+    ItemResponse<Product> upserted = await container.UpsertItemAsync(
+        updated with { price = 30.00d }, partitionKey, noContent);
+
+    Console.WriteLine($"Upsert:      {upserted.RequestCharge:0.00} RU (no payload returned)");
+    ```
+
+1. Add a delete, then recreate the item so later tasks have something to work with:
+
+    ```csharp
+    ItemResponse<Product> deleted = await container.DeleteItemAsync<Product>(id, partitionKey);
+    Console.WriteLine($"Delete:      {deleted.RequestCharge:0.00} RU");
+
+    await container.CreateItemAsync(saddle, partitionKey);
+    ```
+
+1. Run the project and compare the write charges against the read charges from Task 2:
+
+    ```output
+    Replace:     10.67 RU
+    Upsert:      10.67 RU (no payload returned)
+    Delete:      9.52 RU
+    ```
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. In **app.py**, replace everything below the marker comment with the following code. It reads the item created in Task 2 and replaces it with a new price:
+
+    ```python
+    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    saddle = container.read_item(item=item_id, partition_key=category_id)
+
+    saddle["price"] = 32.55
+
+    replaced = container.replace_item(item=item_id, body=saddle)
+    print(f"Replace:     {replaced.get_response_headers()['x-ms-request-charge']} RU")
+    ```
+
+    `replace_item` raises `CosmosResourceNotFoundError` if the item no longer exists.
+
+1. Add an upsert that suppresses the response payload:
+
+    ```python
+    saddle["price"] = 30.00
+
+    upserted = container.upsert_item(body=saddle, no_response=True)
+    charge = upserted.get_response_headers()["x-ms-request-charge"]
+    print(f"Upsert:      {charge} RU (no payload returned)")
+    ```
+
+    With `no_response=True`, the returned `CosmosDict` is empty, but it still carries the response headers, so the charge is still there to read.
+
+1. Add a delete, then recreate the item so later tasks have something to work with:
+
+    ```python
+    container.delete_item(item=item_id, partition_key=category_id)
+    charge = container.client_connection.last_response_headers["x-ms-request-charge"]
+    print(f"Delete:      {charge} RU")
+
+    saddle["price"] = 27.12
+    container.create_item(body=saddle)
+    ```
+
+1. Run the script and compare the write charges against the read charges from Task 2:
+
+    ```output
+    Replace:     10.67 RU
+    Upsert:      10.67 RU (no payload returned)
+    Delete:      9.52 RU
+    ```
+
+::: zone-end
+
+A write costs several times a point read, because the charge covers the document itself plus every index term the container's indexing policy maintains. The replace is the most expensive of the three: it deletes the existing document and inserts the new one, paying the document cost twice, while the delete pays it once. Request charges are deterministic for a given operation over a given dataset, so rerunning the project reproduces these numbers, though your values depend on item size and the container's indexing policy. Suppressing the response payload saves network bandwidth, not request units, which is why the replace and the upsert cost the same.
+
+---
+
+## Task 4: Apply a conditional patch and guard a replace with an ETag
+
+Change one property without rewriting the whole document, and make that change conditional. Patch and replace express a condition differently: a patch uses a filter predicate, and a replace uses an ETag. You use both here.
+
+::: zone pivot="csharp"
+
+1. In **Program.cs**, replace everything below the marker comment with the following code. It patches two properties, guarded by a filter predicate that tests the current price:
+
+    ```csharp
+    string id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71";
+    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
+    PartitionKey partitionKey = new(categoryId);
+
+    PatchItemRequestOptions patchOptions = new()
+    {
+        FilterPredicate = "FROM c WHERE c.price < 100"
+    };
+
+    try
+    {
+        ItemResponse<Product> patched = await container.PatchItemAsync<Product>(
+            id: id,
+            partitionKey: partitionKey,
+            patchOperations: new[]
+            {
+                PatchOperation.Set("/name", "LL Road Seat/Saddle, Clearance"),
+                PatchOperation.Increment("/price", 5.00)
+            },
+            requestOptions: patchOptions);
+
+        Console.WriteLine($"Patch:       {patched.RequestCharge:0.00} RU");
+    }
+    catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
+    {
+        Console.WriteLine("Patch:       412 Precondition Failed");
+    }
+    ```
+
+1. Run the project. The predicate holds, so the patch succeeds and the price is now 32.12. Record its request charge alongside the replace charge from Task 3. Patch doesn't guarantee a lower write charge; its benefits include a smaller request payload and avoiding a preceding read when the changes are already known.
+
+1. Now force the condition to fail. Append the following code to the end of **Program.cs**. It uses a predicate the item no longer satisfies:
 
     ```csharp
     try
     {
-        var response = await container.ReadItemAsync<dynamic>(
-            id: "nonexistent-id",
-            partitionKey: new PartitionKey("nonexistent-category"));
+        await container.PatchItemAsync<Product>(
+            id: id,
+            partitionKey: partitionKey,
+            patchOperations: new[] { PatchOperation.Increment("/price", 5.00) },
+            requestOptions: new PatchItemRequestOptions
+            {
+                FilterPredicate = "FROM c WHERE c.price < 30"
+            });
+
+        Console.WriteLine("Failed patch: unexpectedly succeeded");
     }
-    catch (CosmosException ex)
+    catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
     {
-        Console.WriteLine($"\nCaught CosmosException:");
-        Console.WriteLine($"  Status code:    {(int)ex.StatusCode} ({ex.StatusCode})");
-        Console.WriteLine($"  Is retryable:   " +
-            $"{ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
-               ex.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable}");
+        Console.WriteLine("Failed patch: 412 Precondition Failed, as expected");
     }
     ```
 
-1. Run the project. The output shows a **404 Not Found** exception. Observe that `Is retryable` prints `False`: a 404 means the item doesn't exist and retrying doesn't help. This exception is the basis of the write-retry pattern covered in the error-handling unit.
+1. Now guard a replace with an ETag instead. Append the following code to the end of **Program.cs**. It reads the item, keeps its ETag, and writes with that ETag attached:
+
+    ```csharp
+    ItemResponse<Product> current = await container.ReadItemAsync<Product>(id, partitionKey);
+    ItemRequestOptions etagOptions = new() { IfMatchEtag = current.ETag };
+
+    await container.ReplaceItemAsync(
+        current.Resource with { price = 45.00d }, id, partitionKey, etagOptions);
+
+    Console.WriteLine("Replace:     succeeded with a current ETag");
+    ```
+
+1. Reuse the same, now stale, ETag on a second replace:
+
+    ```csharp
+    try
+    {
+        await container.ReplaceItemAsync(
+            current.Resource with { price = 50.00d }, id, partitionKey, etagOptions);
+
+        Console.WriteLine("Stale replace: unexpectedly succeeded");
+    }
+    catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
+    {
+        Console.WriteLine("Stale replace: 412 Precondition Failed, as expected");
+    }
+    ```
+
+1. Run the project. The first replace succeeds and changes the item's ETag, so the second one fails.
 
 ::: zone-end
 
 ::: zone pivot="python"
 
-1. Below the two `print` lines that show the database and container names, still indented four spaces so it stays inside `main`, add a `try/except` block that attempts to read a nonexistent item:
+1. In **app.py**, replace everything below the marker comment with the following code. It patches two properties, guarded by a filter predicate that tests the current price:
 
     ```python
-        try:
-            container.read_item(
-                item="nonexistent-id",
-                partition_key="nonexistent-category"
-            )
-        except exceptions.CosmosResourceNotFoundError as ex:
-            print(f"\nCaught CosmosResourceNotFoundError:")
-            print(f"  Status code:    {ex.status_code}")
-            print(f"  Is retryable:   {ex.status_code in (429, 503)}")
-        except exceptions.CosmosHttpResponseError as ex:
-            print(f"\nCaught CosmosHttpResponseError:")
-            print(f"  Status code:    {ex.status_code}")
-            print(f"  Is retryable:   {ex.status_code in (429, 503)}")
+    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    try:
+        patched = container.patch_item(
+            item=item_id,
+            partition_key=category_id,
+            patch_operations=[
+                {"op": "set", "path": "/name", "value": "LL Road Seat/Saddle, Clearance"},
+                {"op": "incr", "path": "/price", "value": 5.00},
+            ],
+            filter_predicate="FROM c WHERE c.price < 100",
+        )
+        print(f"Patch:       {patched.get_response_headers()['x-ms-request-charge']} RU")
+    except exceptions.CosmosAccessConditionFailedError:
+        print("Patch:       412 Precondition Failed")
     ```
 
-1. Run the script. The output shows a **404 Not Found** error. `Is retryable` prints `False`: a missing resource requires a code fix, not a retry.
+1. Run the script. The predicate holds, so the patch succeeds and the price is now 32.12. Record its request charge alongside the replace charge from Task 3. Patch doesn't guarantee a lower write charge; its benefits include a smaller request payload and avoiding a preceding read when the changes are already known.
+
+1. Now force the condition to fail. Append the following code, which uses a predicate the item no longer satisfies:
+
+    ```python
+    try:
+        container.patch_item(
+            item=item_id,
+            partition_key=category_id,
+            patch_operations=[{"op": "incr", "path": "/price", "value": 5.00}],
+            filter_predicate="FROM c WHERE c.price < 30",
+        )
+        print("Failed patch: unexpectedly succeeded")
+    except exceptions.CosmosAccessConditionFailedError:
+        print("Failed patch: 412 Precondition Failed, as expected")
+    ```
+
+1. Now guard a replace with an ETag instead. Append the following code, which reads the item, keeps its ETag, and writes with that ETag attached:
+
+    ```python
+    current = container.read_item(item=item_id, partition_key=category_id)
+    etag = current["_etag"]
+
+    current["price"] = 45.00
+    container.replace_item(
+        item=item_id,
+        body=current,
+        etag=etag,
+        match_condition=MatchConditions.IfNotModified,
+    )
+
+    print("Replace:     succeeded with a current ETag")
+    ```
+
+1. Reuse the same, now stale, ETag on a second replace:
+
+    ```python
+    try:
+        current["price"] = 50.00
+        container.replace_item(
+            item=item_id,
+            body=current,
+            etag=etag,
+            match_condition=MatchConditions.IfNotModified,
+        )
+        print("Stale replace: unexpectedly succeeded")
+    except exceptions.CosmosAccessConditionFailedError:
+        print("Stale replace: 412 Precondition Failed, as expected")
+    ```
+
+1. Run the script. The first replace succeeds and changes the item's ETag, so the second one fails.
+
+::: zone-end
+
+This exercise conditions the patch with a filter predicate and the replace with an ETag. The .NET standalone `PatchItemAsync` method doesn't support `IfMatchEtag`, so don't substitute that option for the patch predicate. A replace supports an ETag precondition, but not a filter predicate. Both conditions demonstrated here reject a conflicting write with 412 Precondition Failed. Re-read the item and decide whether to reapply the change. Patch operations inside a transactional batch have separate request options; don't infer their behavior from the standalone method.
+
+---
+
+## Task 5: Expire an item with time to live
+
+Write a transient item, give it a short lifetime, and watch it disappear.
+
+::: zone pivot="csharp"
+
+1. In **Program.cs**, replace everything below the marker comment with the following code. It creates a session item with a 30-second lifetime:
+
+    ```csharp
+    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
+    PartitionKey partitionKey = new(categoryId);
+
+    var session = new
+    {
+        id = "session-9f21",
+        categoryId = categoryId,
+        state = "active",
+        ttl = 30
+    };
+
+    await container.UpsertItemAsync(session, partitionKey);
+    Console.WriteLine("Session created with a 30 second TTL.");
+    ```
+
+    Using an upsert rather than a create lets you rerun the task without a conflict.
+
+1. Add two reads, one before the lifetime elapses and one after, so you can see the item disappear rather than find it missing:
+
+    ```csharp
+    async Task ReadSession(string label)
+    {
+        try
+        {
+            await container.ReadItemAsync<dynamic>("session-9f21", partitionKey);
+            Console.WriteLine($"{label} session still present");
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            Console.WriteLine($"{label} session expired");
+        }
+    }
+
+    await Task.Delay(TimeSpan.FromSeconds(10));
+    await ReadSession("After 10s:");
+
+    await Task.Delay(TimeSpan.FromSeconds(25));
+    await ReadSession("After 35s:");
+    ```
+
+    To leave a margin, the second read lands at 35 seconds rather than exactly 30. An expired item stops appearing in results as soon as its lifetime elapses, even though the physical delete happens later, as a background task.
+
+1. Run the project. The first read succeeds and the second returns 404:
+
+    ```output
+    Session created with a 30 second TTL.
+    After 10s: session still present
+    After 35s: session expired
+    ```
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. In **app.py**, replace everything below the marker comment with the following code. It creates a session item with a 30-second lifetime:
+
+    ```python
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    container.upsert_item(body={
+        "id": "session-9f21",
+        "categoryId": category_id,
+        "state": "active",
+        "ttl": 30,
+    })
+    print("Session created with a 30 second TTL.")
+    ```
+
+    Using an upsert rather than a create lets you rerun the task without a conflict.
+
+1. Add two reads, one before the lifetime elapses and one after, so you can see the item disappear rather than find it missing:
+
+    ```python
+    def read_session(label):
+        try:
+            container.read_item(item="session-9f21", partition_key=category_id)
+            print(f"{label} session still present")
+        except exceptions.CosmosResourceNotFoundError:
+            print(f"{label} session expired")
+
+    time.sleep(10)
+    read_session("After 10s:")
+
+    time.sleep(25)
+    read_session("After 35s:")
+    ```
+
+    To leave a margin, the second read lands at 35 seconds rather than exactly 30. An expired item stops appearing in results as soon as its lifetime elapses, even though the physical delete happens later, as a background task.
+
+1. Run the script. The first read succeeds and the second raises a not-found error:
+
+    ```output
+    Session created with a 30 second TTL.
+    After 10s: session still present
+    After 35s: session expired
+    ```
+
+::: zone-end
+
+A container TTL of `-1` turns on expiration without giving anything a default lifetime. Only items that set their own `ttl` expire: the session item did, and the product item from Task 2 didn't.
+
+---
+
+## Task 6: Commit a transactional batch
+
+To see how the failure reports itself, write two related items atomically, then break the same-partition rule on purpose.
+
+::: zone pivot="csharp"
+
+1. In **Program.cs**, replace everything below the marker comment with the following code. Both items share the partition key value used throughout this exercise:
+
+    ```csharp
+    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
+    PartitionKey partitionKey = new(categoryId);
+
+    Product mountainSaddle = new(
+        "201D0D79-81AD-43D2-AD6E-F09EEE6AC2D7", categoryId,
+        "Components, Saddles", "SE-M798", "ML Mountain Seat/Saddle", 39.14d, Array.Empty<Tag>());
+
+    Product touringSaddle = new(
+        "3FE1A99E-DE14-4D11-B635-F5D39258A0B9", categoryId,
+        "Components, Saddles", "SE-T924", "HL Touring Seat/Saddle", 52.64d, Array.Empty<Tag>());
+
+    TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
+        .UpsertItem(mountainSaddle)
+        .UpsertItem(touringSaddle);
+
+    using TransactionalBatchResponse batchResponse = await batch.ExecuteAsync();
+
+    Console.WriteLine($"Batch:       {batchResponse.StatusCode} ({batchResponse.RequestCharge:0.00} RU)");
+    ```
+
+    The batch upserts rather than creates, so rerunning the task doesn't fail on items that already exist.
+
+1. Run the project. The status is `OK`, and both items exist in the container.
+
+1. Now build a batch that mixes partition key values. Append the following code to the end of **Program.cs**:
+
+    ```csharp
+    Product llMountainSaddle = new(
+        "5996B5E0-6EC7-4CB7-A924-7B5A053AE980", categoryId,
+        "Components, Saddles", "SE-M236", "LL Mountain Seat/Saddle", 27.12d, Array.Empty<Tag>());
+
+    Product helmet = new(
+        "47ED1C3B-C205-4507-94EE-3B69A744B261", "14A1AD5D-59EA-4B63-A189-67B077783B0E",
+        "Accessories, Helmets", "HL-U509", "Sport-100 Helmet, Black", 34.99d, Array.Empty<Tag>());
+
+    TransactionalBatch badBatch = container.CreateTransactionalBatch(partitionKey)
+        .CreateItem(llMountainSaddle)
+        .CreateItem(helmet);
+
+    using TransactionalBatchResponse badResponse = await badBatch.ExecuteAsync();
+
+    for (int i = 0; i < badResponse.Count; i++)
+    {
+        Console.WriteLine($"  Operation {i}: {(int)badResponse[i].StatusCode}");
+    }
+    ```
+
+1. Run the project. The batch fails. One operation reports the real error, and the other reports **424 Failed Dependency**, which means it was rolled back rather than rejected on its own merits. Confirm in the Azure portal's **Data Explorer** that neither item was written.
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. In **app.py**, replace everything below the marker comment with the following code. Both items share the partition key value used throughout this exercise:
+
+    ```python
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    batch_operations = [
+        ("upsert", ({"id": "201D0D79-81AD-43D2-AD6E-F09EEE6AC2D7", "categoryId": category_id,
+                     "categoryName": "Components, Saddles", "sku": "SE-M798",
+                     "name": "ML Mountain Seat/Saddle", "price": 39.14, "tags": []},)),
+        ("upsert", ({"id": "3FE1A99E-DE14-4D11-B635-F5D39258A0B9", "categoryId": category_id,
+                     "categoryName": "Components, Saddles", "sku": "SE-T924",
+                     "name": "HL Touring Seat/Saddle", "price": 52.64, "tags": []},)),
+    ]
+
+    batch_response = container.execute_item_batch(
+        batch_operations=batch_operations,
+        partition_key=category_id,
+    )
+
+    for index, result in enumerate(batch_response):
+        print(f"  Operation {index}: {result.get('statusCode')}")
+    ```
+
+    The batch upserts rather than creates, so rerunning the task doesn't fail on items that already exist.
+
+1. Run the script. Every operation reports a success status, and both items exist in the container.
+
+1. Now build a batch that mixes partition key values. Append the following code:
+
+    ```python
+    bad_operations = [
+        ("create", ({"id": "5996B5E0-6EC7-4CB7-A924-7B5A053AE980", "categoryId": category_id,
+                     "categoryName": "Components, Saddles", "sku": "SE-M236",
+                     "name": "LL Mountain Seat/Saddle", "price": 27.12, "tags": []},)),
+        ("create", ({"id": "47ED1C3B-C205-4507-94EE-3B69A744B261",
+                     "categoryId": "14A1AD5D-59EA-4B63-A189-67B077783B0E",
+                     "categoryName": "Accessories, Helmets", "sku": "HL-U509",
+                     "name": "Sport-100 Helmet, Black", "price": 34.99, "tags": []},)),
+    ]
+
+    try:
+        container.execute_item_batch(bad_operations, partition_key=category_id)
+        print("Bad batch:   unexpectedly succeeded")
+    except exceptions.CosmosBatchOperationError as e:
+        print(f"Bad batch:   operation {e.error_index} failed with status {e.status_code}")
+    ```
+
+1. Run the script. The batch fails, and `error_index` identifies which operation caused it. Confirm in the Azure portal's **Data Explorer** that neither item was written.
 
 ::: zone-end
 
 ---
 
-## Task 6: Point the app at the cloud account
+## Task 7: Load items in bulk
 
-Everything so far ran against the emulator. Now aim the same app at the Azure Cosmos DB account the setup script created.
+Write a few thousand independent items and measure how long the load takes.
 
-The connection is the only thing that changes. The account read, the database and container references, the logging handler, and the error handling are all untouched, because none of them care which endpoint they're talking to. This task illustrates the point: an app written against the SDK is portable between a developer's machine and a real account, and swapping targets is a configuration concern rather than a rewrite.
-One detail differs, and it isn't the endpoint. The emulator accepts a key; the cloud account has key authentication disabled, so the client uses `AzureCliCredential` to select your `az login` identity explicitly. Different credential type, same client, same everything after it.
+This task writes to the `bulkload` container rather than `operations`, so the items you created in earlier tasks stay out of the timing measurement.
 
 ::: zone pivot="csharp"
 
-1. Point `endpoint` at the account the setup script printed, and delete the `key` line. Key-based authentication is disabled for this account:
+1. In **Program.cs**, replace everything below the marker comment with the following code. It uses a second client with bulk execution enabled, because that setting can't be changed after a client is created:
 
     ```csharp
-    string endpoint = "<cosmos-endpoint>";
+    CosmosClientOptions bulkOptions = new() { AllowBulkExecution = true };
+    using CosmosClient bulkClient = new(endpoint, new DefaultAzureCredential(), bulkOptions);
+
+    Container bulkContainer = bulkClient.GetDatabase("cosmicworks").GetContainer("bulkload");
+
+    List<Product> items = Enumerable.Range(0, 2000)
+        .Select(i => new Product(
+            id: Guid.NewGuid().ToString(),
+            categoryId: $"bulk-category-{i % 20}",
+            categoryName: $"Bulk Category {i % 20}",
+            sku: $"BL-{i:D5}",
+            name: $"Bulk Product {i}",
+            price: 10.00d + i % 500,
+            tags: Array.Empty<Tag>()))
+        .ToList();
+
+    Stopwatch timer = Stopwatch.StartNew();
+
+    List<Product> pending = items;
+    int firstPassFailures = 0;
+
+    for (int attempt = 0; attempt < 3; attempt++)
+    {
+        List<Task<Product?>> tasks = pending
+            .Select(async item =>
+            {
+                try
+                {
+                    await bulkContainer.CreateItemAsync(item, new PartitionKey(item.categoryId));
+                    return (Product?)null;
+                }
+                catch (CosmosException exception) when (
+                    exception.StatusCode == HttpStatusCode.TooManyRequests ||
+                    exception.StatusCode == (HttpStatusCode)449)
+                {
+                    return item;
+                }
+            })
+            .ToList();
+
+        Product?[] outcomes = await Task.WhenAll(tasks);
+        pending = outcomes.OfType<Product>().ToList();
+
+        if (attempt == 0)
+        {
+            firstPassFailures = pending.Count;
+        }
+
+        if (pending.Count == 0)
+        {
+            break;
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(2));
+    }
+
+    timer.Stop();
+
+    Console.WriteLine($"Bulk load:   {items.Count - pending.Count} of {items.Count} written in {timer.Elapsed.TotalSeconds:0.0} seconds");
+    Console.WriteLine($"Retried:     {firstPassFailures} on the first pass, {pending.Count} still outstanding");
     ```
 
-1. Replace everything between the `// ==== CLIENT ====` markers with the following code:
+    `AllowBulkExecution` lets the client group concurrent operations by partition key range and send each group as a single request. The 20 partition key values create logical partitions, not physical partitions. This small container can have only one physical partition. Distributing keys supports parallelism across physical partitions when the container scales out.
 
-    ```csharp
-    // ==== CLIENT ====
-    CosmosClient client = new CosmosClientBuilder(endpoint, new AzureCliCredential())
-        .AddCustomHandlers(new LogHandler())
-        .Build();
-    // ==== END CLIENT ====
-    ```
+    The handler retries only 429 and 449 responses, which indicate retryable rejections. Cancellation, nonretryable errors, and ambiguous outcomes such as timeouts propagate instead of being reported as unwritten items. A timed-out create might already have committed, so resolve its outcome before replaying it. `Task.WhenAll` waits for all tasks; its returned task retains their exceptions even though awaiting it throws one.
 
-    `WithConnectionModeGateway` and the certificate bypass are gone. The local example uses gateway mode because its `HttpClientFactory` bypass applies to HTTPS, not direct TCP connections. The legacy emulator also supports direct mode with appropriate certificate trust. The cloud client uses normal certificate verification and defaults to direct mode, which requires the outbound ports described in the connectivity unit. `AddCustomHandlers` stays, so the logging from Task 4 keeps working.
-
-1. Run the project. Nothing below the client changed:
+1. Run the project and note the elapsed time:
 
     ```bash
     dotnet run
     ```
 
-1. The account name in the output is now your cloud account rather than **localhost**, and the primary region is the one you provisioned into. `ReadContainerAsync` returns the `product` container the setup script created. The 404 from Task 5 still appears, because that item doesn't exist in this account either.
+    ```output
+    Bulk load:   2000 of 2000 written in 16.8 seconds
+    Retried:     14 on the first pass, 0 still outstanding
+    ```
+
+    This output is an example; elapsed time and retry counts vary. The SDK might handle all throttling without surfacing any first-pass failures. If retryable rejections remain, the next pass retries those items, but success isn't guaranteed. Check the final outstanding count. Restarting the whole load creates fresh `Guid` values and can write 2,000 more items instead of finishing the first 2,000.
 
 ::: zone-end
 
 ::: zone pivot="python"
 
-1. Point `endpoint` at the account the setup script printed, and delete the `key` line. Key-based authentication is disabled for this account:
-
-    ```python
-    endpoint = "<cosmos-endpoint>"
-    ```
-
-1. Replace everything between the `# ==== CLIENT ====` markers with the following code:
-
-    ```python
-    # ==== CLIENT ====
-    client = CosmosClient(url=endpoint, credential=AzureCliCredential())
-    # ==== END CLIENT ====
-    ```
-
-    `connection_verify=False` is gone. It existed only because the emulator uses a self-signed certificate.
-
-1. Run the script. Nothing below the client changed:
+1. Install the async transport dependency:
 
     ```bash
-    python app.py
+    pip install aiohttp
     ```
 
-1. The endpoint in the output is now your cloud account, and `container.read()` returns the `product` container the setup script created. The 404 from Task 5 still appears, because that item doesn't exist in this account either.
+1. Create a second file named **bulk_load.py** with the following contents. Set the endpoint to the same value you used earlier:
+
+    ```python
+    import asyncio
+    import time
+    import uuid
+    from azure.cosmos import exceptions
+    from azure.cosmos.aio import CosmosClient
+    from azure.identity.aio import DefaultAzureCredential
+
+    endpoint = "<cosmos-endpoint>"
+
+    async def main():
+        items = [
+            {
+                "id": str(uuid.uuid4()),
+                "categoryId": f"bulk-category-{i % 20}",
+                "categoryName": f"Bulk Category {i % 20}",
+                "sku": f"BL-{i:05d}",
+                "name": f"Bulk Product {i}",
+                "price": 10.00 + i % 500,
+                "tags": [],
+            }
+            for i in range(2000)
+        ]
+
+        async with DefaultAzureCredential() as credential:
+            async with CosmosClient(endpoint, credential) as client:
+                container = client.get_database_client("cosmicworks").get_container_client("bulkload")
+
+                semaphore = asyncio.Semaphore(100)
+
+                async def create(item):
+                    async with semaphore:
+                        return await container.create_item(body=item)
+
+                start = time.perf_counter()
+
+                pending = items
+                first_pass_failures = 0
+
+                for attempt in range(3):
+                    results = await asyncio.gather(
+                        *(create(item) for item in pending), return_exceptions=True)
+
+                    for result in results:
+                        if isinstance(result, BaseException) and (
+                            not isinstance(result, exceptions.CosmosHttpResponseError)
+                            or result.status_code not in (429, 449)
+                        ):
+                            raise result
+
+                    pending = [item for item, result in zip(pending, results)
+                               if isinstance(result, Exception)]
+
+                    if attempt == 0:
+                        first_pass_failures = len(pending)
+
+                    if not pending:
+                        break
+
+                    await asyncio.sleep(2)
+
+                elapsed = time.perf_counter() - start
+
+                print(f"Bulk load:   {len(items) - len(pending)} of {len(items)} written in {elapsed:.1f} seconds")
+                print(f"Retried:     {first_pass_failures} on the first pass, {len(pending)} still outstanding")
+
+    asyncio.run(main())
+    ```
+
+    The semaphore caps how many requests are in flight, and `return_exceptions=True` collects each outcome. The handler retries only 429 and 449 responses. Cancellation, nonretryable errors, and ambiguous outcomes such as timeouts propagate. A timed-out create might already have committed, so resolve its outcome before replaying it. Because `gather` preserves order, zipping the results against `pending` identifies the items whose requests were rejected with retryable errors.
+
+    The 20 partition key values create logical partitions, not physical partitions. This small container can have only one physical partition. Distributing keys supports parallelism across physical partitions when the container scales out.
+
+1. Run the script and note the elapsed time:
+
+    ```bash
+    python bulk_load.py
+    ```
+
+    ```output
+    Bulk load:   2000 of 2000 written in 21.4 seconds
+    Retried:     22 on the first pass, 0 still outstanding
+    ```
+
+    This output is an example; elapsed time and retry counts vary. The SDK might handle all throttling without surfacing any first-pass failures. If retryable rejections remain, the next pass retries those items, but success isn't guaranteed. Check the final outstanding count. Restarting the whole load creates fresh `uuid4()` values and can write 2,000 more items instead of finishing the first 2,000.
+
+1. When you finish testing, deactivate the Python environment:
+
+    ```bash
+    deactivate
+    ```
 
 ::: zone-end
+
+Bulk mode doesn't make each write cheaper. Every item costs the same RU charge it would cost on its own. What changes is how many requests are in flight at once, so the load finishes in a fraction of the time the same writes would take one after another. Elapsed time is bounded by the container's provisioned throughput, which is why ingest jobs raise RU/s during a load and lower it afterward.
 
 ---
 
@@ -542,17 +1105,3 @@ If your lab environment provided the resource group, delete only the Azure Cosmo
 ```azurecli
 az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --yes
 ```
-
----
-
-## Summary
-
-In this exercise you:
-
-- Set up an SDK project and installed `Microsoft.Azure.Cosmos` (.NET) or `azure-cosmos` (Python).
-- Connected to the Azure Cosmos DB emulator using the well-known endpoint and key.
-- You created the `cosmicworks` database and `product` container in the emulator's Data Explorer, and referenced them from code.
-- Added a logging handler to observe SDK HTTP traffic and request-unit charges.
-- Caught a `CosmosException` / `CosmosResourceNotFoundError` and distinguished a permanent 404 from transient retryable errors.
-- Pointed the same app at a cloud account by changing the endpoint and client construction and removing the emulator key. The data operations stayed unchanged, while provisioning remained separate from the data-plane application.
-
