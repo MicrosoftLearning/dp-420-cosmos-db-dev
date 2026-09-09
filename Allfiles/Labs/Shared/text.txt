@@ -1,6 +1,6 @@
 TEST LAB....
 
-In this exercise, you build a small data layer against an Azure Cosmos DB for NoSQL container and exercise every operation from this module. You read an item with a point read and compare its cost with the cost of an equivalent query. You then run the full set of write operations. You apply a conditional patch and protect a replace operation with an ETag. You set a time to live (TTL) value to expire an item. You commit a transactional batch. You finish with a bulk load. Throughout, you print the request charge so you can see what each choice costs.
+In this exercise, you build a query layer against an Azure Cosmos DB for NoSQL catalog container and run every query technique from this module. You load the CosmicWorks product catalog, then write a parameterized query that projects a custom shape. You reach into a nested tags array with a correlated subquery, expand that array with a cross-product query, and finish by paging a result set with continuation tokens. Throughout, you print the request charge so you can see what each choice costs.
 
 ## Before you start
 
@@ -46,7 +46,7 @@ If you have no verified core account, follow the setup steps below. To add missi
     az login
     ```
 
-1. Set variables for the resource group (If a resource group was provided by your lab environment, use that name) and region you want to use. Change either value if you prefer a different resource group name or region.
+1. Set variables for the resource group (If your lab environment provided a resource group, use that name) and region you want to use. Change either value if you prefer a different resource group name or region.
 
     ```powershell
     $resourceGroup = "dp420"
@@ -56,25 +56,23 @@ If you have no verified core account, follow the setup steps below. To add missi
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab04 -LabProfile core
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab05 -LabProfile core
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab04a7f3k9`.
+    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab05a7f3k9`.
 
 1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
 
 1. Record the **Account name** and **Account endpoint** values the script prints. You need the endpoint throughout this exercise, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
 
-The script creates the following resources, with throughput measured in request units per second (RU/s):
+The script creates the following resources:
 
 | Resource | Configuration |
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
 | `cosmicworks` database | Holds every container this learning path uses |
-| `operations` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, empty. Tasks 2 through 6 work here |
-| `bulkload` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, empty. Task 7 writes to it |
+| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 request units per second (RU/s), loaded with the 295 CosmicWorks products every query in this exercise runs against |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
-
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
@@ -83,28 +81,40 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ---
 
-## Task 1: Set up the project and connect to the container
+## Task 1: Connect to the CosmicWorks catalog
 
-Task 5 expires an item with time to live (TTL), so enable it on the container now. Replace <your-account-name> with your actual account name:
+Every query in this exercise runs against the same data: the product catalog from the CosmicWorks sample, which the setup script already loaded into the `product` container.
 
-```azurecli
-az cosmosdb sql container update `
-    --account-name <your-account-name> `
-    --resource-group $resourceGroup `
-    --database-name cosmicworks `
-    --name operations `
-    --ttl -1
+The catalog holds 295 products. Each one looks like this:
+
+```json
+{
+    "id": "027D0B9A-F9D9-4C96-8213-C8546C4AAE71",
+    "categoryId": "26C74104-40BC-4541-8EF5-9892F7F03D72",
+    "categoryName": "Components, Saddles",
+    "sku": "SE-R581",
+    "name": "LL Road Seat/Saddle",
+    "description": "The product called \"LL Road Seat/Saddle\"",
+    "price": 27.12,
+    "tags": [
+        { "id": "0573D684-9140-4DEE-89AF-4E4A90E65666", "name": "Tag-113" },
+        { "id": "6C2F05C8-1E61-4912-BE1A-C67A378429BB", "name": "Tag-5" },
+        { "id": "B48D6572-67EB-4630-A1DB-AFD4AD7041C9", "name": "Tag-100" },
+        { "id": "D70F215D-A8AC-483A-9ABD-4A008D2B72B2", "name": "Tag-85" },
+        { "id": "DCF66D9A-E2BF-4C70-8AC1-AD55E5988E9D", "name": "Tag-37" }
+    ]
+}
 ```
 
-A value of `-1` expires only the items that set their own `ttl`.
+`categoryId` is the partition key. `tags` is the nested array that Tasks 3 and 4 query, and 45 of the 295 products carry an empty one.
 
 ::: zone pivot="csharp"
 
 1. Open a terminal and create a new console project:
 
     ```bash
-    dotnet new console -n cosmos-operations-exercise
-    cd cosmos-operations-exercise
+    dotnet new console -n cosmos-queries-exercise
+    cd cosmos-queries-exercise
     ```
 
 1. Add the SDK packages:
@@ -118,24 +128,22 @@ A value of `-1` expires only the items that set their own `ttl`.
 1. Open **Program.cs** and replace its contents with the following code. Set `endpoint` to the account endpoint the setup script printed:
 
     ```csharp
-    using System.Diagnostics;
-    using System.Net;
+    using System.Text.Json;
     using Azure.Identity;
     using Microsoft.Azure.Cosmos;
 
     string endpoint = "<cosmos-endpoint>";
 
     CosmosClient client = new(endpoint, new DefaultAzureCredential());
-    Container container = client.GetContainer("cosmicworks", "operations");
 
-    // ---- Each task replaces everything below this line ----
+    Container container = client.GetContainer("cosmicworks", "product");
 
     Console.WriteLine("Container ready.");
     ```
 
-    `GetContainer` builds a client-side reference without calling the service, so it needs no control-plane permission.
+    `GetContainer` builds a client-side reference without calling the service. Creating a database or container is a control-plane operation, which a Cosmos DB data-plane role can't perform, so the setup script created them for you.
 
-1. Add a second file named **Models.cs** with the item types:
+1. Add the item types at the bottom of the file. Top-level statements come first, so every type declaration in this exercise belongs below the executable code:
 
     ```csharp
     public record Tag(string id, string name);
@@ -146,18 +154,14 @@ A value of `-1` expires only the items that set their own `ttl`.
         string categoryName,
         string sku,
         string name,
+        string description,
         double price,
         Tag[] tags);
     ```
 
-    The `Product` record mirrors the cosmicworks product document: `tags` is an array of objects, each with its own `id` and `name`, not an array of strings.
+    The record property names match the JSON exactly, so no naming policy is needed.
 
-    Keeping the types in their own file leaves **Program.cs** holding nothing but top-level statements, so you can append to the end of it without worrying about declaration order.
-
-    > [!IMPORTANT]
-    > Each task that follows replaces only the code **below the marker comment**. The lines above it, including your endpoint, stay put for the whole exercise. That way every run does only the work of the task you're on, instead of repeating everything before it.
-
-1. Run the project and confirm the output reads `Container ready.`:
+1. Run the project:
 
     ```bash
     dotnet run
@@ -170,8 +174,8 @@ A value of `-1` expires only the items that set their own `ttl`.
 1. Open a terminal, create a project folder, and set up a virtual environment:
 
     ```bash
-    mkdir cosmos-operations-exercise
-    cd cosmos-operations-exercise
+    mkdir cosmos-queries-exercise
+    cd cosmos-queries-exercise
     python -m venv .venv
     ```
 
@@ -193,31 +197,24 @@ A value of `-1` expires only the items that set their own `ttl`.
     pip install azure-cosmos azure-identity
     ```
 
-1. In the **cosmos-operations-exercise** folder, alongside the **.venv** folder rather than inside it, create a file named **app.py** with the following contents. Set `endpoint` to the account endpoint the setup script printed:
+1. In the **cosmos-queries-exercise** folder, alongside the **.venv** folder rather than inside it, create a file named **app.py** with the following contents. Set `endpoint` to the account endpoint the setup script printed:
 
     ```python
-    import time
-
-    from azure.core import MatchConditions
-    from azure.cosmos import CosmosClient, exceptions
+    from azure.cosmos import CosmosClient
     from azure.identity import DefaultAzureCredential
 
     endpoint = "<cosmos-endpoint>"
 
     client = CosmosClient(url=endpoint, credential=DefaultAzureCredential())
-    container = client.get_database_client("cosmicworks").get_container_client("operations")
 
-    # ---- Each task replaces everything below this line ----
+    container = client.get_database_client("cosmicworks").get_container_client("product")
 
     print("Container ready.")
     ```
 
-    `get_container_client` builds a client-side reference without calling the service, so it needs no control-plane permission.
+    `get_container_client` builds a client-side reference without calling the service. Creating a database or container is a control-plane operation, which a Cosmos DB data-plane role can't perform, so the setup script created them for you.
 
-    > [!IMPORTANT]
-    > Each task that follows replaces only the code **below the marker comment**. The lines above it, including your endpoint, stay put for the whole exercise. That way every run does only the work of the task you're on, instead of repeating everything before it.
-
-1. Run the script and confirm the output reads `Container ready.`:
+1. Run the script:
 
     ```bash
     python app.py
@@ -227,868 +224,560 @@ A value of `-1` expires only the items that set their own `ttl`.
 
 ---
 
-## Task 2: Compare a point read against a query
+## Task 2: Write a parameterized, projected query
 
-Create one item, then read it back two ways and compare the request charge.
+Query one category with a price filter and a prefix match, then project the result into the shape a product card needs. Compare what the query costs when it's scoped to the partition key against what it costs cross-partition.
+
+The category for this task is **Components, Road Frames**, which holds 33 products.
+
+> [!TIP]
+> Each task appends to the same file, so every run repeats the queries from the earlier tasks. Comment out the earlier queries once you see their output.
 
 ::: zone pivot="csharp"
 
-1. In **Program.cs**, replace everything below the marker comment with the following code. It creates the saddle item that the rest of this exercise works with:
+1. Append the following code, above the record declarations. It defines the query with three parameters:
 
     ```csharp
-    string id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71";
-    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
-    PartitionKey partitionKey = new(categoryId);
+    const string roadFrames = "3E4CEACD-D007-46EB-82D7-31F6141752B2";
 
-    Product saddle = new(
-        id,
-        categoryId,
-        "Components, Saddles",
-        "SE-R581",
-        "LL Road Seat/Saddle",
-        27.12d,
-        new[]
+    string sql = """
+        SELECT
+            p.name,
+            p.categoryName AS category,
+            { "price": p.price } AS scannerData
+        FROM product p
+        WHERE p.categoryId = @category
+          AND p.price <= @max
+          AND STARTSWITH(p.name, @prefix, true)
+        """;
+
+    QueryDefinition query = new QueryDefinition(sql)
+        .WithParameter("@category", roadFrames)
+        .WithParameter("@max", 400)
+        .WithParameter("@prefix", "ll");
+    ```
+
+    The object literal creates the nested `scannerData` object in the output, and the third argument to `STARTSWITH` makes the prefix match case-insensitive.
+
+1. Add a helper that runs the query and returns its total charge, then call it twice: once scoped to the partition key and once without:
+
+    ```csharp
+    async Task<(int Count, double Charge)> RunAsync(QueryDefinition q, PartitionKey? key)
+    {
+        QueryRequestOptions options = new();
+        if (key.HasValue) options.PartitionKey = key.Value;
+
+        int count = 0;
+        double charge = 0;
+
+        using FeedIterator<ProductCard> iterator =
+            container.GetItemQueryIterator<ProductCard>(q, requestOptions: options);
+
+        while (iterator.HasMoreResults)
         {
-            new Tag("0573D684-9140-4DEE-89AF-4E4A90E65666", "Tag-113"),
-            new Tag("6C2F05C8-1E61-4912-BE1A-C67A378429BB", "Tag-5")
-        });
+            FeedResponse<ProductCard> page = await iterator.ReadNextAsync();
+            count += page.Count;
+            charge += page.RequestCharge;
+        }
 
-    try
-    {
-        await container.CreateItemAsync(saddle, partitionKey);
-        Console.WriteLine("Create:      item created");
+        return (count, charge);
     }
-    catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
-    {
-        Console.WriteLine("Create:      item already exists");
-    }
+
+    var scoped = await RunAsync(query, new PartitionKey(roadFrames));
+    var unscoped = await RunAsync(query, null);
+
+    Console.WriteLine($"Scoped:      {scoped.Count} items, {scoped.Charge:0.00} RU");
+    Console.WriteLine($"Cross-part.: {unscoped.Count} items, {unscoped.Charge:0.00} RU");
     ```
 
-1. Add the point read and print its charge:
+1. Add the result types to the record declarations at the bottom of the file:
 
     ```csharp
-    ItemResponse<Product> readResponse = await container.ReadItemAsync<Product>(id, partitionKey);
-    Console.WriteLine($"Point read:  {readResponse.RequestCharge:0.00} RU");
+    public record ScannerData(double price);
+
+    public record ProductCard(string name, string category, ScannerData scannerData);
     ```
 
-1. Add an equivalent query that filters on the same two values:
+    The result type matches the projection, not the stored item. A query that returns three fields deserializes into a type with three properties.
 
-    ```csharp
-    QueryDefinition query = new QueryDefinition(
-            "SELECT * FROM c WHERE c.id = @id AND c.categoryId = @categoryId")
-        .WithParameter("@id", id)
-        .WithParameter("@categoryId", categoryId);
-
-    double queryCharge = 0;
-    using FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(
-        query,
-        requestOptions: new QueryRequestOptions { PartitionKey = partitionKey });
-
-    while (iterator.HasMoreResults)
-    {
-        FeedResponse<Product> page = await iterator.ReadNextAsync();
-        queryCharge += page.RequestCharge;
-    }
-
-    Console.WriteLine($"Query:       {queryCharge:0.00} RU");
-    ```
-
-1. Run the project and compare the two read charges:
+1. Run the project and compare the two charges:
 
     ```bash
     dotnet run
-    ```
-
-    ```output
-    Create:      item created
-    Point read:  1.00 RU
-    Query:       2.92 RU
     ```
 
 ::: zone-end
 
 ::: zone pivot="python"
 
-1. In **app.py**, replace everything below the marker comment with the following code. It creates the saddle item that the rest of this exercise works with:
+1. Append the following code. It defines the query with three parameters:
 
     ```python
-    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
-    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+    ROAD_FRAMES = "3E4CEACD-D007-46EB-82D7-31F6141752B2"
 
-    saddle = {
-        "id": item_id,
-        "categoryId": category_id,
-        "categoryName": "Components, Saddles",
-        "sku": "SE-R581",
-        "name": "LL Road Seat/Saddle",
-        "price": 27.12,
-        "tags": [
-            {"id": "0573D684-9140-4DEE-89AF-4E4A90E65666", "name": "Tag-113"},
-            {"id": "6C2F05C8-1E61-4912-BE1A-C67A378429BB", "name": "Tag-5"},
-        ],
-    }
+    sql = """
+        SELECT
+            p.name,
+            p.categoryName AS category,
+            { "price": p.price } AS scannerData
+        FROM product p
+        WHERE p.categoryId = @category
+          AND p.price <= @max
+          AND STARTSWITH(p.name, @prefix, true)
+    """
 
-    try:
-        container.create_item(body=saddle)
-        print("Create:      item created")
-    except exceptions.CosmosResourceExistsError:
-        print("Create:      item already exists")
+    parameters = [
+        {"name": "@category", "value": ROAD_FRAMES},
+        {"name": "@max", "value": 400},
+        {"name": "@prefix", "value": "ll"},
+    ]
     ```
 
-1. Add the point read and print its charge:
+    The object literal creates the nested `scannerData` object in the output, and the third argument to `STARTSWITH` makes the prefix match case-insensitive.
+
+1. Add a helper that runs the query and returns its total charge, then call it twice: once scoped to the partition key and once without:
 
     ```python
-    read_item = container.read_item(item=item_id, partition_key=category_id)
-    print(f"Point read:  {read_item.get_response_headers()['x-ms-request-charge']} RU")
+    def run(partition_key=None):
+        charges = []
+
+        def record_charge(headers, _results):
+            charges.append(float(headers["x-ms-request-charge"]))
+
+        scope = (
+            {"partition_key": partition_key}
+            if partition_key
+            else {"enable_cross_partition_query": True}
+        )
+
+        count = 0
+
+        for page in container.query_items(
+            query=sql,
+            parameters=parameters,
+            response_hook=record_charge,
+            **scope,
+        ).by_page():
+            count += len(list(page))
+
+        return count, sum(charges)
+
+    scoped_count, scoped_charge = run(ROAD_FRAMES)
+    unscoped_count, unscoped_charge = run()
+
+    print(f"Scoped:      {scoped_count} items, {scoped_charge:.2f} RU")
+    print(f"Cross-part.: {unscoped_count} items, {unscoped_charge:.2f} RU")
     ```
 
-1. Add an equivalent query that filters on the same two values. A `response_hook` captures the charge from each page of results:
+    The SDK invokes `response_hook` once per page, so summing what it records gives the charge for the whole query.
 
-    ```python
-    query_charge = 0.0
-
-    def capture_charge(headers, results):
-        global query_charge
-        query_charge += float(headers["x-ms-request-charge"])
-
-    results = list(container.query_items(
-        query="SELECT * FROM c WHERE c.id = @id AND c.categoryId = @categoryId",
-        parameters=[
-            {"name": "@id", "value": item_id},
-            {"name": "@categoryId", "value": category_id},
-        ],
-        partition_key=category_id,
-        response_hook=capture_charge,
-    ))
-
-    print(f"Query:       {query_charge:.2f} RU")
-    ```
-
-1. Run the script and compare the two read charges:
+1. Run the script and compare the two charges:
 
     ```bash
     python app.py
     ```
 
-    ```output
-    Create:      item created
-    Point read:  1.00 RU
-    Query:       2.92 RU
-    ```
-
 ::: zone-end
 
-A point read costs about 1 request unit (RU). Fetching the same item by query costs two to three times as much, because it goes through the query engine. Use a point read whenever your code already knows the `id` and the partition key.
+Both calls return the same 12 products, and the two charges are close to identical. This container's autoscale maximum of 1,000 RU/s puts it on a single physical partition, so the unscoped query has only that one partition to reach. Setting the partition key scopes a query to one physical partition; without it, the service fans out the query to every physical partition and merges the results, so the saving grows with the number of partitions the container spans. In a catalog API, the category is always known, so the partition key always belongs on the request.
 
 ---
 
-## Task 3: Run the write operations
+## Task 3: Reach into the tags array with a subquery
 
-Replace, upsert, and delete the item, then recreate it for the tasks that follow.
+Filter products by what their nested `tags` array contains, and project a trimmed version of that array alongside each result.
 
-::: zone pivot="csharp"
-
-1. In **Program.cs**, replace everything below the marker comment with the following code. It reads the item created in Task 2 and replaces it with a new price:
-
-    ```csharp
-    string id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71";
-    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
-    PartitionKey partitionKey = new(categoryId);
-
-    Product saddle = await container.ReadItemAsync<Product>(id, partitionKey);
-
-    Product updated = saddle with { price = 32.55d };
-
-    ItemResponse<Product> replaced = await container.ReplaceItemAsync(updated, id, partitionKey);
-    Console.WriteLine($"Replace:     {replaced.RequestCharge:0.00} RU");
-    ```
-
-    `ReplaceItemAsync` takes the `id` as a separate argument, and it fails with 404 if the item no longer exists.
-
-1. Add an upsert that suppresses the response payload:
-
-    ```csharp
-    ItemRequestOptions noContent = new() { EnableContentResponseOnWrite = false };
-
-    ItemResponse<Product> upserted = await container.UpsertItemAsync(
-        updated with { price = 30.00d }, partitionKey, noContent);
-
-    Console.WriteLine($"Upsert:      {upserted.RequestCharge:0.00} RU (no payload returned)");
-    ```
-
-1. Add a delete, then recreate the item so later tasks have something to work with:
-
-    ```csharp
-    ItemResponse<Product> deleted = await container.DeleteItemAsync<Product>(id, partitionKey);
-    Console.WriteLine($"Delete:      {deleted.RequestCharge:0.00} RU");
-
-    await container.CreateItemAsync(saddle, partitionKey);
-    ```
-
-1. Run the project and compare the write charges against the read charges from Task 2:
-
-    ```output
-    Replace:     10.67 RU
-    Upsert:      10.67 RU (no payload returned)
-    Delete:      9.52 RU
-    ```
-
-::: zone-end
-
-::: zone pivot="python"
-
-1. In **app.py**, replace everything below the marker comment with the following code. It reads the item created in Task 2 and replaces it with a new price:
-
-    ```python
-    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
-    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
-
-    saddle = container.read_item(item=item_id, partition_key=category_id)
-
-    saddle["price"] = 32.55
-
-    replaced = container.replace_item(item=item_id, body=saddle)
-    print(f"Replace:     {replaced.get_response_headers()['x-ms-request-charge']} RU")
-    ```
-
-    `replace_item` raises `CosmosResourceNotFoundError` if the item no longer exists.
-
-1. Add an upsert that suppresses the response payload:
-
-    ```python
-    saddle["price"] = 30.00
-
-    upserted = container.upsert_item(body=saddle, no_response=True)
-    charge = upserted.get_response_headers()["x-ms-request-charge"]
-    print(f"Upsert:      {charge} RU (no payload returned)")
-    ```
-
-    With `no_response=True`, the returned `CosmosDict` is empty, but it still carries the response headers, so the charge is still there to read.
-
-1. Add a delete, then recreate the item so later tasks have something to work with:
-
-    ```python
-    container.delete_item(item=item_id, partition_key=category_id)
-    charge = container.client_connection.last_response_headers["x-ms-request-charge"]
-    print(f"Delete:      {charge} RU")
-
-    saddle["price"] = 27.12
-    container.create_item(body=saddle)
-    ```
-
-1. Run the script and compare the write charges against the read charges from Task 2:
-
-    ```output
-    Replace:     10.67 RU
-    Upsert:      10.67 RU (no payload returned)
-    Delete:      9.52 RU
-    ```
-
-::: zone-end
-
-A write costs several times a point read, because the charge covers the document itself plus every index term the container's indexing policy maintains. The replace is the most expensive of the three: it deletes the existing document and inserts the new one, paying the document cost twice, while the delete pays it once. Request charges are deterministic for a given operation over a given dataset, so rerunning the project reproduces these numbers, though your values depend on item size and the container's indexing policy. Suppressing the response payload saves network bandwidth, not request units, which is why the replace and the upsert cost the same.
-
----
-
-## Task 4: Apply a conditional patch and guard a replace with an ETag
-
-Change one property without rewriting the whole document, and make that change conditional. Patch and replace express a condition differently: a patch uses a filter predicate, and a replace uses an ETag. You use both here.
+CosmicWorks tags are merchandising-assigned identifiers rather than descriptive words. A tag is an object with an `id` and a `name` such as `Tag-30`. The same tag appears on many products, and a product can carry several. A catalog often works that way in practice: the label is a key into a merchandising system, and the query matches it exactly.
 
 ::: zone pivot="csharp"
 
-1. In **Program.cs**, replace everything below the marker comment with the following code. It patches two properties, guarded by a filter predicate that tests the current price:
+1. Append the following code. `EXISTS` filters items by the contents of the array, and the `ARRAY` expression projects the tag names alongside each match:
 
     ```csharp
-    string id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71";
-    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
-    PartitionKey partitionKey = new(categoryId);
+    QueryDefinition subquery = new QueryDefinition("""
+            SELECT
+                p.id,
+                p.name,
+                ARRAY(SELECT VALUE t.name FROM t IN p.tags) AS tagNames
+            FROM product p
+            WHERE p.categoryId = @category
+              AND EXISTS (SELECT VALUE t FROM t IN p.tags WHERE t.name = @tag)
+            """)
+        .WithParameter("@category", roadFrames)
+        .WithParameter("@tag", "Tag-30");
 
-    PatchItemRequestOptions patchOptions = new()
+    int rows = 0;
+    double subqueryCharge = 0;
+
+    using (FeedIterator<TaggedItem> iterator = container.GetItemQueryIterator<TaggedItem>(
+        subquery,
+        requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(roadFrames) }))
     {
-        FilterPredicate = "FROM c WHERE c.price < 100"
-    };
-
-    try
-    {
-        ItemResponse<Product> patched = await container.PatchItemAsync<Product>(
-            id: id,
-            partitionKey: partitionKey,
-            patchOperations: new[]
-            {
-                PatchOperation.Set("/name", "LL Road Seat/Saddle, Clearance"),
-                PatchOperation.Increment("/price", 5.00)
-            },
-            requestOptions: patchOptions);
-
-        Console.WriteLine($"Patch:       {patched.RequestCharge:0.00} RU");
-    }
-    catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
-    {
-        Console.WriteLine("Patch:       412 Precondition Failed");
-    }
-    ```
-
-1. Run the project. The predicate holds, so the patch succeeds and the price is now 32.12. Record its request charge alongside the replace charge from Task 3. Patch doesn't guarantee a lower write charge; its benefits include a smaller request payload and avoiding a preceding read when the changes are already known.
-
-1. Now force the condition to fail. Append the following code to the end of **Program.cs**. It uses a predicate the item no longer satisfies:
-
-    ```csharp
-    try
-    {
-        await container.PatchItemAsync<Product>(
-            id: id,
-            partitionKey: partitionKey,
-            patchOperations: new[] { PatchOperation.Increment("/price", 5.00) },
-            requestOptions: new PatchItemRequestOptions
-            {
-                FilterPredicate = "FROM c WHERE c.price < 30"
-            });
-
-        Console.WriteLine("Failed patch: unexpectedly succeeded");
-    }
-    catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
-    {
-        Console.WriteLine("Failed patch: 412 Precondition Failed, as expected");
-    }
-    ```
-
-1. Now guard a replace with an ETag instead. Append the following code to the end of **Program.cs**. It reads the item, keeps its ETag, and writes with that ETag attached:
-
-    ```csharp
-    ItemResponse<Product> current = await container.ReadItemAsync<Product>(id, partitionKey);
-    ItemRequestOptions etagOptions = new() { IfMatchEtag = current.ETag };
-
-    await container.ReplaceItemAsync(
-        current.Resource with { price = 45.00d }, id, partitionKey, etagOptions);
-
-    Console.WriteLine("Replace:     succeeded with a current ETag");
-    ```
-
-1. Reuse the same, now stale, ETag on a second replace:
-
-    ```csharp
-    try
-    {
-        await container.ReplaceItemAsync(
-            current.Resource with { price = 50.00d }, id, partitionKey, etagOptions);
-
-        Console.WriteLine("Stale replace: unexpectedly succeeded");
-    }
-    catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
-    {
-        Console.WriteLine("Stale replace: 412 Precondition Failed, as expected");
-    }
-    ```
-
-1. Run the project. The first replace succeeds and changes the item's ETag, so the second one fails.
-
-::: zone-end
-
-::: zone pivot="python"
-
-1. In **app.py**, replace everything below the marker comment with the following code. It patches two properties, guarded by a filter predicate that tests the current price:
-
-    ```python
-    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
-    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
-
-    try:
-        patched = container.patch_item(
-            item=item_id,
-            partition_key=category_id,
-            patch_operations=[
-                {"op": "set", "path": "/name", "value": "LL Road Seat/Saddle, Clearance"},
-                {"op": "incr", "path": "/price", "value": 5.00},
-            ],
-            filter_predicate="FROM c WHERE c.price < 100",
-        )
-        print(f"Patch:       {patched.get_response_headers()['x-ms-request-charge']} RU")
-    except exceptions.CosmosAccessConditionFailedError:
-        print("Patch:       412 Precondition Failed")
-    ```
-
-1. Run the script. The predicate holds, so the patch succeeds and the price is now 32.12. Record its request charge alongside the replace charge from Task 3. Patch doesn't guarantee a lower write charge; its benefits include a smaller request payload and avoiding a preceding read when the changes are already known.
-
-1. Now force the condition to fail. Append the following code, which uses a predicate the item no longer satisfies:
-
-    ```python
-    try:
-        container.patch_item(
-            item=item_id,
-            partition_key=category_id,
-            patch_operations=[{"op": "incr", "path": "/price", "value": 5.00}],
-            filter_predicate="FROM c WHERE c.price < 30",
-        )
-        print("Failed patch: unexpectedly succeeded")
-    except exceptions.CosmosAccessConditionFailedError:
-        print("Failed patch: 412 Precondition Failed, as expected")
-    ```
-
-1. Now guard a replace with an ETag instead. Append the following code, which reads the item, keeps its ETag, and writes with that ETag attached:
-
-    ```python
-    current = container.read_item(item=item_id, partition_key=category_id)
-    etag = current["_etag"]
-
-    current["price"] = 45.00
-    container.replace_item(
-        item=item_id,
-        body=current,
-        etag=etag,
-        match_condition=MatchConditions.IfNotModified,
-    )
-
-    print("Replace:     succeeded with a current ETag")
-    ```
-
-1. Reuse the same, now stale, ETag on a second replace:
-
-    ```python
-    try:
-        current["price"] = 50.00
-        container.replace_item(
-            item=item_id,
-            body=current,
-            etag=etag,
-            match_condition=MatchConditions.IfNotModified,
-        )
-        print("Stale replace: unexpectedly succeeded")
-    except exceptions.CosmosAccessConditionFailedError:
-        print("Stale replace: 412 Precondition Failed, as expected")
-    ```
-
-1. Run the script. The first replace succeeds and changes the item's ETag, so the second one fails.
-
-::: zone-end
-
-This exercise conditions the patch with a filter predicate and the replace with an ETag. The .NET standalone `PatchItemAsync` method doesn't support `IfMatchEtag`, so don't substitute that option for the patch predicate. A replace supports an ETag precondition, but not a filter predicate. Both conditions demonstrated here reject a conflicting write with 412 Precondition Failed. Re-read the item and decide whether to reapply the change. Patch operations inside a transactional batch have separate request options; don't infer their behavior from the standalone method.
-
----
-
-## Task 5: Expire an item with time to live
-
-Write a transient item, give it a short lifetime, and watch it disappear.
-
-::: zone pivot="csharp"
-
-1. In **Program.cs**, replace everything below the marker comment with the following code. It creates a session item with a 30-second lifetime:
-
-    ```csharp
-    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
-    PartitionKey partitionKey = new(categoryId);
-
-    var session = new
-    {
-        id = "session-9f21",
-        categoryId = categoryId,
-        state = "active",
-        ttl = 30
-    };
-
-    await container.UpsertItemAsync(session, partitionKey);
-    Console.WriteLine("Session created with a 30 second TTL.");
-    ```
-
-    Using an upsert rather than a create lets you rerun the task without a conflict.
-
-1. Add two reads, one before the lifetime elapses and one after, so you can see the item disappear rather than find it missing:
-
-    ```csharp
-    async Task ReadSession(string label)
-    {
-        try
+        while (iterator.HasMoreResults)
         {
-            await container.ReadItemAsync<dynamic>("session-9f21", partitionKey);
-            Console.WriteLine($"{label} session still present");
-        }
-        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-        {
-            Console.WriteLine($"{label} session expired");
-        }
-    }
+            FeedResponse<TaggedItem> page = await iterator.ReadNextAsync();
+            subqueryCharge += page.RequestCharge;
 
-    await Task.Delay(TimeSpan.FromSeconds(10));
-    await ReadSession("After 10s:");
-
-    await Task.Delay(TimeSpan.FromSeconds(25));
-    await ReadSession("After 35s:");
-    ```
-
-    To leave a margin, the second read lands at 35 seconds rather than exactly 30. An expired item stops appearing in results as soon as its lifetime elapses, even though the physical delete happens later, as a background task.
-
-1. Run the project. The first read succeeds and the second returns 404:
-
-    ```output
-    Session created with a 30 second TTL.
-    After 10s: session still present
-    After 35s: session expired
-    ```
-
-::: zone-end
-
-::: zone pivot="python"
-
-1. In **app.py**, replace everything below the marker comment with the following code. It creates a session item with a 30-second lifetime:
-
-    ```python
-    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
-
-    container.upsert_item(body={
-        "id": "session-9f21",
-        "categoryId": category_id,
-        "state": "active",
-        "ttl": 30,
-    })
-    print("Session created with a 30 second TTL.")
-    ```
-
-    Using an upsert rather than a create lets you rerun the task without a conflict.
-
-1. Add two reads, one before the lifetime elapses and one after, so you can see the item disappear rather than find it missing:
-
-    ```python
-    def read_session(label):
-        try:
-            container.read_item(item="session-9f21", partition_key=category_id)
-            print(f"{label} session still present")
-        except exceptions.CosmosResourceNotFoundError:
-            print(f"{label} session expired")
-
-    time.sleep(10)
-    read_session("After 10s:")
-
-    time.sleep(25)
-    read_session("After 35s:")
-    ```
-
-    To leave a margin, the second read lands at 35 seconds rather than exactly 30. An expired item stops appearing in results as soon as its lifetime elapses, even though the physical delete happens later, as a background task.
-
-1. Run the script. The first read succeeds and the second raises a not-found error:
-
-    ```output
-    Session created with a 30 second TTL.
-    After 10s: session still present
-    After 35s: session expired
-    ```
-
-::: zone-end
-
-A container TTL of `-1` turns on expiration without giving anything a default lifetime. Only items that set their own `ttl` expire: the session item did, and the product item from Task 2 didn't.
-
----
-
-## Task 6: Commit a transactional batch
-
-To see how the failure reports itself, write two related items atomically, then break the same-partition rule on purpose.
-
-::: zone pivot="csharp"
-
-1. In **Program.cs**, replace everything below the marker comment with the following code. Both items share the partition key value used throughout this exercise:
-
-    ```csharp
-    string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
-    PartitionKey partitionKey = new(categoryId);
-
-    Product mountainSaddle = new(
-        "201D0D79-81AD-43D2-AD6E-F09EEE6AC2D7", categoryId,
-        "Components, Saddles", "SE-M798", "ML Mountain Seat/Saddle", 39.14d, Array.Empty<Tag>());
-
-    Product touringSaddle = new(
-        "3FE1A99E-DE14-4D11-B635-F5D39258A0B9", categoryId,
-        "Components, Saddles", "SE-T924", "HL Touring Seat/Saddle", 52.64d, Array.Empty<Tag>());
-
-    TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
-        .UpsertItem(mountainSaddle)
-        .UpsertItem(touringSaddle);
-
-    using TransactionalBatchResponse batchResponse = await batch.ExecuteAsync();
-
-    Console.WriteLine($"Batch:       {batchResponse.StatusCode} ({batchResponse.RequestCharge:0.00} RU)");
-    ```
-
-    The batch upserts rather than creates, so rerunning the task doesn't fail on items that already exist.
-
-1. Run the project. The status is `OK`, and both items exist in the container.
-
-1. Now build a batch that mixes partition key values. Append the following code to the end of **Program.cs**:
-
-    ```csharp
-    Product llMountainSaddle = new(
-        "5996B5E0-6EC7-4CB7-A924-7B5A053AE980", categoryId,
-        "Components, Saddles", "SE-M236", "LL Mountain Seat/Saddle", 27.12d, Array.Empty<Tag>());
-
-    Product helmet = new(
-        "47ED1C3B-C205-4507-94EE-3B69A744B261", "14A1AD5D-59EA-4B63-A189-67B077783B0E",
-        "Accessories, Helmets", "HL-U509", "Sport-100 Helmet, Black", 34.99d, Array.Empty<Tag>());
-
-    TransactionalBatch badBatch = container.CreateTransactionalBatch(partitionKey)
-        .CreateItem(llMountainSaddle)
-        .CreateItem(helmet);
-
-    using TransactionalBatchResponse badResponse = await badBatch.ExecuteAsync();
-
-    for (int i = 0; i < badResponse.Count; i++)
-    {
-        Console.WriteLine($"  Operation {i}: {(int)badResponse[i].StatusCode}");
-    }
-    ```
-
-1. Run the project. The batch fails. One operation reports the real error, and the other reports **424 Failed Dependency**, which means it was rolled back rather than rejected on its own merits. Confirm in the Azure portal's **Data Explorer** that neither item was written.
-
-::: zone-end
-
-::: zone pivot="python"
-
-1. In **app.py**, replace everything below the marker comment with the following code. Both items share the partition key value used throughout this exercise:
-
-    ```python
-    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
-
-    batch_operations = [
-        ("upsert", ({"id": "201D0D79-81AD-43D2-AD6E-F09EEE6AC2D7", "categoryId": category_id,
-                     "categoryName": "Components, Saddles", "sku": "SE-M798",
-                     "name": "ML Mountain Seat/Saddle", "price": 39.14, "tags": []},)),
-        ("upsert", ({"id": "3FE1A99E-DE14-4D11-B635-F5D39258A0B9", "categoryId": category_id,
-                     "categoryName": "Components, Saddles", "sku": "SE-T924",
-                     "name": "HL Touring Seat/Saddle", "price": 52.64, "tags": []},)),
-    ]
-
-    batch_response = container.execute_item_batch(
-        batch_operations=batch_operations,
-        partition_key=category_id,
-    )
-
-    for index, result in enumerate(batch_response):
-        print(f"  Operation {index}: {result.get('statusCode')}")
-    ```
-
-    The batch upserts rather than creates, so rerunning the task doesn't fail on items that already exist.
-
-1. Run the script. Every operation reports a success status, and both items exist in the container.
-
-1. Now build a batch that mixes partition key values. Append the following code:
-
-    ```python
-    bad_operations = [
-        ("create", ({"id": "5996B5E0-6EC7-4CB7-A924-7B5A053AE980", "categoryId": category_id,
-                     "categoryName": "Components, Saddles", "sku": "SE-M236",
-                     "name": "LL Mountain Seat/Saddle", "price": 27.12, "tags": []},)),
-        ("create", ({"id": "47ED1C3B-C205-4507-94EE-3B69A744B261",
-                     "categoryId": "14A1AD5D-59EA-4B63-A189-67B077783B0E",
-                     "categoryName": "Accessories, Helmets", "sku": "HL-U509",
-                     "name": "Sport-100 Helmet, Black", "price": 34.99, "tags": []},)),
-    ]
-
-    try:
-        container.execute_item_batch(bad_operations, partition_key=category_id)
-        print("Bad batch:   unexpectedly succeeded")
-    except exceptions.CosmosBatchOperationError as e:
-        print(f"Bad batch:   operation {e.error_index} failed with status {e.status_code}")
-    ```
-
-1. Run the script. The batch fails, and `error_index` identifies which operation caused it. Confirm in the Azure portal's **Data Explorer** that neither item was written.
-
-::: zone-end
-
----
-
-## Task 7: Load items in bulk
-
-Write a few thousand independent items and measure how long the load takes.
-
-This task writes to the `bulkload` container rather than `operations`, so the items you created in earlier tasks stay out of the timing measurement.
-
-::: zone pivot="csharp"
-
-1. In **Program.cs**, replace everything below the marker comment with the following code. It uses a second client with bulk execution enabled, because that setting can't be changed after a client is created:
-
-    ```csharp
-    CosmosClientOptions bulkOptions = new() { AllowBulkExecution = true };
-    using CosmosClient bulkClient = new(endpoint, new DefaultAzureCredential(), bulkOptions);
-
-    Container bulkContainer = bulkClient.GetDatabase("cosmicworks").GetContainer("bulkload");
-
-    List<Product> items = Enumerable.Range(0, 2000)
-        .Select(i => new Product(
-            id: Guid.NewGuid().ToString(),
-            categoryId: $"bulk-category-{i % 20}",
-            categoryName: $"Bulk Category {i % 20}",
-            sku: $"BL-{i:D5}",
-            name: $"Bulk Product {i}",
-            price: 10.00d + i % 500,
-            tags: Array.Empty<Tag>()))
-        .ToList();
-
-    Stopwatch timer = Stopwatch.StartNew();
-
-    List<Product> pending = items;
-    int firstPassFailures = 0;
-
-    for (int attempt = 0; attempt < 3; attempt++)
-    {
-        List<Task<Product?>> tasks = pending
-            .Select(async item =>
+            foreach (TaggedItem item in page)
             {
-                try
-                {
-                    await bulkContainer.CreateItemAsync(item, new PartitionKey(item.categoryId));
-                    return (Product?)null;
-                }
-                catch (CosmosException exception) when (
-                    exception.StatusCode == HttpStatusCode.TooManyRequests ||
-                    exception.StatusCode == (HttpStatusCode)449)
-                {
-                    return item;
-                }
-            })
-            .ToList();
-
-        Product?[] outcomes = await Task.WhenAll(tasks);
-        pending = outcomes.OfType<Product>().ToList();
-
-        if (attempt == 0)
-        {
-            firstPassFailures = pending.Count;
-        }
-
-        if (pending.Count == 0)
-        {
-            break;
-        }
-
-        await Task.Delay(TimeSpan.FromSeconds(2));
-    }
-
-    timer.Stop();
-
-    Console.WriteLine($"Bulk load:   {items.Count - pending.Count} of {items.Count} written in {timer.Elapsed.TotalSeconds:0.0} seconds");
-    Console.WriteLine($"Retried:     {firstPassFailures} on the first pass, {pending.Count} still outstanding");
-    ```
-
-    `AllowBulkExecution` lets the client group concurrent operations by partition key range and send each group as a single request. The 20 partition key values create logical partitions, not physical partitions. This small container can have only one physical partition. Distributing keys supports parallelism across physical partitions when the container scales out.
-
-    The handler retries only 429 and 449 responses, which indicate retryable rejections. Cancellation, nonretryable errors, and ambiguous outcomes such as timeouts propagate instead of being reported as unwritten items. A timed-out create might already have committed, so resolve its outcome before replaying it. `Task.WhenAll` waits for all tasks; its returned task retains their exceptions even though awaiting it throws one.
-
-1. Run the project and note the elapsed time:
-
-    ```bash
-    dotnet run
-    ```
-
-    ```output
-    Bulk load:   2000 of 2000 written in 16.8 seconds
-    Retried:     14 on the first pass, 0 still outstanding
-    ```
-
-    This output is an example; elapsed time and retry counts vary. The SDK might handle all throttling without surfacing any first-pass failures. If retryable rejections remain, the next pass retries those items, but success isn't guaranteed. Check the final outstanding count. Restarting the whole load creates fresh `Guid` values and can write 2,000 more items instead of finishing the first 2,000.
-
-::: zone-end
-
-::: zone pivot="python"
-
-1. Install the async transport dependency:
-
-    ```bash
-    pip install aiohttp
-    ```
-
-1. Create a second file named **bulk_load.py** with the following contents. Set the endpoint to the same value you used earlier:
-
-    ```python
-    import asyncio
-    import time
-    import uuid
-    from azure.cosmos import exceptions
-    from azure.cosmos.aio import CosmosClient
-    from azure.identity.aio import DefaultAzureCredential
-
-    endpoint = "<cosmos-endpoint>"
-
-    async def main():
-        items = [
-            {
-                "id": str(uuid.uuid4()),
-                "categoryId": f"bulk-category-{i % 20}",
-                "categoryName": f"Bulk Category {i % 20}",
-                "sku": f"BL-{i:05d}",
-                "name": f"Bulk Product {i}",
-                "price": 10.00 + i % 500,
-                "tags": [],
+                Console.WriteLine($"{item.name}: [{string.Join(", ", item.tagNames)}]");
+                rows++;
             }
-            for i in range(2000)
-        ]
+        }
+    }
 
-        async with DefaultAzureCredential() as credential:
-            async with CosmosClient(endpoint, credential) as client:
-                container = client.get_database_client("cosmicworks").get_container_client("bulkload")
-
-                semaphore = asyncio.Semaphore(100)
-
-                async def create(item):
-                    async with semaphore:
-                        return await container.create_item(body=item)
-
-                start = time.perf_counter()
-
-                pending = items
-                first_pass_failures = 0
-
-                for attempt in range(3):
-                    results = await asyncio.gather(
-                        *(create(item) for item in pending), return_exceptions=True)
-
-                    for result in results:
-                        if isinstance(result, BaseException) and (
-                            not isinstance(result, exceptions.CosmosHttpResponseError)
-                            or result.status_code not in (429, 449)
-                        ):
-                            raise result
-
-                    pending = [item for item, result in zip(pending, results)
-                               if isinstance(result, Exception)]
-
-                    if attempt == 0:
-                        first_pass_failures = len(pending)
-
-                    if not pending:
-                        break
-
-                    await asyncio.sleep(2)
-
-                elapsed = time.perf_counter() - start
-
-                print(f"Bulk load:   {len(items) - len(pending)} of {len(items)} written in {elapsed:.1f} seconds")
-                print(f"Retried:     {first_pass_failures} on the first pass, {len(pending)} still outstanding")
-
-    asyncio.run(main())
+    Console.WriteLine($"EXISTS:      {rows} items, {subqueryCharge:0.00} RU");
     ```
 
-    The semaphore caps how many requests are in flight, and `return_exceptions=True` collects each outcome. The handler retries only 429 and 449 responses. Cancellation, nonretryable errors, and ambiguous outcomes such as timeouts propagate. A timed-out create might already have committed, so resolve its outcome before replaying it. Because `gather` preserves order, zipping the results against `pending` identifies the items whose requests were rejected with retryable errors.
+1. Add the result type to the record declarations:
 
-    The 20 partition key values create logical partitions, not physical partitions. This small container can have only one physical partition. Distributing keys supports parallelism across physical partitions when the container scales out.
+    ```csharp
+    public record TaggedItem(string id, string name, string[] tagNames);
+    ```
 
-1. Run the script and note the elapsed time:
+1. Run the project:
 
     ```bash
-    python bulk_load.py
-    ```
-
-    ```output
-    Bulk load:   2000 of 2000 written in 21.4 seconds
-    Retried:     22 on the first pass, 0 still outstanding
-    ```
-
-    This output is an example; elapsed time and retry counts vary. The SDK might handle all throttling without surfacing any first-pass failures. If retryable rejections remain, the next pass retries those items, but success isn't guaranteed. Check the final outstanding count. Restarting the whole load creates fresh `uuid4()` values and can write 2,000 more items instead of finishing the first 2,000.
-
-1. When you finish testing, deactivate the Python environment:
-
-    ```bash
-    deactivate
+    dotnet run
     ```
 
 ::: zone-end
 
-Bulk mode doesn't make each write cheaper. Every item costs the same RU charge it would cost on its own. What changes is how many requests are in flight at once, so the load finishes in a fraction of the time the same writes would take one after another. Elapsed time is bounded by the container's provisioned throughput, which is why ingest jobs raise RU/s during a load and lower it afterward.
+::: zone pivot="python"
+
+1. Append the following code. `EXISTS` filters items by the contents of the array, and the `ARRAY` expression projects the tag names alongside each match:
+
+    ```python
+    subquery = """
+        SELECT
+            p.id,
+            p.name,
+            ARRAY(SELECT VALUE t.name FROM t IN p.tags) AS tagNames
+        FROM product p
+        WHERE p.categoryId = @category
+          AND EXISTS (SELECT VALUE t FROM t IN p.tags WHERE t.name = @tag)
+    """
+
+    tag_parameters = [
+        {"name": "@category", "value": ROAD_FRAMES},
+        {"name": "@tag", "value": "Tag-30"},
+    ]
+
+    rows = 0
+    subquery_charges = []
+
+    for page in container.query_items(
+        query=subquery,
+        parameters=tag_parameters,
+        partition_key=ROAD_FRAMES,
+        response_hook=lambda headers, _results: subquery_charges.append(
+            float(headers["x-ms-request-charge"])
+        ),
+    ).by_page():
+        for item in page:
+            print(f"{item['name']}: {item['tagNames']}")
+            rows += 1
+
+    print(f"EXISTS:      {rows} items, {sum(subquery_charges):.2f} RU")
+    ```
+
+1. Run the script:
+
+    ```bash
+    python app.py
+    ```
+
+::: zone-end
+
+Four products in this category carry `Tag-30`, and each one appears exactly once, no matter how many other tags it holds. The `tagNames` array shows those other tags, which the filter never mentions. Copy the `WHERE t.name = @tag` condition into the `ARRAY` subquery as well and rerun: the projection narrows to the matching tag alone, while the same four products come back. Filtering items and shaping their arrays are separate decisions.
+
+---
+
+## Task 4: Expand the array with a cross-product query
+
+Ask a different question of the same data. A `JOIN` returns one result per array element rather than one result per product, which is the shape tag report needs.
+
+::: zone pivot="csharp"
+
+1. Append the following code. It expands every tag in the category and counts both the rows returned and the distinct products behind them:
+
+    ```csharp
+    QueryDefinition crossProduct = new QueryDefinition("""
+            SELECT p.name, t.name AS tag
+            FROM product p
+            JOIN t IN p.tags
+            WHERE p.categoryId = @category
+            """)
+        .WithParameter("@category", roadFrames);
+
+    HashSet<string> namesInJoin = new();
+    int pairs = 0;
+    double joinCharge = 0;
+
+    using (FeedIterator<TagPair> iterator = container.GetItemQueryIterator<TagPair>(
+        crossProduct,
+        requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(roadFrames) }))
+    {
+        while (iterator.HasMoreResults)
+        {
+            FeedResponse<TagPair> page = await iterator.ReadNextAsync();
+            joinCharge += page.RequestCharge;
+
+            foreach (TagPair pair in page)
+            {
+                namesInJoin.Add(pair.name);
+                pairs++;
+            }
+        }
+    }
+
+    Console.WriteLine($"JOIN:        {pairs} rows from {namesInJoin.Count} products, {joinCharge:0.00} RU");
+    ```
+
+1. Add the result type to the record declarations:
+
+    ```csharp
+    public record TagPair(string name, string tag);
+    ```
+
+1. Run the project.
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. Append the following code. It expands every tag in the category and counts both the rows returned and the distinct products behind them:
+
+    ```python
+    cross_product = """
+        SELECT p.name, t.name AS tag
+        FROM product p
+        JOIN t IN p.tags
+        WHERE p.categoryId = @category
+    """
+
+    names_in_join = set()
+    pairs = 0
+    join_charges = []
+
+    for page in container.query_items(
+        query=cross_product,
+        parameters=[{"name": "@category", "value": ROAD_FRAMES}],
+        partition_key=ROAD_FRAMES,
+        response_hook=lambda headers, _results: join_charges.append(
+            float(headers["x-ms-request-charge"])
+        ),
+    ).by_page():
+        for row in page:
+            names_in_join.add(row["name"])
+            pairs += 1
+
+    print(f"JOIN:        {pairs} rows from {len(names_in_join)} products, {sum(join_charges):.2f} RU")
+    ```
+
+1. Run the script.
+
+::: zone-end
+
+The query returns 98 rows drawn from 29 products, in a category that holds 33. Four products never appear. No predicate excludes them, because the query has none beyond the category. They carry an empty `tags` array, and the cross-product of a value with an empty set is empty.
+
+Now watch the same effect against three products elsewhere in the catalog that carry no tags at all.
+
+::: zone pivot="csharp"
+
+1. Append the following code. The first query finds the products by name, and the second runs the identical filter through a `JOIN`:
+
+    ```csharp
+    string[] untagged = { "Road Tire Tube", "Classic Vest, S", "ML Mountain Pedal" };
+
+    QueryDefinition direct = new QueryDefinition(
+            "SELECT VALUE p.name FROM product p WHERE ARRAY_CONTAINS(@names, p.name)")
+        .WithParameter("@names", untagged);
+
+    QueryDefinition joined = new QueryDefinition("""
+            SELECT VALUE p.name
+            FROM product p
+            JOIN t IN p.tags
+            WHERE ARRAY_CONTAINS(@names, p.name)
+            """)
+        .WithParameter("@names", untagged);
+
+    async Task<int> CountAsync(QueryDefinition q)
+    {
+        int total = 0;
+
+        using FeedIterator<string> iterator = container.GetItemQueryIterator<string>(q);
+
+        while (iterator.HasMoreResults)
+        {
+            total += (await iterator.ReadNextAsync()).Count;
+        }
+
+        return total;
+    }
+
+    Console.WriteLine($"Without JOIN: {await CountAsync(direct)} products");
+    Console.WriteLine($"With JOIN:    {await CountAsync(joined)} products");
+    ```
+
+1. Run the project.
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. Append the following code. The first query finds the products by name, and the second runs the identical filter through a `JOIN`:
+
+    ```python
+    untagged = ["Road Tire Tube", "Classic Vest, S", "ML Mountain Pedal"]
+
+    direct = "SELECT VALUE p.name FROM product p WHERE ARRAY_CONTAINS(@names, p.name)"
+
+    joined = """
+        SELECT VALUE p.name
+        FROM product p
+        JOIN t IN p.tags
+        WHERE ARRAY_CONTAINS(@names, p.name)
+    """
+
+    def count(query):
+        results = container.query_items(
+            query=query,
+            parameters=[{"name": "@names", "value": untagged}],
+            enable_cross_partition_query=True,
+        )
+        return len(list(results))
+
+    print(f"Without JOIN: {count(direct)} products")
+    print(f"With JOIN:    {count(joined)} products")
+    ```
+
+1. Run the script.
+
+::: zone-end
+
+The first query returns all three products. The second returns none, from the same filter against the same items. Nothing in the response signals that anything is missing, which is what makes this behavior worth knowing: a report built on a `JOIN` counts only products that hold at least one array element. Across this catalog, that report silently omits 45 of the 295 products.
+
+When a result must include every product regardless of its tags, keep the array out of the `FROM` clause and project it instead, with the `ARRAY` expression from Task 3.
+
+---
+
+## Task 5: Page a result set with continuation tokens
+
+Serve one category 10 items at a time, the way a stateless API does, resuming each page from the token the previous page returned.
+
+::: zone pivot="csharp"
+
+1. Append the following code. The method fetches exactly one page and returns the token for the next one:
+
+    ```csharp
+    async Task<(int Count, double Charge, string? Token)> GetPageAsync(string? continuationToken)
+    {
+        QueryDefinition paged = new QueryDefinition(
+                "SELECT p.id, p.name, p.price FROM product p WHERE p.categoryId = @category")
+            .WithParameter("@category", roadFrames);
+
+        QueryRequestOptions options = new()
+        {
+            PartitionKey = new PartitionKey(roadFrames),
+            MaxItemCount = 10
+        };
+
+        using FeedIterator<PagedProduct> iterator =
+            container.GetItemQueryIterator<PagedProduct>(paged, continuationToken, options);
+
+        FeedResponse<PagedProduct> page = await iterator.ReadNextAsync();
+
+        return (page.Count, page.RequestCharge, page.ContinuationToken);
+    }
+    ```
+
+1. Add the result type to the record declarations:
+
+    ```csharp
+    public record PagedProduct(string id, string name, double price);
+    ```
+
+1. Add a loop that walks the pages, passing each token into the next request:
+
+    ```csharp
+    string? token = null;
+    int pageNumber = 0;
+
+    do
+    {
+        var result = await GetPageAsync(token);
+        token = result.Token;
+        pageNumber++;
+
+        Console.WriteLine($"Page {pageNumber}: {result.Count} items, {result.Charge:0.00} RU, token: {(token is null ? "none" : "present")}");
+    }
+    while (token is not null);
+    ```
+
+    The first request passes `null` and starts at the beginning. A `null` token in the response means the results are exhausted, which is why the loop tests the token rather than the item count.
+
+1. Run the project:
+
+    ```bash
+    dotnet run
+    ```
+
+::: zone-end
+
+::: zone pivot="python"
+
+1. Append the following code. The function fetches exactly one page and returns the token for the next one:
+
+    ```python
+    def get_page(continuation_token=None):
+        charges = []
+
+        results = container.query_items(
+            query="SELECT p.id, p.name, p.price FROM product p WHERE p.categoryId = @category",
+            parameters=[{"name": "@category", "value": ROAD_FRAMES}],
+            partition_key=ROAD_FRAMES,
+            max_item_count=10,
+            response_hook=lambda headers, _results: charges.append(
+                float(headers["x-ms-request-charge"])
+            ),
+        )
+
+        pager = results.by_page(continuation_token)
+        page = list(next(pager))
+
+        return len(page), sum(charges), pager.continuation_token
+    ```
+
+1. Add a loop that walks the pages, passing each token into the next request:
+
+    ```python
+    token = None
+    page_number = 0
+
+    while True:
+        count, charge, token = get_page(token)
+        page_number += 1
+
+        print(f"Page {page_number}: {count} items, {charge:.2f} RU, token: {'present' if token else 'none'}")
+
+        if token is None:
+            break
+    ```
+
+    The first call passes `None` and starts at the beginning. A `None` token means the results are exhausted, which is why the loop tests the token rather than the item count.
+
+1. Run the script:
+
+    ```bash
+    python app.py
+    ```
+
+::: zone-end
+
+Watch the item counts. Most pages return 10 items, but the service can return fewer at any point and still have more results waiting. The token, not the count, is what tells you whether to ask again.
+
+Two limits are worth confirming yourself. Add `ORDER BY p.price` to the query and rerun: paging still works. Then replace the projection with `SELECT COUNT(1) FROM product p WHERE p.categoryId = @category` and rerun: the aggregate returns a single result and no usable token, because an aggregate has to scan every matching item before it can produce an answer and can't checkpoint partway through that calculation.
 
 ---
 
