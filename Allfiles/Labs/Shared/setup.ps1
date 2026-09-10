@@ -701,6 +701,17 @@ function Invoke-Az {
     # enable_pbe attribute warning az cosmosdb create emits.
     $arguments = @($Arguments) + '--only-show-errors'
 
+    $azCommand = Get-Command az -ErrorAction Stop
+    if ($IsWindows -and $azCommand.CommandType -eq 'Application' -and
+        [IO.Path]::GetExtension($azCommand.Source) -in @('.cmd', '.bat')) {
+        for ($argumentIndex = 0; $argumentIndex -lt $arguments.Count; $argumentIndex++) {
+            if ($arguments[$argumentIndex] -match '^https?://[^"\r\n]*[&|<>()^][^"\r\n]*$') {
+                $PSNativeCommandArgumentPassing = 'Legacy'
+                $arguments[$argumentIndex] = '"' + $arguments[$argumentIndex] + '"'
+            }
+        }
+    }
+
     # Capture stderr to a file rather than merging it into stdout. Merging corrupts
     # every caller that parses the result as JSON or TSV.
     $errorFile = [System.IO.Path]::GetTempFileName()
@@ -709,7 +720,7 @@ function Invoke-Az {
     try {
         # Some PowerShell 7 builds turn redirected native stderr into a terminating error.
         $ErrorActionPreference = 'Continue'
-        $output = & az @arguments 2>$errorFile
+        $output = & $azCommand @arguments 2>$errorFile
         $exitCode = $LASTEXITCODE
         $stderr = (Get-Content -LiteralPath $errorFile -Raw)
     }
