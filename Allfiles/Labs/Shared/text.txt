@@ -1,8 +1,8 @@
 TEST LAB....
 
-In this exercise, you build the pipeline described throughout this module. You load the CosmicWorks catalog and run a consumer. The consumer keeps the denormalized category name current. You then run the same logic in an Azure Function. Finally, you copy the data to a container that uses a different partition key.
+In this exercise, you use both halves of the toolset against one Azure Cosmos DB account. You connect an AI assistant to the CosmicWorks catalog through a Model Context Protocol (MCP) server, give a shopping assistant durable memory with the Agent Memory Toolkit, and then inspect what each tool created so the boundary between them is concrete rather than theoretical.
 
-The category name that products carry is a copy. Renaming a category in one container leaves that copy stale everywhere else until something reconciles it, and the change feed is what makes the reconciliation possible without polling.
+The two halves do different jobs. The MCP server helps *you* understand data you didn't model. The memory toolkit gives your *application* a capability it didn't have. Doing both in one sitting makes the difference hard to miss.
 
 ## Before you start
 
@@ -10,22 +10,13 @@ To complete this exercise, you need an [Azure subscription](https://azure.micros
 
 If your lab environment isn't set up yet, follow [Set up your lab environment](https://github.com/MicrosoftLearning/dp-420-cosmos-db-dev/blob/main/Allfiles/Labs/Shared/00-setup-local-environment.md) to install Visual Studio Code, Git, the Azure CLI, and PowerShell 7.
 
-::: zone pivot="csharp"
-
-You also need the [.NET 10 SDK](https://dotnet.microsoft.com/download) or later installed.
-
-::: zone-end
-
-::: zone pivot="python"
-
 You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed.
-
-::: zone-end
 
 This exercise also requires:
 
-- [Azure Functions Core Tools](/azure/azure-functions/functions-run-local) version 4.
-- [Azurite](/azure/storage/common/storage-use-azurite), for the function's local storage.
+- A Microsoft Foundry project with a chat model deployment and a text embedding model deployment.
+- [Node.js](https://nodejs.org) 22 or later, which supplies the `npx` command the MCP server runs under.
+- Visual Studio Code with the [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension.
 
 ## Set up your Azure Cosmos DB resources
 
@@ -53,7 +44,7 @@ If you have no verified core account, follow the setup steps below. To add missi
     az login
     ```
 
-1. Set variables for the resource group (If a resource group was provided by your lab environment, use that name) and region you want to use. Change either value if you prefer a different resource group name or region.
+1. Set variables for the resource group (if your lab environment provided a resource group, use that name) and region you want to use. Change either value if you prefer a different resource group name or region.
 
     ```powershell
     $resourceGroup = "dp420"
@@ -63,14 +54,14 @@ If you have no verified core account, follow the setup steps below. To add missi
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab07 -LabProfile core
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile core
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab07a7f3k9`.
+    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab08a7f3k9`.
 
 1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
 
-1. Record the **Account name** and **Account endpoint** values the script prints. You need both throughout this exercise, and the endpoint looks like `https://<your-account-name>.documents.azure.com:443/`.
+1. Record the **Account name** and **Account endpoint** values the script prints. Every code file in this exercise needs the endpoint, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
 
 1. Set a variable for the account name so the Azure CLI commands in this exercise can use it.
 
@@ -84,9 +75,7 @@ The script creates the following resources:
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
 | `cosmicworks` database | Holds every container this learning path uses |
-| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, loaded with 295 CosmicWorks products |
-| `productMeta` container | Partitioned on `/type`, autoscale up to 1,000 RU/s, loaded with 237 category and tag records |
-| `leases` container | Partitioned on `/id`, 400 RU/s. The change feed processor stores its checkpoints here |
+| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 request units per second, loaded with 295 CosmicWorks products |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
@@ -94,87 +83,50 @@ Because key-based authentication is disabled, no key or connection string appear
 > [!NOTE]
 > A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
-> [!IMPORTANT]
-> Container copy jobs in Task 4 run in the account's write region and are available in a subset of Azure regions. The setup script warns you if the region you chose doesn't support them. Check the [supported regions](/azure/cosmos-db/container-copy) if you need to pick a different one.
-
 ## Task 1: Set up the project and confirm the catalog
 
-The setup script created the `product`, `productMeta`, and `leases` containers, granted your identity data-plane access, and loaded the catalog. This task builds the project the rest of the exercise uses and confirms the data arrived.
+The setup script grants **Cosmos DB Built-in Data Contributor**, which allows writes. The MCP server you configure next only reads, so in a production deployment it would take **Cosmos DB Built-in Data Reader** instead.
 
-Create a project and add the packages (remember to replace `<your-account-name>` and `<cosmos-endpoint>` with your actual values):
-
-::: zone pivot="csharp"
+Create a project folder and set up a virtual environment:
 
 ```bash
-dotnet new console -o change-feed-lab
-cd change-feed-lab
-dotnet add package Microsoft.Azure.Cosmos
-dotnet add package Newtonsoft.Json
-dotnet add package Azure.Identity
+mkdir ai-tools-lab
+cd ai-tools-lab
+python -m venv .venv
 ```
 
-Replace the contents of `Program.cs` with a count of what each container holds:
-
-```csharp
-using Azure.Identity;
-using Microsoft.Azure.Cosmos;
-
-string endpoint = "<cosmos-endpoint>";
-
-CosmosClient client = new(endpoint, new DefaultAzureCredential());
-Database database = client.GetDatabase("cosmicworks");
-
-foreach (string name in new[] { "productMeta", "product" })
-{
-    Container container = database.GetContainer(name);
-
-    FeedResponse<int> response = await container
-        .GetItemQueryIterator<int>("SELECT VALUE COUNT(1) FROM c")
-        .ReadNextAsync();
-
-    Console.WriteLine($"{name}: {response.First()} items");
-}
-```
-
-Run it:
-
-```bash
-dotnet run
-```
-
-```output
-productMeta: 237 items
-product: 295 items
-```
-
-::: zone-end
-
-::: zone pivot="python"
+Activate the environment. On Windows:
 
 ```powershell
-mkdir change-feed-lab
-cd change-feed-lab
-python -m venv .venv
 .venv\Scripts\activate
+```
+
+On macOS or Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+Install the packages:
+
+```bash
 pip install azure-cosmos azure-identity
 ```
 
-Create `check_catalog.py`:
+Confirm the catalog loaded. In the **ai-tools-lab** folder, alongside the **.venv** folder rather than inside it, save the following code as `check_catalog.py`, replacing the endpoint:
 
 ```python
 from azure.cosmos import CosmosClient
 from azure.identity import DefaultAzureCredential
 
-endpoint = "<cosmos-endpoint>"
+ENDPOINT = "<cosmos-endpoint>"
 
-client = CosmosClient(endpoint, credential=DefaultAzureCredential())
-database = client.get_database_client("cosmicworks")
+client = CosmosClient(ENDPOINT, credential=DefaultAzureCredential())
+container = client.get_database_client("cosmicworks").get_container_client("product")
 
-for name in ["productMeta", "product"]:
-    container = database.get_container_client(name)
-    count = list(container.query_items(query="SELECT VALUE COUNT(1) FROM c"))[0]
+count = list(container.query_items(query="SELECT VALUE COUNT(1) FROM c"))[0]
 
-    print(f"{name}: {count} items")
+print(f"Catalog holds {count} products")
 ```
 
 Run it:
@@ -183,504 +135,254 @@ Run it:
 python check_catalog.py
 ```
 
-```output
-productMeta: 237 items
-product: 295 items
-```
+The output reports 295 products.
 
-::: zone-end
+## Task 2: Connect an AI assistant with the Azure MCP Server
 
-`productMeta` holds two kinds of document discriminated by a `type` property: category documents and tag documents. That detail matters in the next task.
+Create a `.vscode` folder in the project, and add a file named `mcp.json`:
 
-## Task 2: Sync a denormalized property from the change feed
-
-Build a consumer that watches `productMeta` and rewrites `categoryName` on every product in a renamed category.
-
-::: zone pivot="csharp"
-
-Create `Sync.cs` in the `change-feed-lab` directory:
-
-```csharp
-using Azure.Identity;
-using Microsoft.Azure.Cosmos;
-
-public record MetaItem(string id, string name, string type);
-public record ProductRef(string id, string categoryId);
-
-public static class Sync
+```json
 {
-    private static Container productContainer = null!;
-
-    public static async Task RunAsync(string endpoint)
-    {
-        CosmosClient client = new(endpoint, new DefaultAzureCredential());
-        Database database = client.GetDatabase("cosmicworks");
-
-        productContainer = database.GetContainer("product");
-        Container monitoredContainer = database.GetContainer("productMeta");
-        Container leaseContainer = database.GetContainer("leases");
-
-        ChangeFeedProcessor processor = monitoredContainer
-            .GetChangeFeedProcessorBuilder<MetaItem>(
-                processorName: "categoryNameSync",
-                onChangesDelegate: HandleChangesAsync)
-            .WithInstanceName("lab-worker")
-            .WithLeaseContainer(leaseContainer)
-            .Build();
-
-        await processor.StartAsync();
-        Console.WriteLine("Processor started. Press any key to stop.");
-        Console.ReadKey();
-        await processor.StopAsync();
+  "servers": {
+    "Azure MCP Server": {
+      "command": "npx",
+      "args": ["-y", "@azure/mcp@latest", "server", "start"]
     }
-
-    private static async Task HandleChangesAsync(
-        ChangeFeedProcessorContext context,
-        IReadOnlyCollection<MetaItem> changes,
-        CancellationToken cancellationToken)
-    {
-        foreach (MetaItem item in changes)
-        {
-            if (item.type != "category")
-            {
-                continue;
-            }
-
-            QueryDefinition query = new QueryDefinition(
-                    "SELECT p.id, p.categoryId FROM product p WHERE p.categoryId = @categoryId")
-                .WithParameter("@categoryId", item.id);
-
-            int updated = 0;
-            using FeedIterator<ProductRef> iterator =
-                productContainer.GetItemQueryIterator<ProductRef>(query);
-
-            while (iterator.HasMoreResults)
-            {
-                foreach (ProductRef product in await iterator.ReadNextAsync())
-                {
-                    await productContainer.PatchItemAsync<dynamic>(
-                        product.id,
-                        new PartitionKey(product.categoryId),
-                        new[] { PatchOperation.Set("/categoryName", item.name) });
-                    updated++;
-                }
-            }
-
-            Console.WriteLine($"Category '{item.name}' synced to {updated} products.");
-        }
-    }
+  }
 }
 ```
 
-`Sync.cs` only defines a class, and `dotnet run` starts the project's entry point rather than a file you name, so nothing you do runs `Sync.cs` on its own. The call belongs in `Program.cs` instead. Replace that file's entire contents with one line. The counting code from Task 1 has done its job, and `Sync.cs` carries its own `using` directives:
+Open the folder in Visual Studio Code, open GitHub Copilot, and switch to **Agent** mode. Refresh the tools list and confirm the Azure MCP Server appears. The server authenticates with the credentials your `az login` already established, so nothing else needs configuring.
 
-```csharp
-await Sync.RunAsync("<cosmos-endpoint>");
+Now work the catalog through the assistant. Start with the question you'd otherwise answer by opening documents by hand:
+
+```text
+Infer the schema of the product container in the cosmicworks database
+for my Azure Cosmos DB account.
 ```
 
-Run the consumer:
+The assistant reports the top-level properties and how many sampled documents carried each one. Compare those properties against the shape you know from earlier in this learning path: `id`, `categoryId`, `categoryName`, `sku`, `name`, `description`, `price`, and `tags`.
+
+Ask for recent writes, which is how you'd confirm a load succeeded without writing a query:
+
+```text
+Show me the 5 most recently modified items in the product container.
+```
+
+Then ask a real question about the data:
+
+```text
+Query the product container for items where categoryId is
+3E4CEACD-D007-46EB-82D7-31F6141752B2, and return only name and price.
+```
+
+Approve each tool call when prompted. Notice what the assistant reports back: the tool it chose, and the results it got.
+
+> [!NOTE]
+> The server also carries text search and vector similarity search. Neither is exercised here, because text search needs a full-text index on the target property and vector search needs both a vector index and an embedding deployment. The `product` container has neither. That constraint belongs to the tools, not to your prompt: they operate on the indexing policy you configured.
+
+Before moving on, note what didn't happen. You asked the assistant about your data several times and it never offered to change it. Every Azure Cosmos DB tool in the server is read-only.
+
+## Task 3: Add durable memory with the Agent Memory Toolkit
+
+The assistant helped you understand the catalog. It did nothing for the application, which still forgets a shopper between messages.
+
+Your identity also needs data-plane access to the Foundry deployment, which the Cosmos DB role from Task 1 doesn't cover. Owning the subscription isn't enough, because Azure's Owner role carries no data actions and so doesn't authorize inference calls made with Microsoft Entra ID:
+
+```azurecli
+$foundryResourceGroup = "<foundry-resource-group>"
+
+$principalId = az ad signed-in-user show --query id --output tsv
+
+$foundryResourceId = az cognitiveservices account show `
+    --name "<foundry-resource-name>" `
+    --resource-group $foundryResourceGroup `
+    --query id `
+    --output tsv
+
+az role assignment create `
+    --assignee $principalId `
+    --role "53ca6127-db72-4b80-b1b0-d745d6d5456d" `
+    --scope $foundryResourceId
+```
+
+That definition ID is the **Foundry User** role. Use the ID rather than the display name, because these role names are being renamed. If you created the project yourself in the Foundry portal, you might already hold it; running the command again is harmless.
+
+Install the memory toolkit:
 
 ```bash
-dotnet run
+pip install azure-cosmos-agent-memory==0.3.0b2
 ```
 
-```output
-Processor started. Press any key to stop.
+> [!IMPORTANT]
+> Pin the version. This package is in preview, its public surface is still changing between releases, and the toolkit's own guidance is to pin when integrating.
+
+### Provision the memory containers
+
+Microsoft Entra ID doesn't authorize database or container creation through the Cosmos DB data-plane SDK. Assigning a control-plane role doesn't make those SDK creation calls work. Before running the memory client, use the Azure portal to provision the memory store in your existing lab account. Your identity needs a control-plane role that permits database and container creation, in addition to the data-plane role from setup.
+
+In the account's **Features** pane, enable [vector search](/azure/cosmos-db/vector-search#enable-the-vector-indexing-and-search-feature) and confirm enrollment for [full-text search](/azure/cosmos-db/gen-ai/full-text-search). Wait for enrollment to complete before creating containers with these policies. This step doesn't add indexes to the existing `product` container.
+
+In **Data Explorer**, use **New Container** to create the `ai_memory` database and the following containers. For each container, select dedicated autoscale throughput with a maximum of 1,000 RU/s. Use **Add hierarchical partition key** to add the second key level where the table specifies one. The [hierarchical partition key guide](/azure/cosmos-db/hierarchical-partition-keys#create-a-container-by-using-hierarchical-partition-keys) describes this creation flow.
+
+| Container | Partition key paths, in order | Default time to live |
+| :--- | :--- | :--- |
+| `memories` | `/user_id`, `/thread_id` | On, with no default expiry (`-1`) |
+| `memories_turns` | `/user_id`, `/thread_id` | 2,592,000 seconds (30 days) |
+| `memories_summaries` | `/user_id`, `/thread_id` | On, with no default expiry (`-1`) |
+| `counter` | `/user_id`, `/thread_id` | Off |
+| `leases` | `/id` | Off |
+
+For the three memory data containers, configure the following vector embedding policy. The 1,536 dimensions match the toolkit's default. Use a deployment of `text-embedding-3-large` or `text-embedding-3-small`, both of which support this dimension setting.
+
+```json
+{
+    "vectorEmbeddings": [
+        {
+            "path": "/embedding",
+            "dataType": "float32",
+            "distanceFunction": "cosine",
+            "dimensions": 1536
+        }
+    ]
+}
 ```
 
-Leave this terminal open and the consumer running. `Sync.RunAsync` waits at `Console.ReadKey`, so the processor keeps watching the feed until you stop it, and the next step depends on it still running.
+Use this full-text policy for those same three containers:
 
-::: zone-end
+```json
+{
+    "defaultLanguage": "en-US",
+    "fullTextPaths": [
+        { "path": "/content", "language": "en-US" }
+    ]
+}
+```
 
-::: zone pivot="python"
+Configure their indexing policy with the vector and full-text indexes:
 
-The Python SDK doesn't include the change feed processor, so this consumer reads the feed directly and keeps its own position.
+```json
+{
+    "indexingMode": "consistent",
+    "automatic": true,
+    "includedPaths": [
+        { "path": "/*" }
+    ],
+    "excludedPaths": [
+        { "path": "/source_memory_ids/*" },
+        { "path": "/supersedes_ids/*" },
+        { "path": "/\"_etag\"/?" }
+    ],
+    "vectorIndexes": [
+        { "path": "/embedding", "type": "quantizedFlat" }
+    ],
+    "fullTextIndexes": [
+        { "path": "/content" }
+    ]
+}
+```
 
-Create `sync.py`:
+For `memories_summaries`, also add the following `compositeIndexes` property to that indexing policy. Keep the preceding vector and full-text settings when you add it.
+
+```json
+{
+    "compositeIndexes": [
+        [
+            { "path": "/user_id", "order": "ascending" },
+            { "path": "/thread_id", "order": "ascending" },
+            { "path": "/version", "order": "descending" }
+        ]
+    ]
+}
+```
+
+Keep the default indexing policy for `counter` and `leases`. If the memory containers already exist, verify their keys, policies, and retention settings before continuing. Don't overwrite existing policies or delete shared data to repeat the exercise.
+
+### Write and retrieve memory
+
+Collect the Foundry values you need, then save the following code as `shopper_memory.py`. For the endpoint, use either the account-level inference endpoint (`https://<resource>.openai.azure.com/`) or the project endpoint the Foundry portal shows (`https://<resource>.services.ai.azure.com/api/projects/<project>`); the toolkit accepts both.
 
 ```python
-import time
+from azure.cosmos.agent_memory import CosmosMemoryClient
 
-from azure.cosmos import CosmosClient
-from azure.identity import DefaultAzureCredential
+memory = CosmosMemoryClient(
+    cosmos_database="ai_memory",
+    cosmos_container="memories",
+    ai_foundry_endpoint="<foundry-endpoint>",
+    embedding_deployment_name="<embedding-deployment-name>",
+    chat_deployment_name="<chat-deployment-name>",
+    use_default_credential=True,
+)
 
-endpoint = "<cosmos-endpoint>"
+memory.connect_cosmos(endpoint="<cosmos-endpoint>")
 
-client = CosmosClient(endpoint, credential=DefaultAzureCredential())
-database = client.get_database_client("cosmicworks")
-monitored = database.get_container_client("productMeta")
-products = database.get_container_client("product")
+USER = "shopper-4471"
+THREAD = "thread-001"
 
-continuation = None
-print("Reading the change feed. Press Ctrl+C to stop.")
+turns = [
+    ("user", "I ride a road bike and I only want components that fit a carbon frame."),
+    ("agent", "Understood. I'll keep recommendations to carbon-compatible parts."),
+    ("user", "Also, my budget tops out around 900 dollars per component."),
+]
 
-while True:
-    if continuation:
-        changes = monitored.query_items_change_feed(continuation=continuation)
-    else:
-        changes = monitored.query_items_change_feed(start_time="Now")
+for role, content in turns:
+    memory.upsert_memory(user_id=USER, thread_id=THREAD, role=role, content=content)
 
-    for item in changes:
-        if item.get("type") != "category":
-            continue
-
-        updated = 0
-        results = products.query_items(
-            query="SELECT p.id, p.categoryId FROM product p WHERE p.categoryId = @categoryId",
-            parameters=[{"name": "@categoryId", "value": item["id"]}],
-        )
-
-        for product in results:
-            products.patch_item(
-                item=product["id"],
-                partition_key=product["categoryId"],
-                patch_operations=[
-                    {"op": "set", "path": "/categoryName", "value": item["name"]}
-                ],
-            )
-            updated += 1
-
-        print(f"Category '{item['name']}' synced to {updated} products.")
-
-    continuation = monitored.client_connection.last_response_headers["etag"]
-    time.sleep(5)
+memory.process_now(user_id=USER, thread_id=THREAD)
+print("Turns stored and processed.")
 ```
 
 Run it:
 
 ```bash
-python sync.py
+python shopper_memory.py
 ```
 
-```output
-Reading the change feed. Press Ctrl+C to stop.
-```
+`connect_cosmos` opens the preprovisioned containers without creating resources. The constructor deliberately omits `cosmos_endpoint`: supplying it invokes `create_memory_store` automatically, which uses data-plane creation calls. `process_now` then runs the pipeline that turns those raw turns into durable memory. Fact extraction already runs on its own cadence by this point; the explicit call is what produces the thread and user summaries, which otherwise wait for much higher turn counts.
 
-Leave this terminal open and the consumer running. The loop checks the feed every five seconds until you stop it, and the next step depends on it still running.
+> [!NOTE]
+> The role on each turn is `user` or `agent`. The toolkit accepts `user`, `agent`, `tool`, and `system`, and rejects anything else, so `assistant` fails validation.
 
-::: zone-end
-
-With the consumer running, rename a category from a second terminal. Category `3E4CEACD-D007-46EB-82D7-31F6141752B2` is *Components, Road Frames*, and its partition key value is `category`.
-
-::: zone pivot="csharp"
-
-In the second terminal, open the parent folder of `change-feed-lab`. Create a sibling console project and install its dependencies:
-
-```powershell
-dotnet new console -o rename-category
-cd rename-category
-dotnet add package Microsoft.Azure.Cosmos
-dotnet add package Newtonsoft.Json
-dotnet add package Azure.Identity
-```
-
-Replace `Program.cs` in `rename-category` with:
-
-```csharp
-using Azure.Identity;
-using Microsoft.Azure.Cosmos;
-
-string endpoint = "<cosmos-endpoint>";
-const string categoryId = "3E4CEACD-D007-46EB-82D7-31F6141752B2";
-
-CosmosClient client = new(endpoint, new DefaultAzureCredential());
-Container container = client.GetContainer("cosmicworks", "productMeta");
-
-string newName = $"Components, Road Frames (revised {DateTime.UtcNow:HHmmss})";
-
-await container.PatchItemAsync<dynamic>(
-    categoryId,
-    new PartitionKey("category"),
-    new[] { PatchOperation.Set("/name", newName) });
-
-Console.WriteLine($"Renamed category to '{newName}'.");
-```
-
-Run the rename from this second terminal with `dotnet run`. Keep the consumer running in its original terminal.
-
-::: zone-end
-
-::: zone pivot="python"
-
-Create `rename.py`:
+Now recall from a different conversation. Comment out the whole `for role, content in turns:` block, including the indented line beneath it, so the same turns aren't written a second time. Then add the following code to the end of the file and run it again:
 
 ```python
-from datetime import datetime, timezone
-
-from azure.cosmos import CosmosClient
-from azure.identity import DefaultAzureCredential
-
-endpoint = "<cosmos-endpoint>"
-category_id = "3E4CEACD-D007-46EB-82D7-31F6141752B2"
-
-client = CosmosClient(endpoint, credential=DefaultAzureCredential())
-container = client.get_database_client("cosmicworks").get_container_client("productMeta")
-
-stamp = datetime.now(timezone.utc).strftime("%H%M%S")
-new_name = f"Components, Road Frames (revised {stamp})"
-
-container.patch_item(
-    item=category_id,
-    partition_key="category",
-    patch_operations=[{"op": "set", "path": "/name", "value": new_name}],
+hits = memory.search_cosmos(
+    search_terms="frame material and budget preferences",
+    user_id=USER,
+    top_k=5,
+    min_confidence=0.7,
 )
 
-print(f"Renamed category to '{new_name}'.")
+for hit in hits:
+    print(hit.get("type"), "-", hit["content"])
+
+print("\nProfile:", memory.get_user_summary(user_id=USER))
 ```
 
-::: zone-end
+The search is scoped to the user rather than the thread, so a brand-new conversation recalls everything learned earlier. What comes back is extracted facts, not the original sentences: the toolkit decided what was worth keeping. The `min_confidence` filter excludes memories with scores below 0.7. Inferred facts can still meet that threshold, and a confidence score doesn't prove that a memory is correct or explicitly stated.
 
-Run it and watch the consumer's output. It reports the new category name and the number of products it patched. Run it again to see the consumer pick up a second change.
+## Task 4: Separate what the tools own from what you own
 
-Two behaviors are worth noticing:
+Go back to the assistant in Visual Studio Code and point it at what the toolkit built:
 
-- **The `type` filter is doing real work.** `productMeta` holds 200 tag documents alongside the categories. Without the filter, a tag rename would write a tag's name into `categoryName` on unrelated products.
-- **The consumer starts from now.** Changes made before it first ran are invisible to it, because the start position applies only until a lease or continuation token exists.
-
-::: zone pivot="csharp"
-
-> [!TIP]
-> Stop the consumer, run the rename program, then restart the consumer. It resumes from its stored checkpoint and processes the change made while it was stopped, because the lease documents survive the restart.
-
-::: zone-end
-
-::: zone pivot="python"
-
-> [!IMPORTANT]
-> This pull-mode sample keeps its continuation token only in memory. If you stop it, rename the category, and restart it, it starts from `Now` and doesn't replay the intervening change. Rename again while it is running to confirm processing. A production pull consumer must persist its token after successful processing and reload it on restart; this sample doesn't provide durable checkpoints.
-
-::: zone-end
-
-## Task 3: React to changes with an Azure Function
-
-The consumer in Task 2 is a process you have to host. This task runs equivalent logic on Azure Functions instead, watching the `product` container so that the patches from Task 2 become its input.
-
-You build a new project here rather than change the consumer, which should still be running in its own terminal. Open a third terminal and change to the folder that holds `change-feed-lab`, because the commands below create a `product-audit` folder wherever you run them, and it belongs beside the other projects rather than inside one of them. Creating this function can take a few minutes.
-
-::: zone pivot="csharp"
-
-Nesting isn't only untidy in .NET. A project compiles every `.cs` file beneath its own folder, so a function project created inside `change-feed-lab` would break that project's build.
-
-```bash
-func init product-audit --worker-runtime dotnet-isolated --target-framework net10.0
-cd product-audit
-func new --name ProductAudit --template "CosmosDBTrigger"
-dotnet add package Microsoft.Azure.Functions.Worker.Extensions.CosmosDB
+```text
+List the containers in the ai_memory database, and infer the schema
+of the memories container.
 ```
 
-Replace the contents of `ProductAudit.cs` with:
+The loop closes here: the design-time tool inspecting the run-time tool's output. You should see the toolkit's containers, and memory documents carrying `type`, `content`, `confidence`, `user_id`, and `thread_id` among other properties.
 
-```csharp
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Logging;
+Now answer three questions from what you observed, not from recall:
 
-public class ProductAudit
-{
-    private readonly ILogger<ProductAudit> _logger;
+1. **Which container holds the raw turns, and which holds the extracted facts?** The toolkit chose that split and the partition key underneath it. Would you choose the same key for the `product` container in Task 1?
+2. **Which settings did you supply before connecting?** You configured throughput and indexing when you provisioned the memory containers. The toolkit uses those resources; your team remains responsible for their capacity and indexing choices.
+3. **What ran that you didn't call?** Task 3 called `process_now` once, but writing turns also triggers embedding and extraction on a turn-count cadence. Each one is a model call billed to your Foundry deployment.
 
-    public ProductAudit(ILogger<ProductAudit> logger) => _logger = logger;
-
-    [Function("ProductAudit")]
-    public void Run([CosmosDBTrigger(
-        databaseName: "%COSMOS_DATABASE_NAME%",
-        containerName: "%COSMOS_CONTAINER_NAME%",
-        Connection = "COSMOS_CONNECTION",
-        LeaseContainerName = "leases")] IReadOnlyList<Product> changes,
-        FunctionContext context)
-    {
-        if (changes is null)
-        {
-            return;
-        }
-
-        foreach (Product product in changes)
-        {
-            _logger.LogInformation(
-                "Product {id} is now in category '{category}'.",
-                product.id,
-                product.categoryName);
-        }
-    }
-}
-
-public record Product(string id, string categoryId, string categoryName, string name);
-```
-
-Set `local.settings.json`:
-
-```json
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "COSMOS_DATABASE_NAME": "cosmicworks",
-    "COSMOS_CONTAINER_NAME": "product",
-    "COSMOS_CONNECTION__accountEndpoint": "<cosmos-endpoint>"
-  }
-}
-```
-
-::: zone-end
-
-::: zone pivot="python"
-
-```bash
-func init product-audit --worker-runtime python --model V2
-cd product-audit
-```
-
-Replace `function_app.py` with:
-
-```python
-import logging
-
-import azure.functions as func
-
-app = func.FunctionApp()
-
-
-@app.function_name(name="ProductAudit")
-@app.cosmos_db_trigger(
-    arg_name="changes",
-    database_name="%COSMOS_DATABASE_NAME%",
-    container_name="%COSMOS_CONTAINER_NAME%",
-    connection="COSMOS_CONNECTION",
-    lease_container_name="leases",
-)
-def product_audit(changes: func.DocumentList) -> None:
-    for product in changes:
-        logging.info(
-            "Product %s is now in category '%s'.",
-            product["id"],
-            product.get("categoryName"),
-        )
-```
-
-Set `local.settings.json`:
-
-```json
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "python",
-    "COSMOS_DATABASE_NAME": "cosmicworks",
-    "COSMOS_CONTAINER_NAME": "product",
-    "COSMOS_CONNECTION__accountEndpoint": "<cosmos-endpoint>"
-  }
-}
-```
-
-::: zone-end
-
-Azurite emulates Azure Storage on your own machine. The Functions host keeps its internal bookkeeping in a storage account, which is what `AzureWebJobsStorage` points at, and `UseDevelopmentStorage=true` sends that to Azurite. None of your data goes there: the catalog stays in Cosmos DB, and the change feed's checkpoints stay in the `leases` container.
-
-Start Azurite in one terminal:
-
-```bash
-azurite --silent
-```
-
-Start the function in another terminal:
-
-```bash
-func start
-```
-
-> [!NOTE]
-> Select **Allow** if the function requests network access.
-
-
-The connection setting names an endpoint but no credential, so `DefaultAzureCredential` falls back to your `az login` session. Note what's absent from the trigger configuration: `CreateLeaseContainerIfNotExists` stays at its default, because creating a container is a control-plane operation that a data-plane role assignment doesn't permit. The `leases` container from Task 1 is already there.
-
-Now watch the whole pipeline run:
-
-1. Go to the terminal you used for the rename program and run it again.
-
-1. Watch the Task 2 consumer. It reports the category it synced and how many products it patched.
-
-1. Watch the `func start` terminal. Each patched product arrives as a separate execution, and the message is the one your own function logs:
-
-    ```output
-    Product 0AE1D2B4-... is now in category 'Components, Road Frames (revised 051233)'.
-    ```
-
-Two consumers are now reading two different feeds from the same account, and one feeds the other. The Task 2 consumer watches `productMeta` and writes to `product`. The function watches `product`, so the consumer's writes are what trigger it.
-
-> [!NOTE]
-> Both consumers share the `leases` container without colliding, because they monitor different containers and use different processor identities. Two consumers on the *same* monitored container would compete for the same leases, and one of them would sit idle. That case needs a distinct lease container prefix.
-
-## Task 4: Copy a container onto a new partition key
-
-Moving a container to a different partition key means copying its data into a container created with the new key. This task runs that copy yourself, with the CLI.
-
-> [!NOTE]
-> Container copy jobs are in preview. The jobs run on a best-effort basis with no service-level agreement.
-
-Stop everything still running from the previous tasks, then close those terminals. An offline copy job requires writes on the source to be stopped, and the Task 2 consumer is the process writing to `product`. Updates made after the job starts might not be captured.
-
-The rest of this task runs in the Azure CLI. In the **Explorer** pane, open the context menu for the **Allfiles/Labs/Shared** folder and select **Open in Integrated Terminal**, then sign in:
-
-```azurecli
-az login
-```
-
-Set the variables again, replace dp420, if using a different resource group name. The ones you set during setup belonged to a terminal you just closed, and every command below uses them:
-
-```powershell
-$resourceGroup = "dp420"
-$accountName = "<your-account-name>"
-```
-
-Create the destination container with the new key:
-
-```azurecli
-az cosmosdb sql container create `
-    --account-name $accountName `
-    --resource-group $resourceGroup `
-    --database-name cosmicworks `
-    --name productArchive `
-    --partition-key-path "/id" `
-    --throughput 800
-```
-
-The copy commands ship in a preview extension rather than in the core Azure CLI. Install it:
-
-```azurecli
-az extension add --name cosmosdb-preview
-```
-
-Create the copy job:
-
-```azurecli
-az cosmosdb copy create `
-    --resource-group $resourceGroup `
-    --job-name product-to-archive `
-    --src-account $accountName `
-    --dest-account $accountName `
-    --src-nosql database=cosmicworks container=product `
-    --dest-nosql database=cosmicworks container=productArchive
-```
-
-Monitor it:
-
-```azurecli
-az cosmosdb copy show `
-    --resource-group $resourceGroup `
-    --account-name $accountName `
-    --job-name product-to-archive
-```
-
-The output reports a total count, meaning the changes present in the source, and a processed count, meaning what the job writes. The job reads the source container's change feed, which is the same mechanism the previous two tasks used.
-
-When the processed count reaches the total count, the job is finished. Confirm the result by opening the **Data Explorer** in the Azure portal and comparing the item count in `productArchive` against `product`. Every item carries the same `id`, but the destination partitions on it rather than on `categoryId`.
-
-The same job shape moves a container onto a hierarchical partition key, which is one of the documented reasons to run a copy. Before running that migration on your own container, confirm that the combination of `id` and the new partition key value stays unique across the container, because uniqueness is enforced on that pair and a collision fails the job.
+The pattern arrived complete. The decisions underneath it didn't move.
 
 ## Clean up resources
 
-When you finish the course, if you aren't planning to use the resources again, delete the resource group to stop all charges:
+When you finish the course, delete resources you no longer need. Delete the resource group only if you created it for the course and every resource in it can be removed:
 
 ```azurecli
 az group delete --name $resourceGroup --yes --no-wait
@@ -692,4 +394,6 @@ If your lab environment provided the resource group, delete only the Azure Cosmo
 az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
 ```
 
-The `leases` and `productArchive` containers consume provisioned throughput for as long as they exist, so leaving them in place has a running cost.
+Apply the same rule to the resource group holding your Microsoft Foundry project. Keep shared and lab-provided resource groups, and remove only the lab resources you created and no longer need. Don't delete a shared Foundry account or deployments that other applications use.
+
+The provisioned-throughput containers in this exercise incur throughput and storage charges while they exist. Serverless accounts instead charge for consumed request units and storage. Pay-per-token model deployments charge for inference usage, but provisioned model deployments incur capacity charges even while idle.
