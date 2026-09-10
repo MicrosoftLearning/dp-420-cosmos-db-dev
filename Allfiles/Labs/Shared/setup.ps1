@@ -14,7 +14,7 @@
     core     - cosmicworks database with product, productMeta, leases, bulkload.
                Serves the resources, SDK, operations, query, and change feed exercises.
     aitools  - The core catalog plus the five Agent Memory Toolkit containers in
-               ai_memory. Requires two-stage search enrollment. Use EnableFoundry
+               ai_memory. Configures vector and full-text search. Use EnableFoundry
                to provision the chat and embedding deployments for module 8.
     modeling - database-v1 through database-v4, for the data modeling and
                partitioning exercise.
@@ -66,12 +66,12 @@
     these checks before provisioning. The checks do not reserve capacity.
 
 .PARAMETER AccountOnly
-    Create or locate the account without provisioning databases, roles, or data.
-    Use this first for search, agentmemory, and aitools, then enroll features in the portal.
+    Create or locate the account without provisioning Cosmos DB databases, roles,
+    or data. Optional. Omit this switch for automatic account and container setup.
 
 .PARAMETER SearchFeaturesReady
-    Confirm that vector and full-text enrollment is complete in the portal.
-    Requires AccountName so the second stage targets the enrolled account.
+    Compatibility switch for older resume commands. Requires an existing
+    AccountName. Automatic setup does not require this switch or manual enrollment.
 
 .PARAMETER SeedConcurrency
     How many seed writes to issue at once. Set to 1 to load serially when
@@ -80,7 +80,7 @@
 .PARAMETER EnableFoundry
     Deploy foundry.bicep in the same resource group. Creates a keyless Foundry
     resource, project, embedding deployment, optional chat deployment, and user role.
-    Works during either setup stage. Without this switch, no Foundry operations run.
+    Works with full setup or AccountOnly. Without this switch, no Foundry operations run.
 
 .PARAMETER EmbeddingOnly
     With EnableFoundry, omit the chat model for embedding-only exercises.
@@ -1139,15 +1139,24 @@ function Get-DeploymentContainers {
     param([bool]$AccountExists)
 
     $containers = @()
+    $existingDatabases = @()
+    if ($AccountExists) {
+        $existingDatabases = @(Invoke-Az @(
+            'cosmosdb', 'sql', 'database', 'list',
+            '--account-name', $AccountName, '--resource-group', $ResourceGroup,
+            '--query', '[].name', '--output', 'json'
+        ) | ConvertFrom-Json)
+    }
 
     foreach ($database in @($Profiles[$LabProfile].Databases)) {
         $existing = @()
 
-        if ($AccountExists) {
-            $existing = @(& az cosmosdb sql container list `
-                    --account-name $AccountName --resource-group $ResourceGroup `
-                    --database-name $database.Name --query '[].name' --output tsv 2>$null |
-                Where-Object { $_ } | ForEach-Object { $_.Trim() })
+        if ($database.Name -in $existingDatabases) {
+            $existing = @(Invoke-Az @(
+                'cosmosdb', 'sql', 'container', 'list',
+                '--account-name', $AccountName, '--resource-group', $ResourceGroup,
+                '--database-name', $database.Name, '--query', '[].name', '--output', 'json'
+            ) | ConvertFrom-Json)
         }
 
         foreach ($container in @($database.Containers)) {
@@ -1184,24 +1193,68 @@ function Get-DeploymentContainers {
     return $containers
 }
 
-# Deploys the account, every database, every container, and the data-plane role
-# assignment in one operation. Sibling resources in a template carry no dependency on
-# each other, so Azure creates all of them at once instead of one after another.
+function Test-VectorActivationPending {
+    param([object[]]$Operations)
+
+    $failed = @($Operations | Where-Object { $_.properties.provisioningState -eq 'Failed' })
+    if (-not $failed.Count) { return $false }
+    foreach ($operation in $failed) {
+        if ($operation.properties.targetResource.resourceType -ne 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers') { return $false }
+        $status = $operation.properties.statusMessage
+        if ($status -is [string]) {
+            try { $status = $status | ConvertFrom-Json -ErrorAction Stop }
+            catch { return $false }
+        }
+        if (-not $status.error) { return $false }
+        $errors = [System.Collections.Generic.Queue[object]]::new()
+        $errors.Enqueue($status.error)
+        while ($errors.Count) {
+            $detail = $errors.Dequeue()
+            if ($detail.details) {
+                foreach ($child in $detail.details) { $errors.Enqueue($child) }
+                continue
+            }
+            if ($detail.code -ne 'BadRequest' -or
+                $detail.message -notmatch '(?i)\b(?:vector search|vector indexing|EnableNoSQLVectorSearch)\b[^.\r\n]*\b(?:not (?:yet )?(?:enabled|ready|registered)|disabled|pending activation)\b') {
+                return $false
+            }
+        }
+    }
+    return $true
+}
+
 function Invoke-LabDeployment {
     param(
         [bool]$DeployAccount,
-        [string]$PrincipalId
+        [string]$PrincipalId,
+        [switch]$AccountPhase
     )
 
     $options = $Profiles[$LabProfile].Account
+    $accountOnlyDeployment = $AccountOnly -or $AccountPhase
+    $requiresVectorSearch = $options.Capabilities -contains 'EnableNoSQLVectorSearch'
+    if ($requiresVectorSearch -and $DeployAccount -and -not $accountOnlyDeployment) {
+        Invoke-LabDeployment -DeployAccount $true -PrincipalId '' -AccountPhase | Out-Null
+        $DeployAccount = $false
+    }
+    if ($requiresVectorSearch -and -not $DeployAccount -and -not $accountOnlyDeployment) {
+        $capabilities = @(Invoke-Az @(
+            'cosmosdb', 'show', '--name', $AccountName, '--resource-group', $ResourceGroup,
+            '--query', 'capabilities[].name', '--output', 'json'
+        ) | ConvertFrom-Json)
+        $missingCapabilities = @($options.Capabilities | Where-Object { $_ -notin $capabilities })
+        if ($missingCapabilities.Count) {
+            $capabilities = @((@($capabilities) + @($options.Capabilities)) | Where-Object { $_ } | Select-Object -Unique)
+            Write-Step "Enabling required search capabilities on '$AccountName'. Existing capabilities are retained."
+            Invoke-Az (@('cosmosdb', 'update', '--name', $AccountName, '--resource-group', $ResourceGroup, '--capabilities') +
+                $capabilities + @('--output', 'none')) | Out-Null
+        }
+    }
 
     $databaseNames = @()
     $containers = @()
 
-    # -AccountOnly stops after the account, which is stage one of the search and
-    # agentmemory profiles. An empty array creates nothing, so the same template serves
-    # both stages.
-    if (-not $AccountOnly) {
+    if (-not $accountOnlyDeployment) {
         $databaseNames = @(@($Profiles[$LabProfile].Databases) | ForEach-Object { $_.Name })
         $containers = Get-DeploymentContainers -AccountExists (-not $DeployAccount)
     }
@@ -1228,9 +1281,8 @@ function Invoke-LabDeployment {
     }
 
     $parameterFile = Join-Path ([IO.Path]::GetTempPath()) ('dp420-{0}-{1}.parameters.json' -f $AccountName, [Guid]::NewGuid().ToString('N').Substring(0, 8))
-    $parameters | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $parameterFile -Encoding utf8
 
-    $summary = if ($AccountOnly) {
+    $summary = if ($accountOnlyDeployment) {
         'the account only'
     }
     else {
@@ -1238,25 +1290,53 @@ function Invoke-LabDeployment {
     }
 
     if ($DeployAccount) {
-        Write-Step "Deploying account '$AccountName' and $summary. Creating the account takes 5-10 minutes; everything inside it is created at the same time."
+        Write-Step "Deploying account '$AccountName' and $summary. Creating the account can take several minutes."
     }
     else {
         Write-Step "Account '$AccountName' already exists. Deploying $summary into it."
     }
 
-    # A deployment name has to be unique within the resource group, and the fleet
-    # profile deploys twice into the same one.
-    $deploymentName = 'dp420-{0}-{1}' -f $AccountName, (Get-Date -Format 'yyyyMMdd-HHmmss')
+    $deploymentName = 'dp420-{0}-{1}' -f $AccountName, [Guid]::NewGuid().ToString('N').Substring(0, 8)
 
     try {
-        Invoke-Az @(
-            'deployment', 'group', 'create',
-            '--resource-group', $ResourceGroup,
-            '--name', $deploymentName,
-            '--template-file', $script:TemplateFile,
-            '--parameters', "@$parameterFile",
-            '--output', 'none'
-        ) | Out-Null
+        $activationDeadline = (Get-Date).AddMinutes(15)
+        while ($true) {
+            $parameters | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $parameterFile -Encoding utf8
+            try {
+                Invoke-Az @(
+                    'deployment', 'group', 'create',
+                    '--resource-group', $ResourceGroup,
+                    '--name', $deploymentName,
+                    '--template-file', $script:TemplateFile,
+                    '--parameters', "@$parameterFile",
+                    '--output', 'none'
+                ) | Out-Null
+                break
+            }
+            catch {
+                $deploymentFailure = $_
+                if (-not $requiresVectorSearch -or $accountOnlyDeployment -or $DeployAccount -or -not $containers.Count) { throw }
+                try {
+                    $operations = @(Invoke-Az @(
+                        'deployment', 'operation', 'group', 'list',
+                        '--resource-group', $ResourceGroup,
+                        '--name', $deploymentName,
+                        '--output', 'json'
+                    ) | ConvertFrom-Json)
+                }
+                catch { throw $deploymentFailure }
+                if (-not (Test-VectorActivationPending -Operations $operations)) { throw $deploymentFailure }
+                $secondsRemaining = [int][Math]::Floor(($activationDeadline - (Get-Date)).TotalSeconds)
+                if ($secondsRemaining -le 0) {
+                    throw "Vector search did not become ready within the 15-minute retry window for account '$AccountName'. Setup kept the account and any completed containers. To continue, rerun setup with -AccountName '$AccountName' and the same profile. See the setup log for the failed operation."
+                }
+                $retrySeconds = [Math]::Min(30, $secondsRemaining)
+                Write-Step "Vector search activation is pending for '$AccountName'. Retrying missing containers in $retrySeconds seconds."
+                Start-Sleep -Seconds $retrySeconds
+                $containers = @(Get-DeploymentContainers -AccountExists $true)
+                $values.containers.value = $containers
+            }
+        }
     }
     finally {
         Remove-Item -LiteralPath $parameterFile -Force -ErrorAction SilentlyContinue
@@ -1611,12 +1691,10 @@ if ($EmbeddingOnly -and -not $EnableFoundry) {
     throw '-EmbeddingOnly requires -EnableFoundry.'
 }
 if ($AccountOnly -and $SearchFeaturesReady) {
-    throw 'Choose -AccountOnly for stage one or -SearchFeaturesReady for stage two, not both.'
+    throw 'Choose -AccountOnly or -SearchFeaturesReady, not both. Omit both switches for automatic account and container setup.'
 }
-if ($LabProfile -in @('search', 'agentmemory', 'aitools') -and -not $AccountOnly -and -not $PreflightOnly) {
-    if (-not $SearchFeaturesReady -or -not $AccountName) {
-        throw 'First run with -AccountOnly. Enable vector and full-text search in the account Features pane and wait for enrollment to complete. Then rerun with -AccountName and -SearchFeaturesReady. No databases or containers have been created by this run.'
-    }
+if ($SearchFeaturesReady -and -not $AccountName) {
+    throw '-SearchFeaturesReady requires -AccountName for a legacy resume command. Omit -SearchFeaturesReady to run automatic account and container setup.'
 }
 
 if ($Profiles[$LabProfile].Account.RegionCount -eq 2) {
@@ -1737,8 +1815,8 @@ Write-Log "Total run time : $totalElapsed"
 
 Write-Host ''
 if ($AccountOnly) {
-    Write-Host 'Cosmos DB account stage complete. Cosmos databases, containers, roles, and seed data are not provisioned yet.' -ForegroundColor Yellow
-    Write-Host 'Complete feature enrollment in the portal, then rerun with this AccountName and -SearchFeaturesReady.' -ForegroundColor Yellow
+    Write-Host 'Account-only run complete. This run did not create Cosmos DB databases, containers, data roles, or seed data.' -ForegroundColor Yellow
+    Write-Host 'To finish lab setup, rerun the same command without -AccountOnly. Keep the same resource group and account name or name prefix.' -ForegroundColor Yellow
 }
 else {
     Write-Host "Setup complete. Record $(if ($provisioned.Count -gt 1) { 'these values' } else { 'these two values' })." -ForegroundColor Green

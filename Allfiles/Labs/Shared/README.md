@@ -20,7 +20,7 @@ Use these guides to prepare for the DP-420 exercises. Follow your exercise's set
 | Query data in Azure Cosmos DB for NoSQL | `core` | Needs the seeded `product` container |
 | Design a data modeling and partitioning strategy | `modeling` | |
 | Process the Azure Cosmos DB change feed | `core` | Region must support container copy jobs |
-| Implement AI-assisted development tools | `aitools` | Two-stage search enrollment; add `-EnableFoundry` for embedding and chat deployments |
+| Implement AI-assisted development tools | `aitools` | Automatic search configuration; add `-EnableFoundry` for embedding and chat deployments |
 | Secure an Azure Cosmos DB account | `security` | Disposable account, own resource group. Also needs Azure Container Instances quota |
 | Configure backup and restore | `backup` | Disposable account, own resource group. Continuous backup at `Continuous7Days` |
 | Design multi-region availability and failover | `multiregion` | Disposable account, own resource group. Two regions |
@@ -46,12 +46,12 @@ Normal setup checks the required resource provider registrations and registers m
 To check your choices without provisioning, add `-PreflightOnly` to the setup command from your exercise. This mode checks provider registration but doesn't change it. If a required provider isn't registered, follow [Register Azure resource providers](00-register-resource-providers.md) before rerunning the check. For example, with the resource group and region variables from the retrieval-augmented generation (RAG) exercise:
 
 ```powershell
-./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab18 -LabProfile search -AccountOnly -EnableFoundry -FoundryLocation eastus -PreflightOnly
+./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab18 -LabProfile search -EnableFoundry -FoundryLocation eastus -PreflightOnly
 ```
 
 Remove `-PreflightOnly` to run setup. Keep the other options the same, including any account name or model overrides. Setup repeats the checks on each run. If a check fails or Azure doesn't return enough information, setup stops before provisioning. Use the error message to correct `-Location`, `-SecondaryLocation`, or `-FoundryLocation`, or resolve the quota or access issue. Setup doesn't choose a different region or model for you.
 
-These checks don't reserve capacity or guarantee deployment success. Azure Policy, permissions, service-specific restrictions, and changing capacity can still affect deployment. Complete the portal feature-enrollment steps in your exercise. Fabric capacity and workspace access also remain separate prerequisites; the script doesn't verify them.
+These checks don't reserve capacity or guarantee deployment success. Azure Policy, permissions, service-specific restrictions, and changing capacity can still affect deployment. Follow the service-specific prerequisites in your exercise. Fabric capacity and workspace access also remain separate prerequisites; the script doesn't verify them.
 
 ## Optional Foundry deployment
 
@@ -61,7 +61,7 @@ For modules 16 and 17, add `-EmbeddingOnly` to omit chat. Modules 8, 18, and 19 
 
 | Parameter | Default and purpose |
 | :--- | :--- |
-| `-EnableFoundry` | Off. Opt in to model provisioning during either setup stage |
+| `-EnableFoundry` | Off. Opt in to model provisioning |
 | `-EmbeddingOnly` | Off. Skip chat when used with `-EnableFoundry` |
 | `-FoundryLocation` | `eastus`. Independent of the Cosmos DB `-Location` |
 | `-FoundryAccountName` | Cosmos DB account name followed by `-ai`. Stable across retries |
@@ -71,7 +71,7 @@ For modules 16 and 17, add `-EmbeddingOnly` to omit chat. Modules 8, 18, and 19 
 | `-EmbeddingDeploymentSku`, `-ChatDeploymentSku` | `Standard`, `GlobalStandard`. Only pay-per-token deployment types are accepted |
 | `-EmbeddingCapacity`, `-ChatCapacity` | `30` each. New deployments only; existing capacity is preserved |
 
-Run both stages with the same Foundry options. Existing matching accounts, projects, model deployments, and role assignments are reused rather than reset. An incompatible model/version, account kind, region, or authentication setting stops setup with a message. Existing container policies also remain unchanged.
+Keep the same Foundry options on reruns. Existing matching accounts, projects, model deployments, and role assignments are reused rather than reset. An incompatible model/version, account kind, region, or authentication setting stops setup with a message. Existing container policies also remain unchanged.
 
 If your Foundry resource contains an older chat deployment under a different name, rerunning setup adds `gpt-5.4-mini` without removing the older deployment. Update application configuration to the new deployment name and test it before removing any unused deployment. Check the [model retirement schedule](https://learn.microsoft.com/azure/foundry/openai/concepts/model-retirement-schedule) before selecting a different model.
 
@@ -115,7 +115,9 @@ The `security`, `backup`, `multiregion`, `indexing`, `monitoring`, `fleet`, `sea
 
 ## Verify your setup
 
-For `search`, `agentmemory`, and `aitools`, run setup with `-AccountOnly` first. In the account's **Features** pane, enable full-text search and confirm vector search is enabled. Allow enrollment to complete, then rerun with the same resource group, explicit `-AccountName`, profile, and `-SearchFeaturesReady`. The confirmation switch records your check, not an automated readiness test. Only this second stage provisions Cosmos DB containers and roles. Optional Foundry resources can deploy during either stage. Run verification after the second stage succeeds.
+For `search`, `agentmemory`, and `aitools`, run the normal setup command without `-AccountOnly`. Setup enables the required account capabilities and creates the containers with vector and English full-text policies and indexes. If Azure reports that vector activation is pending, setup retries the missing containers for up to 15 minutes. Other errors stop the run. These profiles don't require manual full-text enrollment in the portal.
+
+To resume an interrupted run, use the recorded `-AccountName` with the same resource group, profile, and Foundry options. Existing containers remain unchanged. Older commands with `-AccountOnly` or `-SearchFeaturesReady` remain accepted, but neither switch is required. `-AccountOnly` intentionally stops before container setup. Wait for **Setup complete** before running verification.
 
 The `core` profile loads 295 items into `product` and 237 into `productMeta` (37 `category`, 200 `tag`). Check the counts in Data Explorer before reusing the account.
 

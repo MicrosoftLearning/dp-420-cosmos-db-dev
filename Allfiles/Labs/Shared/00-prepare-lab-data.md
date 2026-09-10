@@ -17,7 +17,7 @@ $resourceGroup = "<your-lab-resource-group>"
 $location = "<region-from-your-exercise>"
 ```
 
-Keep the same resource group for both stages of a two-stage setup. Follow your exercise's cleanup instructions and preserve any supplied resource group.
+Keep the same resource group when rerunning setup. Follow your exercise's cleanup instructions and preserve any supplied resource group.
 
 ## The core profile
 
@@ -44,14 +44,13 @@ It creates a `cosmicworks` database holding five containers:
 Serves module 8, the AI-assisted development tools exercise. Use a disposable account. If the lab provides a resource group, use that group; otherwise, choose a new group for this exercise.
 
 ```powershell
-./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile aitools -AccountOnly -EnableFoundry -FoundryLocation eastus
+./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile aitools -EnableFoundry -FoundryLocation eastus
 ```
 
-Confirm vector and full-text feature enrollment in the account's **Features** pane. Then resume with its recorded name:
+Wait for **Setup complete**. The script configures search and handles vector activation delays during container setup. Record the account name, then verify the resources:
 
 ```powershell
-$accountName = "<account-name-from-stage-one>"
-./setup.ps1 -ResourceGroup $resourceGroup -Location $location -AccountName $accountName -LabProfile aitools -SearchFeaturesReady -EnableFoundry -FoundryLocation eastus
+$accountName = "<account-name-from-setup>"
 ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile aitools -EnableFoundry
 ```
 
@@ -200,38 +199,36 @@ Serves modules 16, 17, and 18. Use each exercise's resource group, or the group 
 This example is for module 16. For the other exercises, use their model switches and name prefixes.
 
 ```powershell
-./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab16 -LabProfile search -AccountOnly -EnableFoundry -EmbeddingOnly
+./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab16 -LabProfile search -EnableFoundry -EmbeddingOnly
 ```
 
-Record the account name. In its portal **Features** pane, enable **Full Text & Hybrid Search for NoSQL API** and confirm **Vector Search for NoSQL API** is enabled. Allow up to 15 minutes for enrollment. Only after both are enabled, complete setup against that account:
+After **Setup complete** appears, record the account name and verify the resources:
 
 ```powershell
-$accountName = "<account-name-from-stage-one>"
-./setup.ps1 -ResourceGroup $resourceGroup -Location $location -AccountName $accountName -LabProfile search -SearchFeaturesReady -EnableFoundry -EmbeddingOnly
+$accountName = "<account-name-from-setup>"
 ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile search -EnableFoundry -EmbeddingOnly
 ```
 
-The confirmation switch records your portal check and doesn't enable the features. The completed setup creates an account with the `EnableNoSQLVectorSearch` capability, a `cosmicworks` database, and a `productSearch` container partitioned on `/categoryId` at an autoscale maximum of 1000 RU/s. The container carries a full-text policy and full-text index on `/searchText`, a vector policy on `/embedding` (`float32`, 1536 dimensions, cosine), a `diskANN` vector index on the same path, and `/embedding/*` in the excluded paths.
+The completed setup creates an account with the `EnableNoSQLVectorSearch` capability, a `cosmicworks` database, and a `productSearch` container partitioned on `/categoryId` at an autoscale maximum of 1000 RU/s. The container carries a full-text policy and full-text index on `/searchText`, a vector policy on `/embedding` (`float32`, 1536 dimensions, cosine), a `diskANN` vector index on the same path, and `/embedding/*` in the excluded paths.
 
 The account is disposable for two reasons. Vector search is an account capability that can't be turned off once it's enabled, and a container's vector policy is fixed at creation, so neither can be added to the shared course account without changing it permanently.
 
 The container is left empty on purpose. The exercise builds the `searchText` property and calls an embedding model itself, so seeding here would store items with no vector at the path the vector index covers.
 
-The `EnableNoSQLVectorSearch` capability can take up to 15 minutes to take effect after the account is created. Full-text search is enabled separately, from the **Features** pane of the account in the Azure portal.
+The `EnableNoSQLVectorSearch` capability can take up to 15 minutes to take effect. Setup retries container creation when Azure reports that activation is pending. The container policies configure English full-text search without a separate portal enrollment step.
 
 ## The agentmemory profile
 
 Serves the agent memory exercise. Use its dedicated account and the resource group you set for this exercise.
 
 ```powershell
-./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab19 -LabProfile agentmemory -AccountOnly -EnableFoundry
+./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab19 -LabProfile agentmemory -EnableFoundry
 ```
 
-Complete the same portal enrollment checks as for `search`, then resume against the recorded account:
+After **Setup complete** appears, record the account name and verify the resources:
 
 ```powershell
-$accountName = "<account-name-from-stage-one>"
-./setup.ps1 -ResourceGroup $resourceGroup -Location $location -AccountName $accountName -LabProfile agentmemory -SearchFeaturesReady -EnableFoundry
+$accountName = "<account-name-from-setup>"
 ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile agentmemory -EnableFoundry
 ```
 

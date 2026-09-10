@@ -9,7 +9,7 @@ param location string
 @description('Second region, added at failover priority 1. Empty for every single-region profile.')
 param secondaryLocation string = ''
 
-@description('Deploy the account itself. Set false to add databases and containers to an account that already exists, which is what the second stage of the search and agentmemory profiles needs: redeploying an enrolled account would strip the capabilities the learner turned on in the portal.')
+@description('Deploy the account itself. Set false to add databases and containers to an existing account while preserving its settings and capabilities. Automatic search setup creates the account first and then uses this mode for containers.')
 param deployAccount bool = true
 
 @description('Create the account in serverless capacity mode.')
