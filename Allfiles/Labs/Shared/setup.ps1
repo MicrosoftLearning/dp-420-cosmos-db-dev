@@ -70,6 +70,11 @@
     How many seed writes to issue at once. Set to 1 to load serially when
     troubleshooting a seeding failure.
 
+.NOTES
+    Every resource is declared in cosmos.bicep, which sits beside this script, and the
+    whole profile is deployed in one operation. Sibling resources in a template carry no
+    dependency on each other, so Azure creates all the databases and containers at once.
+
 .EXAMPLE
     ./setup.ps1 -ResourceGroup dp420 -Location eastus -NamePrefix dp420lab02
 
@@ -93,8 +98,8 @@ param(
 
     [string]$SecondaryLocation,
 
-    [ValidateRange(1, 32)]
-    [int]$SeedConcurrency = 8,
+    [ValidateRange(1, 64)]
+    [int]$SeedConcurrency = 32,
 
     [switch]$SkipSeed,
 
@@ -109,7 +114,10 @@ $ProgressPreference = 'SilentlyContinue'
 #region Configuration
 
 $DataRoot = 'https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data'
-$DataContributorRoleId = '00000000-0000-0000-0000-000000000002'
+
+# The template lives beside this script, so a learner can run the script from anywhere.
+$script:ScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+$script:TemplateFile = Join-Path $script:ScriptRoot 'cosmos.bicep'
 
 # 2.61 is the first release whose behavior these commands rely on.
 $MinimumCliVersion = [version]'2.61.0'
@@ -629,6 +637,18 @@ function Assert-Prerequisites {
 
     Write-Step "Signed in as $($account.user.name) on subscription '$($account.name)'."
 
+    if (-not (Test-Path -LiteralPath $script:TemplateFile)) {
+        throw "cosmos.bicep was not found beside this script at '$script:TemplateFile'. Both files ship together in Allfiles/Labs/Shared."
+    }
+
+    # The CLI installs its own copy of the Bicep compiler on first use. Doing it here
+    # keeps the download out of the middle of a deployment.
+    & az bicep version --only-show-errors 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Step 'Installing the Bicep CLI.'
+        Invoke-Az @('bicep', 'install') | Out-Null
+    }
+
     if ($LabProfile -eq 'core' -and $Location -notin $ContainerCopyRegions) {
         Write-Warning "Region '$Location' does not support container copy jobs. The change feed exercise cannot complete its final task in this region."
     }
@@ -688,177 +708,153 @@ function Initialize-Subscription {
     Invoke-Az @('group', 'create', '--name', $ResourceGroup, '--location', $Location) | Out-Null
 }
 
-# Creates the account when it is missing and returns its document endpoint.
-function New-LabAccount {
+# Returns the account when it already exists, and throws when a setting that is fixed
+# at creation doesn't match the profile. Nothing here creates anything.
+function Get-LabAccount {
     $options = $Profiles[$LabProfile].Account
 
     $existing = & az cosmosdb show --name $AccountName --resource-group $ResourceGroup --output json 2>$null
-    if ($existing) {
-        $account = $existing | ConvertFrom-Json
 
-        # Backup policy and capacity mode are fixed at creation, so a reused account
-        # that was created for a different profile can't be corrected here.
-        if ($options.BackupPolicy -and $account.backupPolicy.type -ne $options.BackupPolicy) {
-            throw "Account '$AccountName' uses $($account.backupPolicy.type) backup, but the '$LabProfile' profile needs $($options.BackupPolicy) backup, which can only be chosen when the account is created. Use a different -NamePrefix or an empty resource group."
+    if (-not $existing) {
+        if ($SearchFeaturesReady) {
+            throw "Enrolled account '$AccountName' was not found. Check -AccountName and -ResourceGroup; this run does not create a replacement account."
         }
 
-        Write-Step "Account '$AccountName' already exists. Skipping creation."
-        return $account.documentEndpoint
+        return $null
     }
 
-    if ($SearchFeaturesReady) {
-        throw "Enrolled account '$AccountName' was not found. Check -AccountName and -ResourceGroup; this run does not create a replacement account."
+    $account = $existing | ConvertFrom-Json
+
+    # Backup policy and capacity mode are fixed at creation, so a reused account
+    # that was created for a different profile can't be corrected here.
+    if ($options.BackupPolicy -and $account.backupPolicy.type -ne $options.BackupPolicy) {
+        throw "Account '$AccountName' uses $($account.backupPolicy.type) backup, but the '$LabProfile' profile needs $($options.BackupPolicy) backup, which can only be chosen when the account is created. Use a different -NamePrefix or an empty resource group."
     }
 
-    Write-Step "Creating account '$AccountName'. This takes 5-10 minutes."
-    $arguments = @(
-        'cosmosdb', 'create',
-        '--name', $AccountName,
-        '--resource-group', $ResourceGroup,
-        '--locations', "regionName=$Location", 'failoverPriority=0', 'isZoneRedundant=False'
-    )
-
-    if ($script:SecondLocation) {
-        Write-Step "Adding '$($script:SecondLocation)' as a second region. Creating both at once is much faster than adding one later."
-        $arguments += @('--locations', "regionName=$($script:SecondLocation)", 'failoverPriority=1', 'isZoneRedundant=False')
-    }
-
-    $arguments += @(
-        '--default-consistency-level', 'Session',
-        '--disable-local-auth', 'true'
-    )
-
-    if ($options.Serverless) { $arguments += @('--capabilities', 'EnableServerless') }
-    # Vector search is an account capability, and it can't be turned off once it is on,
-    # which is why the profile that needs it also creates an account of its own.
-    foreach ($capability in @($options.Capabilities)) {
-        if ($capability) { $arguments += @('--capabilities', $capability) }
-    }
-    if ($options.PublicNetworkAccess) { $arguments += @('--public-network-access', $options.PublicNetworkAccess) }
-    if ($options.BackupPolicy) { $arguments += @('--backup-policy-type', $options.BackupPolicy) }
-    if ($options.ContinuousTier) { $arguments += @('--continuous-tier', $options.ContinuousTier) }
-
-    $created = Invoke-Az ($arguments + @('--output', 'json'))
-
-    return ($created | ConvertFrom-Json).documentEndpoint
+    return $account
 }
 
-# Gives the signed-in user read and write access to data in the account.
-# The account has key authentication disabled, so without this nothing can read or write.
-function Grant-DataPlaneAccess {
-    Write-Step 'Assigning the Cosmos DB Built-in Data Contributor role to the signed-in user.'
+# Flattens the profile's database and container tables into the shape cosmos.bicep
+# takes. Every optional container setting is resolved here rather than in the template,
+# so the template needs no knowledge of any lab.
+function Get-DeploymentContainers {
+    $containers = @()
 
-    $principalId = (Invoke-Az @('ad', 'signed-in-user', 'show', '--query', 'id', '--output', 'tsv')).Trim()
+    foreach ($database in @($Profiles[$LabProfile].Databases)) {
+        foreach ($container in @($database.Containers)) {
+            $resourceProperties = [ordered]@{}
 
-    $assignments = & az cosmosdb sql role assignment list `
-        --account-name $AccountName --resource-group $ResourceGroup --output json 2>$null | ConvertFrom-Json
+            # Time to live has to be enabled on the container before an item's own 'ttl'
+            # property does anything, so a profile that relies on per-item expiry sets this.
+            if ($null -ne $container.DefaultTtl) { $resourceProperties['defaultTtl'] = $container.DefaultTtl }
+            if ($container.IndexingPolicy) { $resourceProperties['indexingPolicy'] = $container.IndexingPolicy }
+            if ($container.VectorEmbeddings) { $resourceProperties['vectorEmbeddingPolicy'] = $container.VectorEmbeddings }
+            if ($container.FullTextPolicy) { $resourceProperties['fullTextPolicy'] = $container.FullTextPolicy }
 
-    $alreadyAssigned = $assignments | Where-Object {
-        $_.principalId -eq $principalId -and $_.roleDefinitionId -match $DataContributorRoleId
+            # A profile may give PartitionKey as one path or as a list of up to three,
+            # which is what a hierarchical partition key needs.
+            $paths = @($container.PartitionKey)
+
+            $containers += [ordered]@{
+                databaseName       = $database.Name
+                name               = $container.Name
+                partitionKeyPaths  = $paths
+                partitionKeyKind   = if ($paths.Count -gt 1) { 'MultiHash' } else { 'Hash' }
+                throughput         = if ($container.Throughput) { [int]$container.Throughput } else { 0 }
+                maxThroughput      = if ($container.MaxThroughput) { [int]$container.MaxThroughput } else { 0 }
+                resourceProperties = $resourceProperties
+            }
+        }
     }
 
-    if ($alreadyAssigned) {
-        Write-Step 'Role assignment already present. Skipping.'
-        return
-    }
-
-    Invoke-Az @(
-        'cosmosdb', 'sql', 'role', 'assignment', 'create',
-        '--account-name', $AccountName,
-        '--resource-group', $ResourceGroup,
-        '--role-definition-id', $DataContributorRoleId,
-        '--principal-id', $principalId,
-        '--scope', '/'
-    ) | Out-Null
+    return $containers
 }
 
-# Creates a database when it is missing.
-function New-LabDatabase {
-    param([string]$Name)
-
-    $exists = (& az cosmosdb sql database exists `
-        --account-name $AccountName --resource-group $ResourceGroup --name $Name --output tsv 2>$null)
-
-    if ($exists -eq 'true') { return }
-
-    Write-Step "Creating database '$Name'."
-    Invoke-Az @(
-        'cosmosdb', 'sql', 'database', 'create',
-        '--account-name', $AccountName,
-        '--resource-group', $ResourceGroup,
-        '--name', $Name
-    ) | Out-Null
-}
-
-# Creates a container from a profile entry, using autoscale when the entry sets
-# MaxThroughput and manual throughput otherwise.
-function New-LabContainer {
+# Deploys the account, every database, every container, and the data-plane role
+# assignment in one operation. Sibling resources in a template carry no dependency on
+# each other, so Azure creates all of them at once instead of one after another.
+function Invoke-LabDeployment {
     param(
-        [string]$Database,
-        [hashtable]$Container
+        [bool]$DeployAccount,
+        [string]$PrincipalId
     )
 
-    $exists = (& az cosmosdb sql container exists `
-        --account-name $AccountName --resource-group $ResourceGroup `
-        --database-name $Database --name $Container.Name --output tsv 2>$null)
+    $options = $Profiles[$LabProfile].Account
 
-    if ($exists -eq 'true') {
-        Write-Step "Container '$Database/$($Container.Name)' already exists. Skipping."
-        return
+    $databaseNames = @()
+    $containers = @()
+
+    # -AccountOnly stops after the account, which is stage one of the search and
+    # agentmemory profiles. An empty array creates nothing, so the same template serves
+    # both stages.
+    if (-not $AccountOnly) {
+        $databaseNames = @(@($Profiles[$LabProfile].Databases) | ForEach-Object { $_.Name })
+        $containers = Get-DeploymentContainers
     }
 
-    $arguments = @(
-        'cosmosdb', 'sql', 'container', 'create',
-        '--account-name', $AccountName,
-        '--resource-group', $ResourceGroup,
-        '--database-name', $Database,
-        '--name', $Container.Name,
-        '--partition-key-path', $Container.PartitionKey
-    )
-
-    # Time to live has to be enabled on the container before an item's own 'ttl'
-    # property does anything, so a profile that relies on per-item expiry sets this.
-    if ($null -ne $Container.DefaultTtl) {
-        $arguments += @('--ttl', $Container.DefaultTtl)
+    $values = [ordered]@{
+        accountName          = @{ value = $AccountName }
+        location             = @{ value = $Location }
+        secondaryLocation    = @{ value = if ($script:SecondLocation) { $script:SecondLocation } else { '' } }
+        deployAccount        = @{ value = $DeployAccount }
+        serverless           = @{ value = [bool]$options.Serverless }
+        capabilities         = @{ value = @(@($options.Capabilities) | Where-Object { $_ }) }
+        publicNetworkAccess  = @{ value = if ($options.PublicNetworkAccess) { (Get-Culture).TextInfo.ToTitleCase($options.PublicNetworkAccess.ToLowerInvariant()) } else { 'Enabled' } }
+        backupPolicyType     = @{ value = if ($options.BackupPolicy) { $options.BackupPolicy } else { 'Periodic' } }
+        continuousTier       = @{ value = if ($options.ContinuousTier) { $options.ContinuousTier } else { 'Continuous7Days' } }
+        dataPlanePrincipalId = @{ value = $PrincipalId }
+        databaseNames        = @{ value = $databaseNames }
+        containers           = @{ value = $containers }
     }
 
-    if ($Profiles[$LabProfile].Account.Serverless) {
-        # Serverless containers take no throughput argument at all.
-        $sizing = 'serverless'
+    $parameters = [ordered]@{
+        '$schema'      = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#'
+        contentVersion = '1.0.0.0'
+        parameters     = $values
     }
-    elseif ($Container.MaxThroughput) {
-        $arguments += @('--max-throughput', $Container.MaxThroughput)
-        $sizing = "autoscale to $($Container.MaxThroughput) RU/s"
+
+    $parameterFile = Join-Path ([IO.Path]::GetTempPath()) ('dp420-{0}-{1}.parameters.json' -f $AccountName, [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    $parameters | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $parameterFile -Encoding utf8
+
+    $summary = if ($AccountOnly) {
+        'the account only'
     }
     else {
-        $arguments += @('--throughput', $Container.Throughput)
-        $sizing = "$($Container.Throughput) RU/s manual"
+        '{0} database(s) and {1} container(s)' -f $databaseNames.Count, $containers.Count
     }
 
-    # PowerShell strips the quotation marks out of an inline JSON argument before the
-    # Azure CLI sees it, so every policy is written to a file and passed with the
-    # documented '@<file>' convention instead.
-    $policyFiles = @()
-    foreach ($policy in @(
-            @{ Key = 'IndexingPolicy'; Argument = '--idx' },
-            @{ Key = 'VectorEmbeddings'; Argument = '--vector-embeddings' },
-            @{ Key = 'FullTextPolicy'; Argument = '--full-text-policy' })) {
-
-        if (-not $Container[$policy.Key]) { continue }
-
-        $path = Join-Path ([IO.Path]::GetTempPath()) ('dp420-{0}-{1}.json' -f $Container.Name, $policy.Key)
-        $Container[$policy.Key] | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $path -Encoding utf8
-        $arguments += @($policy.Argument, "@$path")
-        $policyFiles += $path
+    if ($DeployAccount) {
+        Write-Step "Deploying account '$AccountName' and $summary. Creating the account takes 5-10 minutes; everything inside it is created at the same time."
+    }
+    else {
+        Write-Step "Account '$AccountName' already exists. Deploying $summary into it."
     }
 
-    Write-Step "Creating container '$Database/$($Container.Name)' on $($Container.PartitionKey), $sizing."
+    # A deployment name has to be unique within the resource group, and the fleet
+    # profile deploys twice into the same one.
+    $deploymentName = 'dp420-{0}-{1}' -f $AccountName, (Get-Date -Format 'yyyyMMdd-HHmmss')
+
     try {
-        Invoke-Az $arguments | Out-Null
+        Invoke-Az @(
+            'deployment', 'group', 'create',
+            '--resource-group', $ResourceGroup,
+            '--name', $deploymentName,
+            '--template-file', $script:TemplateFile,
+            '--parameters', "@$parameterFile",
+            '--output', 'none'
+        ) | Out-Null
     }
     finally {
-        $policyFiles | ForEach-Object { Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue }
+        Remove-Item -LiteralPath $parameterFile -Force -ErrorAction SilentlyContinue
     }
+
+    return (Invoke-Az @(
+            'cosmosdb', 'show',
+            '--name', $AccountName,
+            '--resource-group', $ResourceGroup,
+            '--query', 'documentEndpoint',
+            '--output', 'tsv'
+        )).Trim()
 }
 
 #endregion
@@ -876,85 +872,147 @@ function Get-CosmosToken {
     return (Invoke-Az @('account', 'get-access-token', '--resource', $resource, '--query', 'accessToken', '--output', 'tsv')).Trim()
 }
 
-# Downloads a CosmicWorks dataset and upserts every item into the container.
+# Loads every dataset the profile needs, in one pass over every container at once.
 # Writes go over the REST API because this script deliberately takes no SDK dependency:
-# it runs before the learner has installed .NET or Python.
+# it runs before the learner has installed .NET or Python. A single HttpClient is shared
+# by every write, so the connection and its TLS handshake are paid for once rather than
+# once per item, and the work list is flat, so a small container never waits behind a
+# large one.
 function Add-SeedData {
     param(
         [string]$Endpoint,
-        [string]$Database,
-        [hashtable]$Container
+        [array]$Databases
     )
 
-    if (-not $Container.Seed) { return }
-
-    Write-Step "Loading $($Container.Name) from $($Container.Seed)."
-    $items = Invoke-RestMethod -Uri $Container.Seed -Method Get
-
-    $token = Get-CosmosToken -Endpoint $Endpoint
-    $partitionKeyProperty = $Container.PartitionKey.TrimStart('/')
-    $uri = "$($Endpoint.TrimEnd('/'))/dbs/$Database/colls/$($Container.Name)/docs"
-    $authorization = [uri]::EscapeDataString("type=aad&ver=1.0&sig=$token")
-    $total = @($items).Count
-
-    Write-Log "SEED POST $uri ($total items, partition key property '$partitionKeyProperty', concurrency $SeedConcurrency)"
-    # Enough to diagnose a rejected header without writing the bearer token to disk.
-    Write-Log "SEED Authorization prefix '$($authorization.Substring(0, 24))...' length $($authorization.Length)"
-
-    $outcomes = $items | ForEach-Object -ThrottleLimit $SeedConcurrency -Parallel {
-        $item = $_
-        $uri = $using:uri
-        $authorization = $using:authorization
-        $partitionKeyProperty = $using:partitionKeyProperty
-
-        # The header must be a JSON array. ConvertTo-Json unwraps a single-element
-        # array, so build the brackets by hand and let it escape only the value.
-        $partitionKeyHeader = '[' + ($item.$partitionKeyProperty | ConvertTo-Json -Compress) + ']'
-        $body = [System.Text.Encoding]::UTF8.GetBytes(($item | ConvertTo-Json -Depth 20 -Compress))
-
-        $maxAttempts = 6
-
-        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-            $headers = @{
-                'Authorization'                = $authorization
-                'x-ms-version'                 = '2018-12-31'
-                'x-ms-date'                    = [DateTime]::UtcNow.ToString('r')
-                'x-ms-documentdb-partitionkey' = $partitionKeyHeader
-                'x-ms-documentdb-is-upsert'    = 'true'
-            }
-
-            try {
-                Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Body $body -ContentType 'application/json' | Out-Null
-                [pscustomobject]@{ Id = $item.id; Status = 'ok'; Detail = $null; Retries = $attempt - 1 }
-                break
-            }
-            catch {
-                $response = $_.Exception.Response
-                $status = if ($response) { [int]$response.StatusCode } else { 0 }
-
-                # A raw REST client gets none of the automatic 429 handling the SDKs provide.
-                if ($status -eq 429 -and $attempt -lt $maxAttempts) {
-                    $waitMs = 1000
-                    $values = $null
-                    if ($response.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$values)) {
-                        $waitMs = [int]($values | Select-Object -First 1)
-                    }
-                    Start-Sleep -Milliseconds ([Math]::Max($waitMs, 100))
-                    continue
-                }
+    $targets = @(
+        foreach ($database in $Databases) {
+            foreach ($container in @($database.Containers)) {
+                if (-not $container.Seed) { continue }
 
                 [pscustomobject]@{
-                    Id      = $item.id
-                    Status  = $status
-                    Detail  = $_.ErrorDetails.Message
-                    Retries = $attempt - 1
+                    Database  = $database.Name
+                    Container = $container.Name
+                    Seed      = $container.Seed
+                    KeyPath   = $container.PartitionKey.TrimStart('/')
                 }
-                break
             }
+        }
+    )
+
+    if ($targets.Count -eq 0) {
+        Write-Step 'This profile seeds no data.'
+        return
+    }
+
+    Write-Step "Downloading $($targets.Count) dataset(s)."
+    $datasets = $targets | ForEach-Object -ThrottleLimit 8 -Parallel {
+        [pscustomobject]@{
+            Target = $_
+            Items  = @(Invoke-RestMethod -Uri $_.Seed -Method Get)
         }
     }
 
-    $written = @($outcomes | Where-Object { $_.Status -eq 'ok' }).Count
+    $work = @(
+        foreach ($dataset in $datasets) {
+            $uri = "$($Endpoint.TrimEnd('/'))/dbs/$($dataset.Target.Database)/colls/$($dataset.Target.Container)/docs"
+
+            foreach ($item in $dataset.Items) {
+                [pscustomobject]@{
+                    Container = $dataset.Target.Container
+                    Uri       = $uri
+                    # The header must be a JSON array. ConvertTo-Json unwraps a
+                    # single-element array, so build the brackets by hand and let it
+                    # escape only the value.
+                    Key       = '[' + ($item.($dataset.Target.KeyPath) | ConvertTo-Json -Compress) + ']'
+                    Body      = $item | ConvertTo-Json -Depth 20 -Compress
+                }
+            }
+        }
+    )
+
+    $token = Get-CosmosToken -Endpoint $Endpoint
+    $authorization = [uri]::EscapeDataString("type=aad&ver=1.0&sig=$token")
+
+    Write-Step "Writing $($work.Count) items across $($targets.Count) container(s), $SeedConcurrency at a time."
+    Write-Log "SEED $($work.Count) items, concurrency $SeedConcurrency"
+    # Enough to diagnose a rejected header without writing the bearer token to disk.
+    Write-Log "SEED Authorization prefix '$($authorization.Substring(0, 24))...' length $($authorization.Length)"
+
+    $client = [System.Net.Http.HttpClient]::new()
+    $client.Timeout = [TimeSpan]::FromSeconds(100)
+
+    try {
+        $outcomes = $work | ForEach-Object -ThrottleLimit $SeedConcurrency -Parallel {
+            $unit = $_
+            $client = $using:client
+            $authorization = $using:authorization
+
+            $maxAttempts = 6
+
+            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+                $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Post, $unit.Uri)
+                $request.Content = [System.Net.Http.StringContent]::new($unit.Body, [System.Text.Encoding]::UTF8, 'application/json')
+                $request.Headers.TryAddWithoutValidation('Authorization', $authorization) | Out-Null
+                $request.Headers.TryAddWithoutValidation('x-ms-version', '2018-12-31') | Out-Null
+                $request.Headers.TryAddWithoutValidation('x-ms-date', [DateTime]::UtcNow.ToString('r')) | Out-Null
+                $request.Headers.TryAddWithoutValidation('x-ms-documentdb-partitionkey', $unit.Key) | Out-Null
+                $request.Headers.TryAddWithoutValidation('x-ms-documentdb-is-upsert', 'true') | Out-Null
+
+                $response = $null
+
+                try {
+                    $response = $client.Send($request)
+                    $status = [int]$response.StatusCode
+
+                    if ($status -lt 300) {
+                        [pscustomobject]@{ Container = $unit.Container; Status = 'ok'; Detail = $null; Retries = $attempt - 1 }
+                        break
+                    }
+
+                    # A raw REST client gets none of the automatic 429 handling the SDKs provide.
+                    if ($status -eq 429 -and $attempt -lt $maxAttempts) {
+                        $waitMs = 1000
+                        $values = $null
+                        if ($response.Headers.TryGetValues('x-ms-retry-after-ms', [ref]$values)) {
+                            $waitMs = [int]($values | Select-Object -First 1)
+                        }
+                        Start-Sleep -Milliseconds ([Math]::Max($waitMs, 100))
+                        continue
+                    }
+
+                    [pscustomobject]@{
+                        Container = $unit.Container
+                        Status    = $status
+                        Detail    = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+                        Retries   = $attempt - 1
+                    }
+                    break
+                }
+                catch {
+                    if ($attempt -lt $maxAttempts) {
+                        Start-Sleep -Milliseconds 500
+                        continue
+                    }
+
+                    [pscustomobject]@{
+                        Container = $unit.Container
+                        Status    = 0
+                        Detail    = $_.Exception.Message
+                        Retries   = $attempt - 1
+                    }
+                    break
+                }
+                finally {
+                    if ($response) { $response.Dispose() }
+                    $request.Dispose()
+                }
+            }
+        }
+    }
+    finally {
+        $client.Dispose()
+    }
+
     $throttled = @($outcomes | Where-Object { $_.Retries -gt 0 }).Count
     $failures = @($outcomes | Where-Object { $_.Status -ne 'ok' })
 
@@ -964,17 +1022,19 @@ function Add-SeedData {
 
     if ($failures.Count -gt 0) {
         $first = $failures[0]
-        Write-Log "SEED FAILED $($failures.Count) of $total. First: id '$($first.Id)' HTTP $($first.Status). $($first.Detail)"
+        Write-Log "SEED FAILED $($failures.Count) of $($work.Count). First: $($first.Container) HTTP $($first.Status). $($first.Detail)"
 
         if ($first.Status -eq 401 -or $first.Status -eq 403) {
-            throw "Authorization failed writing to $($Container.Name) (HTTP $($first.Status)). A new role assignment can take a few minutes to propagate. Wait, then re-run this script."
+            throw "Authorization failed writing to $($first.Container) (HTTP $($first.Status)). A new role assignment can take a few minutes to propagate. Wait, then re-run this script."
         }
 
-        throw "Failed writing $($failures.Count) of $total items to $($Container.Name). The first failure was HTTP $($first.Status)."
+        throw "Failed writing $($failures.Count) of $($work.Count) items. The first failure was $($first.Container), HTTP $($first.Status)."
     }
 
-    Write-Log "SEED loaded $written items into $($Container.Name)."
-    Write-Host "    Loaded $written items into $($Container.Name)." -ForegroundColor Green
+    foreach ($group in @($outcomes | Where-Object { $_.Status -eq 'ok' } | Group-Object Container)) {
+        Write-Log "SEED loaded $($group.Count) items into $($group.Name)."
+        Write-Host "    Loaded $($group.Count) items into $($group.Name)." -ForegroundColor Green
+    }
 }
 
 #endregion
@@ -1065,30 +1125,24 @@ foreach ($name in $accountNames) {
     # The provisioning and seeding functions read $AccountName from this scope.
     $AccountName = $name
 
-    $endpoint = New-LabAccount
+    $existingAccount = Get-LabAccount
 
-    if ($AccountOnly) {
-        $provisioned += [pscustomobject]@{ Name = $name; Endpoint = $endpoint }
-        continue
-    }
-
-    if ($Profiles[$LabProfile].Account.GrantDataPlaneAccess -eq $false) {
-        Write-Step 'This profile grants no data-plane role to the signed-in user. The exercise assigns scoped roles itself.'
-    }
-    else {
-        Grant-DataPlaneAccess
-    }
-
-    foreach ($database in $databases) {
-        New-LabDatabase -Name $database.Name
-
-        foreach ($container in $database.Containers) {
-            New-LabContainer -Database $database.Name -Container $container
-
-            if (-not $SkipSeed) {
-                Add-SeedData -Endpoint $endpoint -Database $database.Name -Container $container
-            }
+    $principalId = ''
+    if (-not $AccountOnly) {
+        if ($Profiles[$LabProfile].Account.GrantDataPlaneAccess -eq $false) {
+            Write-Step 'This profile grants no data-plane role to the signed-in user. The exercise assigns scoped roles itself.'
         }
+        else {
+            # The account has key authentication disabled, so without this role nothing
+            # can read or write, including the seed step below.
+            $principalId = (Invoke-Az @('ad', 'signed-in-user', 'show', '--query', 'id', '--output', 'tsv')).Trim()
+        }
+    }
+
+    $endpoint = Invoke-LabDeployment -DeployAccount (-not $existingAccount) -PrincipalId $principalId
+
+    if (-not $AccountOnly -and -not $SkipSeed) {
+        Add-SeedData -Endpoint $endpoint -Databases $databases
     }
 
     $provisioned += [pscustomobject]@{ Name = $name; Endpoint = $endpoint }
