@@ -78,11 +78,23 @@ var accountLocations = empty(secondaryLocation) ? [
   }
 ]
 
+// The resource provider rejects a Periodic policy that carries no interval and
+// retention, so the property is omitted altogether and the account keeps the service
+// defaults, which is what the profiles that say nothing about backup always got.
+var backupPolicy = backupPolicyType == 'Continuous' ? {
+  backupPolicy: {
+    type: 'Continuous'
+    continuousModeProperties: {
+      tier: continuousTier
+    }
+  }
+} : {}
+
 resource account 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' = if (deployAccount) {
   name: accountName
   location: location
   kind: 'GlobalDocumentDB'
-  properties: {
+  properties: union({
     databaseAccountOfferType: 'Standard'
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
@@ -93,15 +105,7 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' = if (deploy
     // Every exercise authenticates with the signed-in identity, so no account in this
     // course ever hands out a key or a connection string.
     disableLocalAuth: true
-    backupPolicy: backupPolicyType == 'Continuous' ? {
-      type: 'Continuous'
-      continuousModeProperties: {
-        tier: continuousTier
-      }
-    } : {
-      type: 'Periodic'
-    }
-  }
+  }, backupPolicy)
 }
 
 // Sibling resources carry no dependency on each other, so the deployment creates all of

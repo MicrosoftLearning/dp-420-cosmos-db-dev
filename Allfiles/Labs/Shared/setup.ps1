@@ -184,7 +184,6 @@ $Profiles = @{
         )
     }
     modeling = @{
-        Account = @{ Dedicated = $true }
         # Four stages of the same e-commerce data. Partition keys differ per stage,
         # so each container is declared explicitly rather than discovered.
         Databases = @(
@@ -236,7 +235,6 @@ $Profiles = @{
         # The exercise disables public network access on this account and then deletes
         # the whole resource group, so it must never share either with the rest of the course.
         Account   = @{
-            Dedicated            = $true
             Providers            = @('Microsoft.ContainerInstance')
             Serverless           = $true
             PublicNetworkAccess  = 'ENABLED'
@@ -258,7 +256,6 @@ $Profiles = @{
         # region that has been taken offline stays offline until Microsoft restores
         # it, so this account must never be the shared course account.
         Account   = @{
-            Dedicated  = $true
             RegionCount = 2
         }
         Databases = @(
@@ -275,7 +272,6 @@ $Profiles = @{
         # continuous backup can only be chosen at account creation, so this exercise
         # gets an account and a resource group of its own.
         Account   = @{
-            Dedicated      = $true
             BackupPolicy   = 'Continuous'
             ContinuousTier = 'Continuous7Days'
         }
@@ -293,9 +289,6 @@ $Profiles = @{
         # the resource group. A diagnostic setting has to be removed before its target
         # resource is deleted or renamed, so keeping both in a group of their own means
         # one delete cleans up everything.
-        Account   = @{
-            Dedicated = $true
-        }
         Databases = @(
             @{
                 Name       = 'cosmicworks'
@@ -314,7 +307,6 @@ $Profiles = @{
         # turned off again, so this exercise gets an account and a resource group of
         # its own rather than altering the shared course account.
         Account   = @{
-            Dedicated      = $true
             BackupPolicy   = 'Continuous'
             ContinuousTier = 'Continuous7Days'
         }
@@ -337,7 +329,6 @@ $Profiles = @{
         # configuration, because accounts can share a fleetspace throughput pool
         # only when their regions and their service tier match.
         Account   = @{
-            Dedicated    = $true
             AccountCount = 2
         }
         Databases = @(
@@ -354,7 +345,6 @@ $Profiles = @{
         # search container's vector policy is fixed at creation, so this exercise gets
         # an account and a resource group of its own rather than altering the shared one.
         Account   = @{
-            Dedicated    = $true
             Capabilities = @('EnableNoSQLVectorSearch')
         }
         Databases = @(
@@ -405,7 +395,6 @@ $Profiles = @{
         # exercise gets an account and a resource group of its own rather than altering
         # the shared one. The two containers hold the module's two memory tiers.
         Account   = @{
-            Dedicated    = $true
             Capabilities = @('EnableNoSQLVectorSearch')
         }
         Databases = @(
@@ -465,7 +454,6 @@ $Profiles = @{
         # Continuous backup can only be chosen when the account is created, and the
         # exercise deletes the container it restores, so this account stands alone too.
         Account   = @{
-            Dedicated      = $true
             BackupPolicy   = 'Continuous'
             ContinuousTier = 'Continuous7Days'
         }
@@ -737,11 +725,31 @@ function Get-LabAccount {
 # Flattens the profile's database and container tables into the shape cosmos.bicep
 # takes. Every optional container setting is resolved here rather than in the template,
 # so the template needs no knowledge of any lab.
+#
+# Containers that already exist are left out. Provisioning is additive, and several
+# exercises change a container's own settings, so redeploying a definition the learner
+# has since edited would quietly undo their work.
 function Get-DeploymentContainers {
+    param([bool]$AccountExists)
+
     $containers = @()
 
     foreach ($database in @($Profiles[$LabProfile].Databases)) {
+        $existing = @()
+
+        if ($AccountExists) {
+            $existing = @(& az cosmosdb sql container list `
+                    --account-name $AccountName --resource-group $ResourceGroup `
+                    --database-name $database.Name --query '[].name' --output tsv 2>$null |
+                Where-Object { $_ } | ForEach-Object { $_.Trim() })
+        }
+
         foreach ($container in @($database.Containers)) {
+            if ($container.Name -in $existing) {
+                Write-Step "Container '$($database.Name)/$($container.Name)' already exists. Leaving it as it is."
+                continue
+            }
+
             $resourceProperties = [ordered]@{}
 
             # Time to live has to be enabled on the container before an item's own 'ttl'
@@ -789,7 +797,7 @@ function Invoke-LabDeployment {
     # both stages.
     if (-not $AccountOnly) {
         $databaseNames = @(@($Profiles[$LabProfile].Databases) | ForEach-Object { $_.Name })
-        $containers = Get-DeploymentContainers
+        $containers = Get-DeploymentContainers -AccountExists (-not $DeployAccount)
     }
 
     $values = [ordered]@{
@@ -906,9 +914,14 @@ function Add-SeedData {
 
     Write-Step "Downloading $($targets.Count) dataset(s)."
     $datasets = $targets | ForEach-Object -ThrottleLimit 8 -Parallel {
+        # Invoke-RestMethod writes a JSON array to the pipeline as one object rather
+        # than unrolling it, so wrapping the call in @() nests the whole dataset inside
+        # a single-element array. Assign it and let the property hold the array itself.
+        $items = Invoke-RestMethod -Uri $_.Seed -Method Get
+
         [pscustomobject]@{
             Target = $_
-            Items  = @(Invoke-RestMethod -Uri $_.Seed -Method Get)
+            Items  = $items
         }
     }
 
@@ -1078,10 +1091,6 @@ trap {
 }
 
 Assert-Prerequisites
-
-if ($Profiles[$LabProfile].Account.Dedicated) {
-    Write-Warning "The '$LabProfile' profile creates a disposable account that its exercise reconfigures and then deletes. Run it against a resource group of its own, not the one holding your shared course account."
-}
 
 Initialize-Subscription
 
