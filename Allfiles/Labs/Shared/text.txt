@@ -101,7 +101,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 The setup script created the `product`, `productMeta`, and `leases` containers, granted your identity data-plane access, and loaded the catalog. This task builds the project the rest of the exercise uses and confirms the data arrived.
 
-Create a project and add the packages:
+Create a project and add the packages (remember to replace `<your-account-name>` and `<cosmos-endpoint>` with your actual values):
 
 ::: zone pivot="csharp"
 
@@ -198,7 +198,7 @@ Build a consumer that watches `productMeta` and rewrites `categoryName` on every
 
 ::: zone pivot="csharp"
 
-Create `Sync.cs`:
+Create `Sync.cs` in the `change-feed-lab` directory:
 
 ```csharp
 using Azure.Identity;
@@ -272,11 +272,23 @@ public static class Sync
 }
 ```
 
-Call it from `Program.cs` in place of the loader:
+`Sync.cs` only defines a class, and `dotnet run` starts the project's entry point rather than a file you name, so nothing you do runs `Sync.cs` on its own. The call belongs in `Program.cs` instead. Replace that file's entire contents with one line. The counting code from Task 1 has done its job, and `Sync.cs` carries its own `using` directives:
 
 ```csharp
 await Sync.RunAsync("<cosmos-endpoint>");
 ```
+
+Run the consumer:
+
+```bash
+dotnet run
+```
+
+```output
+Processor started. Press any key to stop.
+```
+
+Leave this terminal open and the consumer running. `Sync.RunAsync` waits at `Console.ReadKey`, so the processor keeps watching the feed until you stop it, and the next step depends on it still running.
 
 ::: zone-end
 
@@ -339,6 +351,12 @@ Run it:
 ```bash
 python sync.py
 ```
+
+```output
+Reading the change feed. Press Ctrl+C to stop.
+```
+
+Leave this terminal open and the consumer running. The loop checks the feed every five seconds until you stop it, and the next step depends on it still running.
 
 ::: zone-end
 
@@ -437,7 +455,11 @@ Two behaviors are worth noticing:
 
 The consumer in Task 2 is a process you have to host. This task runs equivalent logic on Azure Functions instead, watching the `product` container so that the patches from Task 2 become its input.
 
+You build a new project here rather than change the consumer, which should still be running in its own terminal. Open a third terminal and change to the folder that holds `change-feed-lab`, because the commands below create a `product-audit` folder wherever you run them, and it belongs beside the other projects rather than inside one of them. Creating this function can take a few minutes.
+
 ::: zone pivot="csharp"
+
+Nesting isn't only untidy in .NET. A project compiles every `.cs` file beneath its own folder, so a function project created inside `change-feed-lab` would break that project's build.
 
 ```bash
 func init product-audit --worker-runtime dotnet-isolated --target-framework net10.0
@@ -446,7 +468,7 @@ func new --name ProductAudit --template "CosmosDBTrigger"
 dotnet add package Microsoft.Azure.Functions.Worker.Extensions.CosmosDB
 ```
 
-Replace the generated function with:
+Replace the contents of `ProductAudit.cs` with:
 
 ```csharp
 using Microsoft.Azure.Functions.Worker;
@@ -552,21 +574,39 @@ Set `local.settings.json`:
 
 ::: zone-end
 
+Azurite emulates Azure Storage on your own machine. The Functions host keeps its internal bookkeeping in a storage account, which is what `AzureWebJobsStorage` points at, and `UseDevelopmentStorage=true` sends that to Azurite. None of your data goes there: the catalog stays in Cosmos DB, and the change feed's checkpoints stay in the `leases` container.
+
 Start Azurite in one terminal:
 
 ```bash
 azurite --silent
 ```
 
-Start the function in another:
+Start the function in another terminal:
 
 ```bash
 func start
 ```
 
+> [!NOTE]
+> Select **Allow** if the function requests network access.
+
+
 The connection setting names an endpoint but no credential, so `DefaultAzureCredential` falls back to your `az login` session. Note what's absent from the trigger configuration: `CreateLeaseContainerIfNotExists` stays at its default, because creating a container is a control-plane operation that a data-plane role assignment doesn't permit. The `leases` container from Task 1 is already there.
 
-Rename another category and watch both terminals. The Task 2 consumer patches products, and those patches appear in the function's log as `product` container changes. Two consumers are now reading two different feeds from the same account.
+Now watch the whole pipeline run:
+
+1. Go to the terminal you used for the rename program and run it again.
+
+1. Watch the Task 2 consumer. It reports the category it synced and how many products it patched.
+
+1. Watch the `func start` terminal. Each patched product arrives as a separate execution, and the message is the one your own function logs:
+
+    ```output
+    Product 0AE1D2B4-... is now in category 'Components, Road Frames (revised 051233)'.
+    ```
+
+Two consumers are now reading two different feeds from the same account, and one feeds the other. The Task 2 consumer watches `productMeta` and writes to `product`. The function watches `product`, so the consumer's writes are what trigger it.
 
 > [!NOTE]
 > Both consumers share the `leases` container without colliding, because they monitor different containers and use different processor identities. Two consumers on the *same* monitored container would compete for the same leases, and one of them would sit idle. That case needs a distinct lease container prefix.
@@ -578,7 +618,20 @@ Moving a container to a different partition key means copying its data into a co
 > [!NOTE]
 > Container copy jobs are in preview. The jobs run on a best-effort basis with no service-level agreement.
 
-Stop the Task 2 consumer and the function first. An offline copy job requires writes on the source to be stopped, and updates made after the job starts might not be captured.
+Stop everything still running from the previous tasks, then close those terminals. An offline copy job requires writes on the source to be stopped, and the Task 2 consumer is the process writing to `product`. Updates made after the job starts might not be captured.
+
+The rest of this task runs in the Azure CLI. In the **Explorer** pane, open the context menu for the **Allfiles/Labs/Shared** folder and select **Open in Integrated Terminal**, then sign in:
+
+```azurecli
+az login
+```
+
+Set the variables again, replace dp420, if using a different resource group name. The ones you set during setup belonged to a terminal you just closed, and every command below uses them:
+
+```powershell
+$resourceGroup = "dp420"
+$accountName = "<your-account-name>"
+```
 
 Create the destination container with the new key:
 
