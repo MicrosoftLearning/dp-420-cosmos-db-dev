@@ -1,8 +1,8 @@
 TEST LAB....
 
-In this exercise, you measure what a data model costs and then build the partitioning strategy that lets it scale. You compare the request charge of assembling a customer from three containers against reading the same customer as one embedded item. You compare the cost of rendering a product page from four containers against reading it from one denormalized container. Then you create a subpartitioned container for a multitenant catalog and measure how query routing changes depending on which levels of the hierarchy a query names.
+In this exercise, you build the pipeline described throughout this module. You load the CosmicWorks catalog and run a consumer. The consumer keeps the denormalized category name current. You then run the same logic in an Azure Function. Finally, you copy the data to a container that uses a different partition key.
 
-Every measurement in this exercise happens in Data Explorer. A setup script provisions the account and loads the sample data, so no application code is required.
+The category name that products carry is a copy. Renaming a category in one container leaves that copy stale everywhere else until something reconciles it, and the change feed is what makes the reconciliation possible without polling.
 
 ## Before you start
 
@@ -10,12 +10,28 @@ To complete this exercise, you need an [Azure subscription](https://azure.micros
 
 If your lab environment isn't set up yet, follow [Set up your lab environment](https://github.com/MicrosoftLearning/dp-420-cosmos-db-dev/blob/main/Allfiles/Labs/Shared/00-setup-local-environment.md) to install Visual Studio Code, Git, the Azure CLI, and PowerShell 7.
 
+::: zone pivot="csharp"
+
+You also need the [.NET 10 SDK](https://dotnet.microsoft.com/download) or later installed.
+
+::: zone-end
+
+::: zone pivot="python"
+
+You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed.
+
+::: zone-end
+
+This exercise also requires:
+
+- [Azure Functions Core Tools](/azure/azure-functions/functions-run-local) version 4.
+- [Azurite](/azure/storage/common/storage-use-azurite), for the function's local storage.
+
 ## Set up your Azure Cosmos DB resources
 
-This exercise needs the CosmicWorks data at four stages of modeling, which the other exercises in this learning path don't provision. Run the setup script with the `modeling` profile in a resource group of its own, even if you already have an account from an earlier exercise.
+The core exercises reuse an account prepared with the `core` profile, not the two-item account from the first portal exercise. Before skipping setup, open **Allfiles/Labs/Shared** in PowerShell, sign in with `az login`, and set `$resourceGroup`, `$location`, and `$accountName` to your recorded values. Run `./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile core` and continue only when it succeeds. In Data Explorer, confirm 295 items in `cosmicworks/product` and 237 in `cosmicworks/productMeta` with `SELECT VALUE COUNT(1) FROM c`.
 
-> [!WARNING]
-> This exercise deletes its modeling resources when you finish. Never use the shared course resource group for this setup or its group-deletion command.
+If you have no verified core account, follow the setup steps below. To add missing resources to an existing lab account, pass its explicit `-AccountName` to setup rather than using a different module's name prefix. Reseeding restores canonical items but doesn't remove extra items or reset container policies. Resolve mismatches before continuing; don't reset a shared account automatically.
 
 1. Start **Visual Studio Code**.
 
@@ -37,346 +53,590 @@ This exercise needs the CosmicWorks data at four stages of modeling, which the o
     az login
     ```
 
-1. Set variables for a dedicated resource group and region. If your lab environment provides a resource group containing other resources already, use it only with the account-only cleanup option at the end.
+1. Set variables for the resource group (If a resource group was provided by your lab environment, use that name) and region you want to use. Change either value if you prefer a different resource group name or region.
 
     ```powershell
-    $resourceGroup = "dp420-modeling"
+    $resourceGroup = "dp420"
     $location = "westus2"
     ```
 
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab06 -LabProfile modeling
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab07 -LabProfile core
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab06a7f3k9`.
+    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab07a7f3k9`.
 
-1. Wait for the script to finish. The `modeling` profile creates 22 containers across four databases, so it takes 10-15 minutes, longer than the other exercises in this learning path.
+1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
 
-1. Record the **Account name** the script prints. You need it to find the account in the Azure portal.
+1. Record the **Account name** and **Account endpoint** values the script prints. You need both throughout this exercise, and the endpoint looks like `https://<your-account-name>.documents.azure.com:443/`.
+
+1. Set a variable for the account name so the Azure CLI commands in this exercise can use it.
+
+    ```powershell
+    $accountName = "<your-account-name>"
+    ```
 
 The script creates the following resources:
 
 | Resource | Configuration |
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
-| `database-v1` | 9 containers, each partitioned on `/id`, holding the relational schema |
-| `database-v2` | 5 containers, with customer addresses and credentials embedded |
-| `database-v3` | 5 containers, with category and tag names denormalized onto the product |
-| `database-v4` | 3 containers, with entity types merged |
+| `cosmicworks` database | Holds every container this learning path uses |
+| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, loaded with 295 CosmicWorks products |
+| `productMeta` container | Partitioned on `/type`, autoscale up to 1,000 RU/s, loaded with 237 category and tag records |
+| `leases` container | Partitioned on `/id`, 400 RU/s. The change feed processor stores its checkpoints here |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
-Every container is provisioned with autoscale up to 1,000 request units per second (RU/s), and every one is loaded with the CosmicWorks data for its modeling stage.
+Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
 > [!NOTE]
 > A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
----
+> [!IMPORTANT]
+> Container copy jobs in Task 4 run in the account's write region and are available in a subset of Azure regions. The setup script warns you if the region you chose doesn't support them. Check the [supported regions](/azure/cosmos-db/container-copy) if you need to pick a different one.
 
-## Task 1: Confirm the four modeling stages
+## Task 1: Set up the project and confirm the catalog
 
-The CosmicWorks sample publishes the same e-commerce data at four stages of modeling, and this exercise uses all four:
+The setup script created the `product`, `productMeta`, and `leases` containers, granted your identity data-plane access, and loaded the catalog. This task builds the project the rest of the exercise uses and confirms the data arrived.
 
-| Database | Model | Containers |
-|:---------|:------|:-----------|
-| `database-v1` | The relational schema lifted directly into Azure Cosmos DB | 9, each keyed on `/id` |
-| `database-v2` | Customer addresses and credentials embedded; product data still referenced | 5 |
-| `database-v3` | Category and tag names denormalized onto the product | 5 |
-| `database-v4` | Entity types merged: customers with their sales orders, categories with tags | 3 |
+Create a project and add the packages:
 
-Each stage is a step in the same design process, so you measure the cost of one model and then the cost of the next.
+::: zone pivot="csharp"
 
-1. In a browser, go to the [Azure portal](https://portal.azure.com), select **Azure Cosmos DB**, and select the account the setup script created.
+```bash
+dotnet new console -o change-feed-lab
+cd change-feed-lab
+dotnet add package Microsoft.Azure.Cosmos
+dotnet add package Newtonsoft.Json
+dotnet add package Azure.Identity
+```
 
-1. On the left pane, select **Data Explorer**, and confirm that **database-v1**, **database-v2**, **database-v3**, and **database-v4** all appear in the tree.
+Replace the contents of `Program.cs` with a count of what each container holds:
 
-1. Expand **database-v4** and confirm it holds three containers: **customer**, **product**, and **productMeta**. That's the model this module designed, and the rest of the exercise measures the steps that led to it.
+```csharp
+using Azure.Identity;
+using Microsoft.Azure.Cosmos;
 
----
+string endpoint = "<cosmos-endpoint>";
 
-## Task 2: Compare the normalized and embedded customer models
+CosmosClient client = new(endpoint, new DefaultAzureCredential());
+Database database = client.GetDatabase("cosmicworks");
 
-Signing in a customer needs three things at once: the customer record, their addresses, and their stored credential. In the normalized model, they live in three containers, and Azure Cosmos DB has no join across containers, so the application pays for three round trips.
+foreach (string name in new[] { "productMeta", "product" })
+{
+    Container container = database.GetContainer(name);
 
-### Measure the normalized model
+    FeedResponse<int> response = await container
+        .GetItemQueryIterator<int>("SELECT VALUE COUNT(1) FROM c")
+        .ReadNextAsync();
 
-1. Expand **database-v1** and select the **customer** container.
+    Console.WriteLine($"{name}: {response.First()} items");
+}
+```
 
-1. At the top of the page, select **New SQL Query**, paste the following query, and select **Execute Query**:
+Run it:
 
-    ```sql
-    SELECT * FROM c WHERE c.id = "44A6D5F6-AF44-4B34-8AB5-21C5DC50926E"
-    ```
+```bash
+dotnet run
+```
 
-1. Select the **Query Stats** tab and record the **Request Charge**. It's about 2.83 request units (RUs).
+```output
+productMeta: 237 items
+product: 295 items
+```
 
-1. Select the **customerAddress** container, open a new query, and run:
+::: zone-end
 
-    ```sql
-    SELECT * FROM c WHERE c.customerId = "44A6D5F6-AF44-4B34-8AB5-21C5DC50926E"
-    ```
+::: zone pivot="python"
 
-1. Record the request charge. It's about 2.83 RUs.
+```powershell
+mkdir change-feed-lab
+cd change-feed-lab
+python -m venv .venv
+.venv\Scripts\activate
+pip install azure-cosmos azure-identity
+```
 
-1. Select the **customerPassword** container, open a new query, and run:
+Create `check_catalog.py`:
 
-    ```sql
-    SELECT * FROM c WHERE c.id = "44A6D5F6-AF44-4B34-8AB5-21C5DC50926E"
-    ```
+```python
+from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
 
-1. Record the request charge. It's about 2.83 RUs.
+endpoint = "<cosmos-endpoint>"
 
-    | Query | Request charge |
-    |:------|:---------------|
-    | Customer | 2.83 |
-    | Customer address | 2.83 |
-    | Customer password | 2.83 |
-    | **Total** | **8.49** |
+client = CosmosClient(endpoint, credential=DefaultAzureCredential())
+database = client.get_database_client("cosmicworks")
 
-> [!NOTE]
-> Your figures vary slightly from run to run and from account to account, usually within a range of 0.1 RU. Record what you measure rather than the published number.
+for name in ["productMeta", "product"]:
+    container = database.get_container_client(name)
+    count = list(container.query_items(query="SELECT VALUE COUNT(1) FROM c"))[0]
 
-### Measure the embedded model
+    print(f"{name}: {count} items")
+```
 
-`database-v2` embeds the address list and the credential into the customer item, exactly as the embed-or-reference rules in this module prescribe: the entities are read together, one relationship is one-to-one, and the other is bounded one-to-few.
+Run it:
 
-1. Expand **database-v2** and select the **customer** container.
+```bash
+python check_catalog.py
+```
 
-1. Open a new query and run the same statement you ran first:
+```output
+productMeta: 237 items
+product: 295 items
+```
 
-    ```sql
-    SELECT * FROM c WHERE c.id = "44A6D5F6-AF44-4B34-8AB5-21C5DC50926E"
-    ```
+::: zone-end
 
-1. Select the **Results** tab. The addresses and the credential are now nested inside the customer item.
+`productMeta` holds two kinds of document discriminated by a `type` property: category documents and tag documents. That detail matters in the next task.
 
-1. Select **Query Stats** and record the request charge. It's about 2.83 RUs, against 8.49 for the three queries you ran before.
+## Task 2: Sync a denormalized property from the change feed
 
-Two observations are worth writing down before you move on.
+Build a consumer that watches `productMeta` and rewrites `categoryName` on every product in a renamed category.
 
-The saving comes from **request count**, not from a cheaper query. One request replaced three, so the latency is one round trip rather than three sequential ones, and the application needs no code to stitch the pieces together.
+::: zone pivot="csharp"
 
-The embedded item is larger than any single item in the normalized model. That cost lands on writes, which is the trade you accepted. A profile update now rewrites the addresses and the credential too.
+Create `Sync.cs`:
+
+```csharp
+using Azure.Identity;
+using Microsoft.Azure.Cosmos;
+
+public record MetaItem(string id, string name, string type);
+public record ProductRef(string id, string categoryId);
+
+public static class Sync
+{
+    private static Container productContainer = null!;
+
+    public static async Task RunAsync(string endpoint)
+    {
+        CosmosClient client = new(endpoint, new DefaultAzureCredential());
+        Database database = client.GetDatabase("cosmicworks");
+
+        productContainer = database.GetContainer("product");
+        Container monitoredContainer = database.GetContainer("productMeta");
+        Container leaseContainer = database.GetContainer("leases");
+
+        ChangeFeedProcessor processor = monitoredContainer
+            .GetChangeFeedProcessorBuilder<MetaItem>(
+                processorName: "categoryNameSync",
+                onChangesDelegate: HandleChangesAsync)
+            .WithInstanceName("lab-worker")
+            .WithLeaseContainer(leaseContainer)
+            .Build();
+
+        await processor.StartAsync();
+        Console.WriteLine("Processor started. Press any key to stop.");
+        Console.ReadKey();
+        await processor.StopAsync();
+    }
+
+    private static async Task HandleChangesAsync(
+        ChangeFeedProcessorContext context,
+        IReadOnlyCollection<MetaItem> changes,
+        CancellationToken cancellationToken)
+    {
+        foreach (MetaItem item in changes)
+        {
+            if (item.type != "category")
+            {
+                continue;
+            }
+
+            QueryDefinition query = new QueryDefinition(
+                    "SELECT p.id, p.categoryId FROM product p WHERE p.categoryId = @categoryId")
+                .WithParameter("@categoryId", item.id);
+
+            int updated = 0;
+            using FeedIterator<ProductRef> iterator =
+                productContainer.GetItemQueryIterator<ProductRef>(query);
+
+            while (iterator.HasMoreResults)
+            {
+                foreach (ProductRef product in await iterator.ReadNextAsync())
+                {
+                    await productContainer.PatchItemAsync<dynamic>(
+                        product.id,
+                        new PartitionKey(product.categoryId),
+                        new[] { PatchOperation.Set("/categoryName", item.name) });
+                    updated++;
+                }
+            }
+
+            Console.WriteLine($"Category '{item.name}' synced to {updated} products.");
+        }
+    }
+}
+```
+
+Call it from `Program.cs` in place of the loader:
+
+```csharp
+await Sync.RunAsync("<cosmos-endpoint>");
+```
+
+::: zone-end
+
+::: zone pivot="python"
+
+The Python SDK doesn't include the change feed processor, so this consumer reads the feed directly and keeps its own position.
+
+Create `sync.py`:
+
+```python
+import time
+
+from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
+
+endpoint = "<cosmos-endpoint>"
+
+client = CosmosClient(endpoint, credential=DefaultAzureCredential())
+database = client.get_database_client("cosmicworks")
+monitored = database.get_container_client("productMeta")
+products = database.get_container_client("product")
+
+continuation = None
+print("Reading the change feed. Press Ctrl+C to stop.")
+
+while True:
+    if continuation:
+        changes = monitored.query_items_change_feed(continuation=continuation)
+    else:
+        changes = monitored.query_items_change_feed(start_time="Now")
+
+    for item in changes:
+        if item.get("type") != "category":
+            continue
+
+        updated = 0
+        results = products.query_items(
+            query="SELECT p.id, p.categoryId FROM product p WHERE p.categoryId = @categoryId",
+            parameters=[{"name": "@categoryId", "value": item["id"]}],
+        )
+
+        for product in results:
+            products.patch_item(
+                item=product["id"],
+                partition_key=product["categoryId"],
+                patch_operations=[
+                    {"op": "set", "path": "/categoryName", "value": item["name"]}
+                ],
+            )
+            updated += 1
+
+        print(f"Category '{item['name']}' synced to {updated} products.")
+
+    continuation = monitored.client_connection.last_response_headers["etag"]
+    time.sleep(5)
+```
+
+Run it:
+
+```bash
+python sync.py
+```
+
+::: zone-end
+
+With the consumer running, rename a category from a second terminal. Category `3E4CEACD-D007-46EB-82D7-31F6141752B2` is *Components, Road Frames*, and its partition key value is `category`.
+
+::: zone pivot="csharp"
+
+In the second terminal, open the parent folder of `change-feed-lab`. Create a sibling console project and install its dependencies:
+
+```powershell
+dotnet new console -o rename-category
+cd rename-category
+dotnet add package Microsoft.Azure.Cosmos
+dotnet add package Newtonsoft.Json
+dotnet add package Azure.Identity
+```
+
+Replace `Program.cs` in `rename-category` with:
+
+```csharp
+using Azure.Identity;
+using Microsoft.Azure.Cosmos;
+
+string endpoint = "<cosmos-endpoint>";
+const string categoryId = "3E4CEACD-D007-46EB-82D7-31F6141752B2";
+
+CosmosClient client = new(endpoint, new DefaultAzureCredential());
+Container container = client.GetContainer("cosmicworks", "productMeta");
+
+string newName = $"Components, Road Frames (revised {DateTime.UtcNow:HHmmss})";
+
+await container.PatchItemAsync<dynamic>(
+    categoryId,
+    new PartitionKey("category"),
+    new[] { PatchOperation.Set("/name", newName) });
+
+Console.WriteLine($"Renamed category to '{newName}'.");
+```
+
+Run the rename from this second terminal with `dotnet run`. Keep the consumer running in its original terminal.
+
+::: zone-end
+
+::: zone pivot="python"
+
+Create `rename.py`:
+
+```python
+from datetime import datetime, timezone
+
+from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
+
+endpoint = "<cosmos-endpoint>"
+category_id = "3E4CEACD-D007-46EB-82D7-31F6141752B2"
+
+client = CosmosClient(endpoint, credential=DefaultAzureCredential())
+container = client.get_database_client("cosmicworks").get_container_client("productMeta")
+
+stamp = datetime.now(timezone.utc).strftime("%H%M%S")
+new_name = f"Components, Road Frames (revised {stamp})"
+
+container.patch_item(
+    item=category_id,
+    partition_key="category",
+    patch_operations=[{"op": "set", "path": "/name", "value": new_name}],
+)
+
+print(f"Renamed category to '{new_name}'.")
+```
+
+::: zone-end
+
+Run it and watch the consumer's output. It reports the new category name and the number of products it patched. Run it again to see the consumer pick up a second change.
+
+Two behaviors are worth noticing:
+
+- **The `type` filter is doing real work.** `productMeta` holds 200 tag documents alongside the categories. Without the filter, a tag rename would write a tag's name into `categoryName` on unrelated products.
+- **The consumer starts from now.** Changes made before it first ran are invisible to it, because the start position applies only until a lease or continuation token exists.
+
+::: zone pivot="csharp"
 
 > [!TIP]
-> An application that knows both the item identifier and the partition key can read this item with a point read rather than a query. A point read of a 1-KB item costs 1 RU, and the charge rises with item size from there. Data Explorer runs queries, not point reads. Therefore, you can't measure the request charge for a point read here. A point read is the least expensive way to retrieve a known item. Embedding allows one point read to return all required data under one identifier.
+> Stop the consumer, run the rename program, then restart the consumer. It resumes from its stored checkpoint and processes the change made while it was stopped, because the lease documents survive the restart.
 
----
+::: zone-end
 
-## Task 3: Measure the cost of denormalizing
+::: zone pivot="python"
+
+> [!IMPORTANT]
+> This pull-mode sample keeps its continuation token only in memory. If you stop it, rename the category, and restart it, it starts from `Now` and doesn't replay the intervening change. Rename again while it is running to confirm processing. A production pull consumer must persist its token after successful processing and reload it on restart; this sample doesn't provide durable checkpoints.
+
+::: zone-end
+
+## Task 3: React to changes with an Azure Function
+
+The consumer in Task 2 is a process you have to host. This task runs equivalent logic on Azure Functions instead, watching the `product` container so that the patches from Task 2 become its input.
+
+::: zone pivot="csharp"
+
+```bash
+func init product-audit --worker-runtime dotnet-isolated --target-framework net10.0
+cd product-audit
+func new --name ProductAudit --template "CosmosDBTrigger"
+dotnet add package Microsoft.Azure.Functions.Worker.Extensions.CosmosDB
+```
+
+Replace the generated function with:
+
+```csharp
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Logging;
+
+public class ProductAudit
+{
+    private readonly ILogger<ProductAudit> _logger;
+
+    public ProductAudit(ILogger<ProductAudit> logger) => _logger = logger;
+
+    [Function("ProductAudit")]
+    public void Run([CosmosDBTrigger(
+        databaseName: "%COSMOS_DATABASE_NAME%",
+        containerName: "%COSMOS_CONTAINER_NAME%",
+        Connection = "COSMOS_CONNECTION",
+        LeaseContainerName = "leases")] IReadOnlyList<Product> changes,
+        FunctionContext context)
+    {
+        if (changes is null)
+        {
+            return;
+        }
+
+        foreach (Product product in changes)
+        {
+            _logger.LogInformation(
+                "Product {id} is now in category '{category}'.",
+                product.id,
+                product.categoryName);
+        }
+    }
+}
 
-Rendering one category page against `database-v2` takes five queries: one for the category name, one for the products in the category, and one for the tag names of each product returned.
+public record Product(string id, string categoryId, string categoryName, string name);
+```
 
-### Measure the referenced model
+Set `local.settings.json`:
 
-1. Expand **database-v2** and select the **productCategory** container.
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "COSMOS_DATABASE_NAME": "cosmicworks",
+    "COSMOS_CONTAINER_NAME": "product",
+    "COSMOS_CONNECTION__accountEndpoint": "<cosmos-endpoint>"
+  }
+}
+```
 
-1. Open a new query and run:
+::: zone-end
 
-    ```sql
-    SELECT * FROM c WHERE c.type = 'category' AND c.id = "AB952F9F-5ABA-4251-BC2D-AFF8DF412A4A"
-    ```
+::: zone pivot="python"
 
-    The result is the category *Components, Headsets*. Record the request charge, about 2.92 RUs.
+```bash
+func init product-audit --worker-runtime python --model V2
+cd product-audit
+```
+
+Replace `function_app.py` with:
+
+```python
+import logging
 
-1. Select the **product** container, open a new query, and run:
+import azure.functions as func
 
-    ```sql
-    SELECT * FROM c WHERE c.categoryId = "AB952F9F-5ABA-4251-BC2D-AFF8DF412A4A"
-    ```
-
-    Three products come back: HL Headset, LL Headset, and ML Headset. Each carries a stock keeping unit (SKU), a name, a price, and an array of tag identifiers rather than tag names. Record the request charge, about 2.89 RUs.
-
-1. To resolve those identifiers into names, select the **productTag** container and run one query per product:
-
-    ```sql
-    SELECT * FROM c WHERE c.type = 'tag' AND c.id IN ('87BC6842-2CCA-4CD3-994C-33AB101455F4', 'F07885AF-BD6C-4B71-88B1-F04295992176')
-    ```
-
-    ```sql
-    SELECT * FROM c WHERE c.type = 'tag' AND c.id IN ('18AC309F-F81C-4234-A752-5DDD2BEAEE83', '1B387A00-57D3-4444-8331-18A90725E98B', 'C6AB3E24-BA48-40F0-A260-CB04EB03D5B0', 'DAC25651-3DD3-4483-8FD1-581DC41EF34B', 'E6D5275B-8C42-47AE-BDEC-FC708DB3E0AC')
-    ```
-
-    ```sql
-    SELECT * FROM c WHERE c.type = 'tag' AND c.id IN ('A34D34F7-3286-4FA4-B4B0-5E61CCEEE197', 'BA4D7ABD-2E82-4DC2-ACF2-5D3B0DEAE1C1', 'D69B1B6C-4963-4E85-8FA5-6A3E1CD1C83B')
-    ```
-
-1. Record each request charge and total them.
-
-    | Query | Request charge |
-    |:------|:---------------|
-    | Category name | 2.92 |
-    | Products in category | 2.89 |
-    | HL Headset tags | 3.06 |
-    | LL Headset tags | 3.47 |
-    | ML Headset tags | 3.20 |
-    | **Total** | **15.54** |
-
-    Notice that the tag queries dominate. The cost increases with the number of products on the page. It also increases with the number of tags for each product. As the catalog grows, the page becomes slower and more expensive.
-
-### Measure the denormalized model
-
-`database-v3` copies the category name and each tag's name onto the product item.
-
-1. Expand **database-v3** and select the **product** container.
-
-1. Open a new query and run:
-
-    ```sql
-    SELECT * FROM c WHERE c.categoryId = "AB952F9F-5ABA-4251-BC2D-AFF8DF412A4A"
-    ```
-
-1. Select the **Results** tab. Each product now carries `categoryName`, and its `tags` array now holds the tag name alongside each identifier rather than the identifier alone. Everything the page renders is in this one result.
-
-1. Select **Query Stats** and record the request charge, about 2.89 RUs, against 15.54 for the five queries you ran before.
-
-Five requests became one, and the cost fell by more than 80 percent. The price of that saving is a synchronization obligation: when a category is renamed, every product carrying the old `categoryName` is wrong until something updates it. That update is the job the change feed does, and the write cost of a rename is now proportional to how many items carry the copy.
-
-### Combine entity types into one container
-
-`database-v3` still keeps categories and tags in separate containers, and sales orders in a container of their own. `database-v4` merges each pair, because in both cases the two entity types share a partition key path and an access pattern.
-
-1. Expand **database-v4** and select the **productMeta** container.
-
-1. Open a new query and run:
-
-    ```sql
-    SELECT c.type, COUNT(1) AS itemCount FROM c GROUP BY c.type
-    ```
-
-    One container now holds 37 items of type `category` and 200 of type `tag`. In `database-v3`, listing both took one query against `productCategory` and another against `productTag`. Here a single query returns either kind, or both, depending on whether you filter on `c.type`.
-
-1. Select the **customer** container in **database-v4**, open a new query, and run:
-
-    ```sql
-    SELECT c.type, c.firstName, c.lastName, c.salesOrderCount, c.orderDate
-    FROM c
-    WHERE c.customerId = "44A6D5F6-AF44-4B34-8AB5-21C5DC50926E"
-    ```
-
-1. Review the results. The customer item and every sales order that customer placed come back together, because both entity types carry `customerId` and the container is partitioned on it. Everything you see sits in one logical partition.
-
-1. Note the `salesOrderCount` property on the customer item, and count the items of type `salesOrder` in the result. The counts match.
-
-    That property is a preaggregate. Ranking customers by order count would otherwise scan every customer in the container, so the model stores the answer instead of computing it. Keeping it correct is what makes the merge necessary: an order insert and the counter increment have to succeed or fail together, and Azure Cosmos DB provides that guarantee only within a single logical partition.
-
----
-
-## Task 4: Build a subpartitioned container for multiple tenants
-
-Contoso now hosts catalogs for several retail brands. Partitioning on the tenant alone is the intuitive choice and the one that fails first: tenants are wildly uneven, and the largest reaches the 20-GB logical partition ceiling while the others sit nearly empty.
-
-This task builds the alternative from the hierarchical partition keys unit: a three-level key of `/tenantId`, `/categoryId`, `/id`.
-
-The `tenantId` property doesn't exist in the CosmicWorks data, because the sample models a single retailer. The lab repository includes a tagged copy of the product data at **data/tenant-products.json**, which assigns every product in a category to the same tenant: 201 products to `contoso-outdoors`, 61 to `fabrikam-cycles`, and 33 to `adventure-works`. The skew is deliberate.
-
-1. In Data Explorer, select **New Container**.
-
-1. Configure the container:
-
-    | Setting | Value |
-    |:--------|:------|
-    | **Database id** | *Create new* &vert; `multitenant` |
-    | **Container id** | `tenantProduct` |
-    | **Partition key** | `/tenantId` |
-    | **Container throughput** | *Manual* &vert; `400` |
-
-1. Under the partition key box, select **Add hierarchical partition key** twice, and set the second and third levels to `/categoryId` and `/id`.
-
-    The order of the levels is the order of the hierarchy, and it can't be changed after the container is created.
-
-1. Select **OK** to create the container.
-
-1. Expand **multitenant**, expand **tenantProduct**, and select **Items**.
-
-1. Select **Upload Item**, browse to **data/tenant-products.json** in the cloned repository, and select **Upload**.
-
-1. Confirm that the container reports 295 items.
-
----
-
-## Task 5: Compare query routing and spot the anti-pattern
-
-The reason to order a hierarchy around access patterns is routing. This task runs the same catalog query four ways, changing only which levels of the hierarchy the filter names.
-
-The category `3E4CEACD-D007-46EB-82D7-31F6141752B2` is *Components, Road Frames*. It holds 33 products, and all of them belong to `contoso-outdoors`.
-
-1. With the **tenantProduct** container selected, open a new query and run each of the following queries, recording the request charge and the item count for each.
-
-    A routable prefix naming two levels:
-
-    ```sql
-    SELECT * FROM c WHERE c.tenantId = "contoso-outdoors" AND c.categoryId = "3E4CEACD-D007-46EB-82D7-31F6141752B2"
-    ```
-
-    A routable prefix naming one level:
-
-    ```sql
-    SELECT * FROM c WHERE c.tenantId = "contoso-outdoors"
-    ```
-
-    A filter that skips the first level:
-
-    ```sql
-    SELECT * FROM c WHERE c.categoryId = "3E4CEACD-D007-46EB-82D7-31F6141752B2"
-    ```
-
-    No filter at all:
-
-    ```sql
-    SELECT * FROM c
-    ```
-
-1. To measure how the data is distributed across first-level key values, run one more query:
-
-    ```sql
-    SELECT c.tenantId, COUNT(1) AS itemCount FROM c GROUP BY c.tenantId
-    ```
-
-### What the numbers show
-
-**The distribution is the finding.** The container reports 201 items for `contoso-outdoors`, 61 for `fabrikam-cycles`, and 33 for `adventure-works`. One first-level key value holds 68 percent of the data. That measurement is the anti-pattern this module warns about, made concrete: it's the same shape a real platform sees when one tenant dwarfs the others, and it's visible at 295 items exactly as it is at 295 million.
-
-**Request charge tracks items evaluated, not partitions.** The tenant-only query returns 201 items and costs noticeably more than the tenant-and-category query returning 33. Narrowing the filter down the hierarchy cuts the charge, because the engine reads less, which the **Retrieved document count** and **Output document count** rows in Query Stats show directly.
-
-### What this container is too small to show
-
-The third query, filtering on category alone, skips the first level of the hierarchy and can't be routed. It costs about what the routable query costs, which is correct rather than a mistake in your setup.
-
-Your container holds 295 small items, which fits in a single physical partition. A query that can't be routed fans out to every physical partition, and here there's exactly one, so there's nothing to fan out to. Fan-out is invisible at this scale by definition.
-
-The cost is arithmetic rather than mystery. Each extra physical partition a query has to check adds two to three RUs before it reads a single item. A container spread across 100 physical partitions charges 200 to 300 RUs of pure overhead on the category-only query, while the tenant-prefixed query still reaches only the partitions holding that tenant. A container needs about 5 TB of data to reach 100 physical partitions. Alternatively, it needs 1,000,000 RU/s of provisioned throughput. This lab can demonstrate data skew, but it can't demonstrate fan-out at that scale.
-
-The design lesson survives the scale gap: you can measure distribution on day one, and distribution is what determines whether fan-out ever becomes your problem.
-
-### Review the design you didn't ship
-
-Suppose `tenantProduct` were partitioned on `/tenantId` alone. Using the distribution you measured, answer three questions:
-
-1. How many logical partitions would the container have, and how much of the data sits in the largest one?
-1. Which two of the criteria for a good partition key does that design fail?
-1. What happens to `contoso-outdoors` as its catalog grows, and at what point does it stop being a performance problem and start being an outage?
-
-The design has three logical partitions, and your own output shows one of them holding 68 percent of the items. This key has low cardinality and distributes data unevenly. It sends all writes for a tenant to one logical partition. As a result, the partition receives all write throughput for that tenant. When `contoso-outdoors` reaches 20 GB, writes for that tenant stop, and the fix at that point is a container migration rather than a configuration change.
-
-The hierarchy you built avoids all three outcomes. The first level still groups a tenant's data for routing, while the deeper levels let one tenant's data spread across as many physical partitions as it needs.
-
----
+app = func.FunctionApp()
+
+
+@app.function_name(name="ProductAudit")
+@app.cosmos_db_trigger(
+    arg_name="changes",
+    database_name="%COSMOS_DATABASE_NAME%",
+    container_name="%COSMOS_CONTAINER_NAME%",
+    connection="COSMOS_CONNECTION",
+    lease_container_name="leases",
+)
+def product_audit(changes: func.DocumentList) -> None:
+    for product in changes:
+        logging.info(
+            "Product %s is now in category '%s'.",
+            product["id"],
+            product.get("categoryName"),
+        )
+```
+
+Set `local.settings.json`:
+
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "COSMOS_DATABASE_NAME": "cosmicworks",
+    "COSMOS_CONTAINER_NAME": "product",
+    "COSMOS_CONNECTION__accountEndpoint": "<cosmos-endpoint>"
+  }
+}
+```
+
+::: zone-end
+
+Start Azurite in one terminal:
+
+```bash
+azurite --silent
+```
+
+Start the function in another:
+
+```bash
+func start
+```
+
+The connection setting names an endpoint but no credential, so `DefaultAzureCredential` falls back to your `az login` session. Note what's absent from the trigger configuration: `CreateLeaseContainerIfNotExists` stays at its default, because creating a container is a control-plane operation that a data-plane role assignment doesn't permit. The `leases` container from Task 1 is already there.
+
+Rename another category and watch both terminals. The Task 2 consumer patches products, and those patches appear in the function's log as `product` container changes. Two consumers are now reading two different feeds from the same account.
+
+> [!NOTE]
+> Both consumers share the `leases` container without colliding, because they monitor different containers and use different processor identities. Two consumers on the *same* monitored container would compete for the same leases, and one of them would sit idle. That case needs a distinct lease container prefix.
+
+## Task 4: Copy a container onto a new partition key
+
+Moving a container to a different partition key means copying its data into a container created with the new key. This task runs that copy yourself, with the CLI.
+
+> [!NOTE]
+> Container copy jobs are in preview. The jobs run on a best-effort basis with no service-level agreement.
+
+Stop the Task 2 consumer and the function first. An offline copy job requires writes on the source to be stopped, and updates made after the job starts might not be captured.
+
+Create the destination container with the new key:
+
+```azurecli
+az cosmosdb sql container create `
+    --account-name $accountName `
+    --resource-group $resourceGroup `
+    --database-name cosmicworks `
+    --name productArchive `
+    --partition-key-path "/id" `
+    --throughput 800
+```
+
+The copy commands ship in a preview extension rather than in the core Azure CLI. Install it:
+
+```azurecli
+az extension add --name cosmosdb-preview
+```
+
+Create the copy job:
+
+```azurecli
+az cosmosdb copy create `
+    --resource-group $resourceGroup `
+    --job-name product-to-archive `
+    --src-account $accountName `
+    --dest-account $accountName `
+    --src-nosql database=cosmicworks container=product `
+    --dest-nosql database=cosmicworks container=productArchive
+```
+
+Monitor it:
+
+```azurecli
+az cosmosdb copy show `
+    --resource-group $resourceGroup `
+    --account-name $accountName `
+    --job-name product-to-archive
+```
+
+The output reports a total count, meaning the changes present in the source, and a processed count, meaning what the job writes. The job reads the source container's change feed, which is the same mechanism the previous two tasks used.
+
+When the processed count reaches the total count, the job is finished. Confirm the result by opening the **Data Explorer** in the Azure portal and comparing the item count in `productArchive` against `product`. Every item carries the same `id`, but the destination partitions on it rather than on `categoryId`.
+
+The same job shape moves a container onto a hierarchical partition key, which is one of the documented reasons to run a copy. Before running that migration on your own container, confirm that the combination of `id` and the new partition key value stays unique across the container, because uniqueness is enforced on that pair and a collision fails the job.
 
 ## Clean up resources
 
-The `modeling` profile provisions 22 containers that no other exercise in this learning path uses, so delete them when you finish this exercise rather than at the end of the course.
-
-If you created the dedicated `dp420-modeling` group and it contains only this exercise's resources, delete that group to stop all charges. Check its contents first:
+When you finish the course, if you aren't planning to use the resources again, delete the resource group to stop all charges:
 
 ```azurecli
-az resource list --resource-group $resourceGroup --query "[].{Name:name,Type:type}" --output table
 az group delete --name $resourceGroup --yes --no-wait
 ```
 
-If your lab environment provided the resource group, or it holds any other resources, don't run the group deletion. Delete only the modeling account whose name the setup script printed:
+If your lab environment provided the resource group, delete only the Azure Cosmos DB account instead:
 
 ```azurecli
-az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --yes
+az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
 ```
+
+The `leases` and `productArchive` containers consume provisioned throughput for as long as they exist, so leaving them in place has a running cost.
