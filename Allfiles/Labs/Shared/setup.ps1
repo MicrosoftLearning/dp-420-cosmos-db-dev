@@ -857,6 +857,9 @@ function Assert-FoundryAvailability {
     $subscriptionId = ''
     if ($requests.Create -contains $true) {
         $usages = @(Invoke-Az @('cognitiveservices', 'usage', 'list', '--location', $FoundryLocation, '--output', 'json') | ConvertFrom-Json)
+        if (-not $usages.Count) {
+            throw "Azure returned no quota records for '$FoundryLocation'. Preflight cannot confirm deployment quota. Check Microsoft.CognitiveServices registration and subscription-level quota-read access, such as Cognitive Services Usages Reader. Resource-group permissions alone do not provide subscription quota visibility."
+        }
         $subscriptionId = (Invoke-Az @('account', 'show', '--query', 'id', '--output', 'tsv')).Trim()
         if (-not $subscriptionId) { throw 'Azure did not return the current subscription ID for capacity checks.' }
     }
@@ -920,12 +923,18 @@ function Assert-FoundryAvailability {
             }
             $capacityCache[$cacheKey] = $entries
         }
+        if (-not $capacityCache[$cacheKey].Count) {
+            throw "Azure returned no capacity records for '$($request.Name)' version '$($request.Version)'. Preflight cannot confirm capacity for '$($request.Sku)' in '$FoundryLocation'. An empty response does not report a capacity shortage. Check Microsoft.CognitiveServices registration and model access for the selected subscription before rerunning."
+        }
         $available = $capacityCache[$cacheKey] | Where-Object {
             ($_.location -replace '\s', '') -eq $FoundryLocation -and
             $_.properties.skuName -eq $request.Sku -and
             $_.properties.model.name -eq $request.Name -and $_.properties.model.version -eq $request.Version
         } | Select-Object -First 1
-        if (-not $available -or $null -eq $available.properties.availableCapacity -or $available.properties.availableCapacity -lt $needed) {
+        if (-not $available -or $null -eq $available.properties.availableCapacity -or $available.properties.availableCapacity -lt 0) {
+            throw "Azure did not return usable capacity information for '$($request.Name)' version '$($request.Version)' on '$($request.Sku)' in '$FoundryLocation'. Preflight cannot confirm capacity. Check model access and capacity information for the selected subscription before rerunning."
+        }
+        if ($available.properties.availableCapacity -lt $needed) {
             $alternatives = @($capacityCache[$cacheKey] | Where-Object {
                 $_.properties.skuName -eq $request.Sku -and $_.properties.availableCapacity -ge $needed
             } | ForEach-Object { $_.location } | Sort-Object -Unique)
@@ -997,7 +1006,7 @@ function Assert-LabAvailability {
         Write-Step 'Availability preflight passed. Capacity is not reserved; Azure policies, permissions, and feature enrollment can still affect deployment.'
     }
     catch {
-        throw "Availability preflight failed before Azure resources were created or changed. $($_.Exception.Message)"
+        throw "Availability preflight failed before lab resources were created or changed. $($_.Exception.Message)"
     }
 }
 
@@ -1028,17 +1037,45 @@ function New-AccountName {
     throw "Could not find an available account name after 10 attempts. Try a different -NamePrefix."
 }
 
-# Registers the resource providers and makes sure the resource group exists.
-# A lab environment often supplies the group already, so an existing one is reused.
-function Initialize-Subscription {
+# Registers required resource providers before querying their service APIs.
+function Initialize-ResourceProviders {
+    param([switch]$CheckOnly)
+
     $providers = @('Microsoft.DocumentDB') + @($Profiles[$LabProfile].Account.Providers | Where-Object { $_ })
     if ($EnableFoundry) { $providers += 'Microsoft.CognitiveServices' }
 
-    foreach ($provider in $providers) {
-        Write-Step "Registering the $provider resource provider."
-        Invoke-Az @('provider', 'register', '--namespace', $provider, '--wait') | Out-Null
-    }
+    foreach ($provider in $providers | Select-Object -Unique) {
+        $metadata = Invoke-Az @('provider', 'show', '--namespace', $provider, '--output', 'json') | ConvertFrom-Json
+        $registrationState = [string]$metadata.registrationState
+        if (-not $registrationState) {
+            throw "Azure did not return a registration state for '$provider'. Check subscription read access before rerunning setup."
+        }
+        Write-Step "Resource provider '$provider': $registrationState."
+        if ($registrationState -in @('Registered', 'Registering')) { continue }
+        if ($registrationState -ne 'NotRegistered') {
+            throw "Resource provider '$provider' is '$registrationState'. Resolve this registration state before rerunning setup."
+        }
+        if ($CheckOnly) {
+            throw "Resource provider '$provider' is not registered for this subscription. -PreflightOnly does not change provider registrations. Register the provider for the lab subscription, then rerun preflight."
+        }
 
+        Write-Step "Registering the $provider resource provider."
+        try {
+            Invoke-Az @('provider', 'register', '--namespace', $provider, '--wait') | Out-Null
+        }
+        catch {
+            throw "Could not register '$provider'. Registration requires the provider's register/action permission at subscription scope. Ask your subscription administrator or lab provider to register it. $($_.Exception.Message)"
+        }
+        $metadata = Invoke-Az @('provider', 'show', '--namespace', $provider, '--output', 'json') | ConvertFrom-Json
+        if ($metadata.registrationState -notin @('Registered', 'Registering')) {
+            throw "Resource provider '$provider' did not complete registration. Reported state: '$($metadata.registrationState)'. No lab resources were created."
+        }
+        Write-Step "Resource provider '$provider': $($metadata.registrationState)."
+    }
+}
+
+# A lab environment often supplies the group already, so an existing one is reused.
+function Initialize-Subscription {
     $existingGroup = & az group show --name $ResourceGroup --output json 2>$null | ConvertFrom-Json
 
     if ($existingGroup) {
@@ -1616,6 +1653,8 @@ $accountCount = if ($Profiles[$LabProfile].Account.AccountCount) { $Profiles[$La
 if ($AccountName -and ($accountCount -gt 1 -or $AccountName -notmatch '^[a-z0-9][a-z0-9-]{1,42}[a-z0-9]$')) {
     throw 'Use a valid 3-44 character Cosmos DB account name. Profiles that create multiple accounts require -NamePrefix instead of -AccountName.'
 }
+Initialize-ResourceProviders -CheckOnly:$PreflightOnly
+
 $resourceGroupExists = Invoke-Az @('group', 'exists', '--name', $ResourceGroup, '--output', 'json') | ConvertFrom-Json
 $existingAccounts = @()
 if ($resourceGroupExists) {

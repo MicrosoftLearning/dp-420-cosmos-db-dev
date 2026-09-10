@@ -36,14 +36,14 @@ Use these guides to prepare for the DP-420 exercises. Follow your exercise's set
 
 ## Check regional availability
 
-Setup automatically checks the regions for your selected profile before creating or changing Azure resources. Use the intended subscription for your `az login` session. The checks include:
+Normal setup checks the required resource provider registrations and registers missing providers before checking service availability. It then checks the regions for your selected profile before creating a resource group or creating or changing lab resources. Use the intended subscription for your `az login` session. The checks include:
 
 - Cosmos DB regional status and your subscription's regional access for new accounts. On reruns, setup checks the existing account's actual regions.
 - Both Cosmos DB regions for `multiregion`, and the documented container-copy regions for the shared `core` account.
 - Container Instances for `security`, Log Analytics workspaces for `monitoring`, and fleets and storage accounts for `fleet`, using each resource provider's region list.
 - With `-EnableFoundry`, the exact model versions and deployment types in `-FoundryLocation`, supported capacity values, reported deployable capacity, and remaining model quota. Matching existing model deployments don't require more quota.
 
-To check your choices without provisioning, add `-PreflightOnly` to the setup command from your exercise. For example, with the resource group and region variables from the retrieval-augmented generation (RAG) exercise:
+To check your choices without provisioning, add `-PreflightOnly` to the setup command from your exercise. This mode checks provider registration but doesn't change it. If a required provider isn't registered, follow [Register Azure resource providers](00-register-resource-providers.md) before rerunning the check. For example, with the resource group and region variables from the retrieval-augmented generation (RAG) exercise:
 
 ```powershell
 ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab18 -LabProfile search -AccountOnly -EnableFoundry -FoundryLocation eastus -PreflightOnly

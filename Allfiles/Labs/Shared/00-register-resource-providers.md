@@ -8,7 +8,7 @@ lab:
 
 A subscription can only create a resource type after the resource provider that owns it is registered. Registration is a one-time step per subscription.
 
-The shared setup script registers `Microsoft.DocumentDB` for you. Follow these steps only if you provision resources by hand, or if a deployment fails with a `MissingSubscriptionRegistration` error.
+Normal setup registers the providers its selected profile needs before checking service availability. With `-EnableFoundry`, it also registers `Microsoft.CognitiveServices`. The `-PreflightOnly` mode checks registration without changing it. Follow these steps if you provision resources by hand, if check-only mode reports an unregistered provider, or if a deployment fails with a `MissingSubscriptionRegistration` error.
 
 Before registering a provider, [sign in to Azure and select the subscription](00-setup-local-environment.md#sign-in-to-azure) you use for the exercise.
 
