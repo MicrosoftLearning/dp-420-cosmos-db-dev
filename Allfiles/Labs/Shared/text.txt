@@ -20,7 +20,7 @@ This exercise also requires:
 
 This exercise uses the `aitools` profile, which creates the CosmicWorks catalog and the Agent Memory Toolkit's containers. It enables vector search, so use a disposable account rather than the shared core account. You don't need an existing Foundry project.
 
-Setup runs in two stages. The first creates the Cosmos DB account and Foundry model deployments. After you confirm Cosmos DB search-feature enrollment in the portal, the second creates the databases, containers, and Cosmos DB role assignment.
+To create the lab resources and load the catalog data, run setup once. The script configures the search policies and handles vector-search activation before completing container setup.
 
 1. Start **Visual Studio Code**.
 
@@ -53,12 +53,12 @@ Setup runs in two stages. The first creates the Cosmos DB account and Foundry mo
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile aitools -AccountOnly -EnableFoundry -FoundryLocation $foundryLocation
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile aitools -EnableFoundry -FoundryLocation $foundryLocation
     ```
 
     Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab08a7f3k9`.
 
-1. Wait for the account and model deployments to finish. Deployment time varies by region and available capacity.
+1. Wait for **Setup complete** in the terminal. If Azure reports that vector search is not ready, setup retries container creation for up to 15 minutes. Other deployment failures stop setup and appear in the log.
 
 1. Record the **Account name**, **Account endpoint**, **Foundry account**, and **OpenAI endpoint** values the script prints. The Cosmos DB endpoint looks like `https://<your-account-name>.documents.azure.com:443/`. Setup also saves the Foundry settings in `logs/foundry-<account-name>.json`.
 
@@ -68,16 +68,13 @@ Setup runs in two stages. The first creates the Cosmos DB account and Foundry mo
     $accountName = "<your-account-name>"
     ```
 
-1. Open that Cosmos DB account in the Azure portal. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled, then enable **Full Text & Hybrid Search for NoSQL API**. Allow up to 15 minutes for enrollment and confirm both features are enabled before continuing.
-
-1. Resume setup against the same account, then verify the resources. The confirmation switch records your portal check; it doesn't enable or independently verify feature enrollment.
+1. Verify the resources.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -AccountName $accountName -LabProfile aitools -SearchFeaturesReady -EnableFoundry -FoundryLocation $foundryLocation
     ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile aitools -EnableFoundry
     ```
 
-    Continue only after both commands succeed. If Foundry deployment fails because of model availability or quota, resolve the issue and retry against this Cosmos DB account. Keep any `-FoundryLocation` or `-FoundryAccountName` overrides consistent on both setup stages.
+    Continue only after setup and verification succeed. To resume a failed setup, replace `-NamePrefix dp420lab08` with `-AccountName <your-account-name>` in the setup command. Keep the resource group, profile, and Foundry options unchanged.
 
 1. Load the saved model settings in the **Allfiles/Labs/Shared** terminal.
 
@@ -87,7 +84,7 @@ Setup runs in two stages. The first creates the Cosmos DB account and Foundry mo
     $foundry | Format-List FoundryAccountName, OpenAiEndpoint, EmbeddingDeployment, EmbeddingDimensions, ChatDeployment
     ```
 
-After both stages, setup creates these resources:
+Setup creates these resources:
 
 | Resource | Configuration |
 | :--- | :--- |
