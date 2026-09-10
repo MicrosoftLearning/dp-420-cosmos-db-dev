@@ -6,13 +6,13 @@ lab:
 
 # Set up your lab environment
 
-Complete these steps once, before your first exercise. Every exercise in this course assumes the software listed here is installed.
+Use this guide to install the tools your exercise requires. If your lab environment already provides a tool, check its version instead of installing it again.
 
 > **Note**: These instructions target a Windows 11 computer. You can also use Linux or macOS, though you might need to adapt some steps. Because local configurations vary widely, the course team can't support issues you encounter in your own environment.
 
 ## Install the core tools
 
-Every exercise needs these.
+Install these for exercises that use the shared setup script.
 
 | Tool | Notes |
 | :--- | :--- |
@@ -28,12 +28,13 @@ Then install the Visual Studio Code extensions for the language you plan to use:
 
 ## Install a runtime
 
-Install the runtime that matches the language you work in. If you plan to try both language tracks, install both.
+For code-based exercises, install the runtime that matches your chosen language. If you plan to try both language tracks, install both. Exercises that use only the portals and Azure CLI don't require a local .NET or Python installation.
 
 | Runtime | Version |
 | :--- | :--- |
 | [.NET SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | 10.0 or later. Install the SDK, not the runtime. |
 | [Python](https://www.python.org/downloads/) | 3.12 or 3.13. Select **Add python.exe to PATH** in the installer. |
+
 ## Install the per-exercise tools
 
 Three exercises need extra software. Install these only when you reach the exercise that needs them.
@@ -46,7 +47,7 @@ Three exercises need extra software. Install these only when you reach the exerc
 
 ## Sign in to Azure
 
-Open a terminal and sign in. The shared setup script and every exercise authenticate as the identity you sign in with here.
+Open a terminal and sign in with the identity specified by your lab environment. The shared setup script uses that identity.
 
 ```azurecli
 az login
@@ -69,4 +70,4 @@ Several exercises reference files in this repository.
 
 ## Next step
 
-Continue to [Create your Azure Cosmos DB account](00-create-cosmos-account.md).
+Return to your exercise's setup steps. For help with the shared account setup, see [Create your Azure Cosmos DB account](00-create-cosmos-account.md).

@@ -25,7 +25,7 @@ param capabilities array = []
 ])
 param publicNetworkAccess string = 'Enabled'
 
-@description('Backup mode. Fixed when the account is created and never changeable afterward.')
+@description('Backup mode for a new account. setup.ps1 does not migrate backup mode on existing accounts.')
 @allowed([
   'Periodic'
   'Continuous'

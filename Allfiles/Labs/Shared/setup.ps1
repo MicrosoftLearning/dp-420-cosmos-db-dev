@@ -12,8 +12,10 @@
 
 .PARAMETER LabProfile
     core     - cosmicworks database with product, productMeta, leases, bulkload.
-               Serves the resources, SDK, operations, query, change feed, and
-               AI-assisted tools exercises.
+               Serves the resources, SDK, operations, query, and change feed exercises.
+    aitools  - The core catalog plus the five Agent Memory Toolkit containers in
+               ai_memory. Requires two-stage search enrollment. Use EnableFoundry
+               to provision the chat and embedding deployments for module 8.
     modeling - database-v1 through database-v4, for the data modeling and
                partitioning exercise.
     security - A disposable account for the security exercise. Serverless, with an
@@ -58,9 +60,14 @@
 .PARAMETER SkipSeed
     Provision the databases and containers, but do not load any data.
 
+.PARAMETER PreflightOnly
+    Check the selected profile's regions and optional Foundry model capacity and
+    quota without creating or changing Azure resources. Normal setup also runs
+    these checks before provisioning. The checks do not reserve capacity.
+
 .PARAMETER AccountOnly
     Create or locate the account without provisioning databases, roles, or data.
-    Use this first for search and agentmemory, then enroll features in the portal.
+    Use this first for search, agentmemory, and aitools, then enroll features in the portal.
 
 .PARAMETER SearchFeaturesReady
     Confirm that vector and full-text enrollment is complete in the portal.
@@ -70,10 +77,52 @@
     How many seed writes to issue at once. Set to 1 to load serially when
     troubleshooting a seeding failure.
 
+.PARAMETER EnableFoundry
+    Deploy foundry.bicep in the same resource group. Creates a keyless Foundry
+    resource, project, embedding deployment, optional chat deployment, and user role.
+    Works during either setup stage. Without this switch, no Foundry operations run.
+
+.PARAMETER EmbeddingOnly
+    With EnableFoundry, omit the chat model for embedding-only exercises.
+
+.PARAMETER FoundryLocation
+    Region for the model deployments, independent of the Cosmos DB region.
+    Defaults to eastus. Model availability and quota must permit the deployment.
+
+.PARAMETER FoundryAccountName
+    Optional existing or new Foundry resource name. Defaults to the Cosmos DB
+    account name followed by -ai. Existing resources and deployments are not reset.
+
+.PARAMETER FoundryProjectName
+    Project to create or reuse in the Foundry resource. Defaults to dp420.
+
+.PARAMETER EmbeddingModel
+    Embedding model and deployment name. Defaults to text-embedding-3-small.
+
+.PARAMETER EmbeddingModelVersion
+    Embedding model version. Defaults to 1.
+
+.PARAMETER ChatModel
+    Chat model and deployment name. Defaults to gpt-5.4-mini.
+
+.PARAMETER ChatModelVersion
+    Chat model version. Defaults to 2026-03-17.
+
+.PARAMETER EmbeddingDeploymentSku
+    Pay-per-token embedding deployment type. Defaults to Standard.
+
+.PARAMETER ChatDeploymentSku
+    Pay-per-token chat deployment type. Defaults to GlobalStandard.
+
+.PARAMETER EmbeddingCapacity
+    Model-specific embedding capacity units. Defaults to 30.
+
+.PARAMETER ChatCapacity
+    Model-specific chat capacity units. Defaults to 30.
+
 .NOTES
-    Every resource is declared in cosmos.bicep, which sits beside this script, and the
-    whole profile is deployed in one operation. Sibling resources in a template carry no
-    dependency on each other, so Azure creates all the databases and containers at once.
+    Cosmos resources are declared in cosmos.bicep. Optional Foundry resources are
+    declared in foundry.bicep. Both templates sit beside this script.
 
 .EXAMPLE
     ./setup.ps1 -ResourceGroup dp420 -Location eastus -NamePrefix dp420lab02
@@ -91,7 +140,7 @@ param(
     [ValidatePattern('^[a-z0-9][a-z0-9-]{1,30}$')]
     [string]$NamePrefix = 'dp420lab',
 
-    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'mirroring', 'fleet', 'search', 'agentmemory')]
+    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'mirroring', 'fleet', 'search', 'agentmemory', 'aitools')]
     [string]$LabProfile = 'core',
 
     [string]$Location = 'westus2',
@@ -103,9 +152,47 @@ param(
 
     [switch]$SkipSeed,
 
+    [switch]$PreflightOnly,
+
     [switch]$AccountOnly,
 
-    [switch]$SearchFeaturesReady
+    [switch]$SearchFeaturesReady,
+
+    [switch]$EnableFoundry,
+
+    [switch]$EmbeddingOnly,
+
+    [string]$FoundryLocation = 'eastus',
+
+    [ValidatePattern('^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$')]
+    [string]$FoundryAccountName,
+
+    [ValidatePattern('^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,63}$')]
+    [string]$FoundryProjectName = 'dp420',
+
+    [ValidateSet('text-embedding-3-small', 'text-embedding-3-large')]
+    [string]$EmbeddingModel = 'text-embedding-3-small',
+
+    [ValidateNotNullOrEmpty()]
+    [string]$EmbeddingModelVersion = '1',
+
+    [ValidatePattern('^[a-zA-Z0-9][a-zA-Z0-9_.-]*$')]
+    [string]$ChatModel = 'gpt-5.4-mini',
+
+    [ValidateNotNullOrEmpty()]
+    [string]$ChatModelVersion = '2026-03-17',
+
+    [ValidateSet('Standard', 'GlobalStandard', 'DataZoneStandard')]
+    [string]$EmbeddingDeploymentSku = 'Standard',
+
+    [ValidateSet('Standard', 'GlobalStandard', 'DataZoneStandard')]
+    [string]$ChatDeploymentSku = 'GlobalStandard',
+
+    [ValidateRange(1, 1000)]
+    [int]$EmbeddingCapacity = 30,
+
+    [ValidateRange(1, 1000)]
+    [int]$ChatCapacity = 30
 )
 
 $ErrorActionPreference = 'Stop'
@@ -118,6 +205,7 @@ $DataRoot = 'https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/da
 # The template lives beside this script, so a learner can run the script from anywhere.
 $script:ScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 $script:TemplateFile = Join-Path $script:ScriptRoot 'cosmos.bicep'
+$script:FoundryTemplateFile = Join-Path $script:ScriptRoot 'foundry.bicep'
 
 # 2.61 is the first release whose behavior these commands rely on.
 $MinimumCliVersion = [version]'2.61.0'
@@ -236,6 +324,7 @@ $Profiles = @{
         # the whole resource group, so it must never share either with the rest of the course.
         Account   = @{
             Providers            = @('Microsoft.ContainerInstance')
+            RegionalResources    = @(@{ ProviderNamespace = 'Microsoft.ContainerInstance'; ResourceType = 'containerGroups' })
             Serverless           = $true
             PublicNetworkAccess  = 'ENABLED'
             GrantDataPlaneAccess = $false
@@ -289,6 +378,9 @@ $Profiles = @{
         # the resource group. A diagnostic setting has to be removed before its target
         # resource is deleted or renamed, so keeping both in a group of their own means
         # one delete cleans up everything.
+        Account = @{
+            RegionalResources = @(@{ ProviderNamespace = 'Microsoft.OperationalInsights'; ResourceType = 'workspaces' })
+        }
         Databases = @(
             @{
                 Name       = 'cosmicworks'
@@ -302,13 +394,12 @@ $Profiles = @{
         )
     }
     mirroring = @{
-        # Microsoft Fabric mirroring requires continuous backup on the account, and
-        # continuous backup can only be chosen at account creation and can never be
-        # turned off again, so this exercise gets an account and a resource group of
-        # its own rather than altering the shared course account.
         Account   = @{
-            BackupPolicy   = 'Continuous'
-            ContinuousTier = 'Continuous7Days'
+            BackupPolicy        = 'Continuous'
+            ContinuousTier      = 'Continuous7Days'
+            PublicNetworkAccess = 'Enabled'
+            RequireAllNetworks  = $true
+            RequireSingleWriteLocation = $true
         }
         Databases = @(
             @{
@@ -330,6 +421,10 @@ $Profiles = @{
         # only when their regions and their service tier match.
         Account   = @{
             AccountCount = 2
+            RegionalResources = @(
+                @{ ProviderNamespace = 'Microsoft.DocumentDB'; ResourceType = 'fleets' }
+                @{ ProviderNamespace = 'Microsoft.Storage'; ResourceType = 'storageAccounts' }
+            )
         }
         Databases = @(
             @{
@@ -395,7 +490,7 @@ $Profiles = @{
         # exercise gets an account and a resource group of its own rather than altering
         # the shared one. The two containers hold the module's two memory tiers.
         Account   = @{
-            Capabilities = @('EnableNoSQLVectorSearch')
+            Capabilities = @('EnableNoSQLVectorSearch', 'DeleteAllItemsByPartitionKey')
         }
         Databases = @(
             @{
@@ -470,6 +565,59 @@ $Profiles = @{
     }
 }
 
+$Profiles.aitools = @{
+    Account = @{ Capabilities = @('EnableNoSQLVectorSearch') }
+    Databases = @($Profiles.core.Databases) + @(
+        @{
+            Name = 'ai_memory'
+            Containers = @(
+                foreach ($containerName in 'memories', 'memories_turns', 'memories_summaries') {
+                    $indexingPolicy = @{
+                        indexingMode = 'consistent'
+                        automatic = $true
+                        includedPaths = @(@{ path = '/*' })
+                        excludedPaths = @(
+                            @{ path = '/source_memory_ids/*' }
+                            @{ path = '/supersedes_ids/*' }
+                            @{ path = '/"_etag"/?' }
+                        )
+                        vectorIndexes = @(@{ path = '/embedding'; type = 'quantizedFlat' })
+                        fullTextIndexes = @(@{ path = '/content' })
+                    }
+                    if ($containerName -eq 'memories_summaries') {
+                        $indexingPolicy.compositeIndexes = ,@(
+                            @{ path = '/user_id'; order = 'ascending' }
+                            @{ path = '/thread_id'; order = 'ascending' }
+                            @{ path = '/version'; order = 'descending' }
+                        )
+                    }
+                    @{
+                        Name = $containerName
+                        PartitionKey = @('/user_id', '/thread_id')
+                        MaxThroughput = 1000
+                        DefaultTtl = if ($containerName -eq 'memories_turns') { 2592000 } else { -1 }
+                        VectorEmbeddings = @{
+                            vectorEmbeddings = @(@{
+                                path = '/embedding'
+                                dataType = 'float32'
+                                dimensions = 1536
+                                distanceFunction = 'cosine'
+                            })
+                        }
+                        FullTextPolicy = @{
+                            defaultLanguage = 'en-US'
+                            fullTextPaths = @(@{ path = '/content'; language = 'en-US' })
+                        }
+                        IndexingPolicy = $indexingPolicy
+                    }
+                }
+                @{ Name = 'counter'; PartitionKey = @('/user_id', '/thread_id'); MaxThroughput = 1000 }
+                @{ Name = 'leases'; PartitionKey = '/id'; MaxThroughput = 1000 }
+            )
+        }
+    )
+}
+
 #endregion
 
 #region Logging
@@ -519,6 +667,11 @@ function Initialize-Log {
     Write-Log "Location       : $Location"
     Write-Log "Secondary      : $(if ($script:SecondLocation) { $script:SecondLocation } else { '(none)' })"
     Write-Log "SkipSeed       : $SkipSeed"
+    Write-Log "EnableFoundry  : $EnableFoundry"
+    if ($EnableFoundry) {
+        Write-Log "Foundry        : $FoundryAccountName / $FoundryProjectName in $FoundryLocation"
+        Write-Log "Models         : $EmbeddingModel $EmbeddingModelVersion; chat enabled: $(-not $EmbeddingOnly)"
+    }
     Write-Log "PSVersion      : $($PSVersionTable.PSVersion)"
     Write-Log "OS             : $([System.Environment]::OSVersion.VersionString)"
 }
@@ -628,6 +781,9 @@ function Assert-Prerequisites {
     if (-not (Test-Path -LiteralPath $script:TemplateFile)) {
         throw "cosmos.bicep was not found beside this script at '$script:TemplateFile'. Both files ship together in Allfiles/Labs/Shared."
     }
+    if ($EnableFoundry -and -not (Test-Path -LiteralPath $script:FoundryTemplateFile)) {
+        throw "foundry.bicep was not found beside this script at '$script:FoundryTemplateFile'. Update the lab repository before using -EnableFoundry."
+    }
 
     # The CLI installs its own copy of the Bicep compiler on first use. Doing it here
     # keeps the download out of the middle of a deployment.
@@ -637,8 +793,200 @@ function Assert-Prerequisites {
         Invoke-Az @('bicep', 'install') | Out-Null
     }
 
-    if ($LabProfile -eq 'core' -and $Location -notin $ContainerCopyRegions) {
-        Write-Warning "Region '$Location' does not support container copy jobs. The change feed exercise cannot complete its final task in this region."
+}
+
+function Assert-ResourceRegion {
+    param(
+        [string]$ProviderNamespace,
+        [string]$ResourceType,
+        [string[]]$Regions
+    )
+
+    $provider = Invoke-Az @('provider', 'show', '--namespace', $ProviderNamespace, '--output', 'json') | ConvertFrom-Json
+    $resource = $provider.resourceTypes | Where-Object { $_.resourceType -eq $ResourceType } | Select-Object -First 1
+    $supported = @($resource.locations | Where-Object { $_ } | ForEach-Object { ($_ -replace '\s', '').ToLowerInvariant() })
+    if (-not $supported.Count) {
+        throw "Azure did not return supported regions for '$ProviderNamespace/$ResourceType'. Check subscription access and rerun setup."
+    }
+
+    foreach ($region in $Regions) {
+        if ($region -notin $supported) {
+            throw "'$ProviderNamespace/$ResourceType' is not listed in region '$region'. Choose a supported region: $($supported -join ', ')."
+        }
+        Write-Step "Region '$region' supports '$ProviderNamespace/$ResourceType'."
+    }
+}
+
+function Assert-FoundryAvailability {
+    param([string[]]$AccountNames, [bool]$ResourceGroupExists)
+
+    Assert-ResourceRegion -ProviderNamespace 'Microsoft.CognitiveServices' -ResourceType 'accounts' -Regions @($FoundryLocation)
+    $foundryAccounts = @()
+    if ($ResourceGroupExists) {
+        $foundryAccounts = @(Invoke-Az @('cognitiveservices', 'account', 'list', '--resource-group', $ResourceGroup, '--output', 'json') | ConvertFrom-Json)
+    }
+    $requests = @()
+    $plannedAccounts = @{}
+    foreach ($cosmosName in $AccountNames) {
+        $values = Get-FoundryDeploymentParameters -PrincipalId '' -CosmosAccountName $cosmosName -Accounts $foundryAccounts
+        $name = $values.accountName.value
+        if ($plannedAccounts.ContainsKey($name)) { continue }
+        $plannedAccounts[$name] = $true
+        $requests += [pscustomobject]@{ Name = $EmbeddingModel; Version = $EmbeddingModelVersion; Sku = $EmbeddingDeploymentSku; Capacity = $EmbeddingCapacity; CapacityOption = '-EmbeddingCapacity'; Create = $values.deployEmbedding.value }
+        if (-not $EmbeddingOnly) {
+            $requests += [pscustomobject]@{ Name = $ChatModel; Version = $ChatModelVersion; Sku = $ChatDeploymentSku; Capacity = $ChatCapacity; CapacityOption = '-ChatCapacity'; Create = $values.deployChat.value }
+        }
+    }
+    if (-not $requests.Count) {
+        throw 'No Foundry deployment targets were selected for preflight.'
+    }
+
+    $models = @(Invoke-Az @('cognitiveservices', 'model', 'list', '--location', $FoundryLocation, '--output', 'json') | ConvertFrom-Json)
+    $usages = @()
+    $subscriptionId = ''
+    if ($requests.Create -contains $true) {
+        $usages = @(Invoke-Az @('cognitiveservices', 'usage', 'list', '--location', $FoundryLocation, '--output', 'json') | ConvertFrom-Json)
+        $subscriptionId = (Invoke-Az @('account', 'show', '--query', 'id', '--output', 'tsv')).Trim()
+        if (-not $subscriptionId) { throw 'Azure did not return the current subscription ID for capacity checks.' }
+    }
+    $requiredQuota = @{}
+    $capacityCache = @{}
+
+    foreach ($group in $requests | Group-Object Name, Version, Sku) {
+        $request = $group.Group[0]
+        $newDeployments = @($group.Group | Where-Object { $_.Create })
+        $needed = [int](($newDeployments | Measure-Object -Property Capacity -Sum).Sum)
+        $matchingModels = @($models | Where-Object {
+            $_.model.format -eq 'OpenAI' -and $_.model.name -eq $request.Name -and $_.model.version -eq $request.Version
+        })
+        $sku = $matchingModels.model.skus | Where-Object { $_.name -eq $request.Sku } | Select-Object -First 1
+        if (-not $matchingModels.Count -or -not $sku) {
+            throw "Foundry region '$FoundryLocation' does not list '$($request.Name)' version '$($request.Version)' on '$($request.Sku)'. Change -FoundryLocation or select a supported model/version/deployment type before rerunning."
+        }
+        $model = $matchingModels[0].model
+        if ($model.lifecycleStatus -in @('Deprecated', 'Retired')) {
+            throw "Model '$($request.Name)' version '$($request.Version)' is retired. Select a supported model version."
+        }
+        foreach ($retirement in @($model.deprecation.inference, $sku.deprecationDate) | Where-Object { $_ }) {
+            if ([DateTimeOffset]::Parse($retirement) -le [DateTimeOffset]::UtcNow) {
+                throw "Model '$($request.Name)' version '$($request.Version)' on '$($request.Sku)' is past its published retirement date."
+            }
+        }
+        if ($needed -gt 0 -and $model.lifecycleStatus -eq 'Deprecating') {
+            throw "Model '$($request.Name)' version '$($request.Version)' is restricted to existing customers. New-deployment access cannot be confirmed by this preflight. Select a generally available model or reuse an existing matching deployment."
+        }
+        if ($needed -eq 0) {
+            Write-Step "Model '$($request.Name)' version '$($request.Version)' already has a matching deployment. No additional quota or capacity is needed."
+            continue
+        }
+
+        $limits = $sku.capacity
+        foreach ($deployment in $newDeployments) {
+            $capacity = $deployment.Capacity
+            $invalid = ($null -ne $limits.minimum -and $capacity -lt $limits.minimum) -or
+                ($null -ne $limits.maximum -and $capacity -gt $limits.maximum) -or
+                ($limits.step -gt 0 -and ($capacity - [int]$limits.minimum) % $limits.step -ne 0) -or
+                (@($limits.allowedValues).Count -gt 0 -and $limits.allowedValues -and $capacity -notin $limits.allowedValues)
+            if ($invalid) {
+                throw "Capacity $capacity is not supported for '$($request.Name)' on '$($request.Sku)' in '$FoundryLocation'. Check $($request.CapacityOption): minimum=$($limits.minimum), maximum=$($limits.maximum), step=$($limits.step), allowed=$($limits.allowedValues -join ',')."
+            }
+        }
+        if (-not $sku.usageName) {
+            throw "Azure did not return a quota identifier for '$($request.Name)' on '$($request.Sku)'. Quota cannot be verified; update the Azure CLI or check subscription access."
+        }
+        $requiredQuota[$sku.usageName] += $needed
+
+        $cacheKey = "$($request.Name)/$($request.Version)"
+        if (-not $capacityCache.ContainsKey($cacheKey)) {
+            $modelName = [uri]::EscapeDataString($request.Name)
+            $modelVersion = [uri]::EscapeDataString($request.Version)
+            $url = "https://management.azure.com/subscriptions/$subscriptionId/providers/Microsoft.CognitiveServices/modelCapacities?api-version=2024-10-01&modelFormat=OpenAI&modelName=$modelName&modelVersion=$modelVersion"
+            $entries = @()
+            while ($url) {
+                $page = Invoke-Az @('rest', '--method', 'GET', '--url', $url, '--output', 'json') | ConvertFrom-Json
+                $entries += @($page.value | Where-Object { $_ })
+                $url = $page.nextLink
+            }
+            $capacityCache[$cacheKey] = $entries
+        }
+        $available = $capacityCache[$cacheKey] | Where-Object {
+            ($_.location -replace '\s', '') -eq $FoundryLocation -and
+            $_.properties.skuName -eq $request.Sku -and
+            $_.properties.model.name -eq $request.Name -and $_.properties.model.version -eq $request.Version
+        } | Select-Object -First 1
+        if (-not $available -or $null -eq $available.properties.availableCapacity -or $available.properties.availableCapacity -lt $needed) {
+            $alternatives = @($capacityCache[$cacheKey] | Where-Object {
+                $_.properties.skuName -eq $request.Sku -and $_.properties.availableCapacity -ge $needed
+            } | ForEach-Object { $_.location } | Sort-Object -Unique)
+            throw "Insufficient reported capacity for '$($request.Name)' version '$($request.Version)' on '$($request.Sku)' in '$FoundryLocation': need $needed, reported '$($available.properties.availableCapacity)'. Check -FoundryLocation and $($request.CapacityOption). Other reported regions to evaluate: $($alternatives -join ', ')."
+        }
+        Write-Step "Foundry lists '$($request.Name)' version '$($request.Version)' on '$($request.Sku)' in '$FoundryLocation' with capacity for $needed additional units."
+    }
+
+    foreach ($quotaName in $requiredQuota.Keys) {
+        $usage = $usages | Where-Object { $_.name.value -eq $quotaName } | Select-Object -First 1
+        if (-not $usage -or $null -eq $usage.limit -or $null -eq $usage.currentValue -or $usage.limit -lt 0 -or $usage.currentValue -lt 0) {
+            throw "Azure did not return usable quota information for '$quotaName' in '$FoundryLocation'. Check subscription quota access before rerunning."
+        }
+        $remaining = $usage.limit - $usage.currentValue
+        if ($remaining -lt $requiredQuota[$quotaName]) {
+            throw "Insufficient Foundry quota for '$quotaName' in '$FoundryLocation': need $($requiredQuota[$quotaName]) additional capacity units; $remaining remain ($($usage.currentValue) used of $($usage.limit)). Reduce the requested capacity, request quota, or choose another -FoundryLocation."
+        }
+        Write-Step "Quota '$quotaName': $remaining units remain; setup needs $($requiredQuota[$quotaName])."
+    }
+}
+
+function Assert-LabAvailability {
+    param([string[]]$AccountNames, [object[]]$ExistingAccounts, [bool]$ResourceGroupExists)
+
+    Write-Step "Checking regions and optional model availability for the '$LabProfile' profile before provisioning."
+    try {
+        $regionChecks = @{}
+        $primaryRegions = @()
+        foreach ($name in $AccountNames) {
+            $existing = $ExistingAccounts | Where-Object { $_.name -eq $name } | Select-Object -First 1
+            if ($existing) {
+                $locations = @($existing.locations | Sort-Object failoverPriority)
+                if (-not $locations.Count) { throw "Azure did not return regions for existing Cosmos DB account '$name'." }
+                foreach ($region in $locations.locationName) {
+                    $regionName = ($region -replace '\s', '').ToLowerInvariant()
+                    if (-not $regionChecks.ContainsKey($regionName)) { $regionChecks[$regionName] = $false }
+                }
+                $primaryRegions += ($locations[0].locationName -replace '\s', '').ToLowerInvariant()
+            }
+            else {
+                if ($SearchFeaturesReady) { throw "Enrolled account '$name' was not found. Check -AccountName and -ResourceGroup; setup does not create a replacement for stage two." }
+                $regionChecks[$Location] = $true
+                $primaryRegions += $Location
+                if ($script:SecondLocation) { $regionChecks[$script:SecondLocation] = $true }
+            }
+        }
+        $locations = @(Invoke-Az @('cosmosdb', 'locations', 'list', '--output', 'json') | ConvertFrom-Json)
+        foreach ($region in $regionChecks.Keys) {
+            $metadata = $locations | Where-Object { ($_.name -replace '\s', '') -eq $region } | Select-Object -First 1
+            if (-not $metadata -or $metadata.properties.status -ne 'Online') {
+                throw "Cosmos DB region '$region' is not listed as Online for this subscription. Choose another -Location or -SecondaryLocation."
+            }
+            if ($regionChecks[$region] -and $metadata.properties.isSubscriptionRegionAccessAllowedForRegular -ne $true) {
+                throw "This subscription does not report access to create the lab's non-zone-redundant Cosmos DB account in '$region'. Choose another region or request regional access."
+            }
+            Write-Step "Cosmos DB region '$region' passed the published availability check."
+        }
+        foreach ($region in $primaryRegions | Sort-Object -Unique) {
+            if ($LabProfile -eq 'core' -and $region -notin $ContainerCopyRegions) {
+                throw "The shared core account also serves the change feed exercise, whose container copy job is not supported in '$region'. Choose a documented copy-job region, such as eastus or westus2."
+            }
+        }
+        foreach ($resource in @($Profiles[$LabProfile].Account.RegionalResources) | Where-Object { $_ }) {
+            Assert-ResourceRegion -ProviderNamespace $resource.ProviderNamespace -ResourceType $resource.ResourceType -Regions @($Location)
+        }
+        if ($EnableFoundry) {
+            Assert-FoundryAvailability -AccountNames $AccountNames -ResourceGroupExists $ResourceGroupExists
+        }
+        Write-Step 'Availability preflight passed. Capacity is not reserved; Azure policies, permissions, and feature enrollment can still affect deployment.'
+    }
+    catch {
+        throw "Availability preflight failed before Azure resources were created or changed. $($_.Exception.Message)"
     }
 }
 
@@ -673,6 +1021,7 @@ function New-AccountName {
 # A lab environment often supplies the group already, so an existing one is reused.
 function Initialize-Subscription {
     $providers = @('Microsoft.DocumentDB') + @($Profiles[$LabProfile].Account.Providers | Where-Object { $_ })
+    if ($EnableFoundry) { $providers += 'Microsoft.CognitiveServices' }
 
     foreach ($provider in $providers) {
         Write-Step "Registering the $provider resource provider."
@@ -696,8 +1045,7 @@ function Initialize-Subscription {
     Invoke-Az @('group', 'create', '--name', $ResourceGroup, '--location', $Location) | Out-Null
 }
 
-# Returns the account when it already exists, and throws when a setting that is fixed
-# at creation doesn't match the profile. Nothing here creates anything.
+# Returns an existing account without changing its configuration.
 function Get-LabAccount {
     $options = $Profiles[$LabProfile].Account
 
@@ -713,10 +1061,20 @@ function Get-LabAccount {
 
     $account = $existing | ConvertFrom-Json
 
-    # Backup policy and capacity mode are fixed at creation, so a reused account
-    # that was created for a different profile can't be corrected here.
     if ($options.BackupPolicy -and $account.backupPolicy.type -ne $options.BackupPolicy) {
-        throw "Account '$AccountName' uses $($account.backupPolicy.type) backup, but the '$LabProfile' profile needs $($options.BackupPolicy) backup, which can only be chosen when the account is created. Use a different -NamePrefix or an empty resource group."
+        throw "Account '$AccountName' uses $($account.backupPolicy.type) backup, but the '$LabProfile' profile needs $($options.BackupPolicy) backup. This script does not migrate backup mode. Use a dedicated lab account or complete a supported migration separately."
+    }
+
+    if ($options.RequireAllNetworks -and (
+        $account.publicNetworkAccess -ne 'Enabled' -or
+        @($account.ipRules | Where-Object { $_ }).Count -gt 0 -or
+        $account.isVirtualNetworkFilterEnabled
+    )) {
+        throw "The '$LabProfile' lab requires public network access for all networks. Existing network restrictions on '$AccountName' are not changed. Use a dedicated lab account, or configure Fabric private-network access separately."
+    }
+
+    if ($options.RequireSingleWriteLocation -and $account.enableMultipleWriteLocations) {
+        throw "The '$LabProfile' lab requires a single write region. Existing write-region settings on '$AccountName' are not changed. Use a dedicated lab account."
     }
 
     return $account
@@ -865,6 +1223,148 @@ function Invoke-LabDeployment {
         )).Trim()
 }
 
+function Get-FoundryDeploymentParameters {
+    param(
+        [string]$PrincipalId,
+        [string]$CosmosAccountName = $AccountName,
+        [AllowEmptyCollection()][object[]]$Accounts
+    )
+
+    $name = if ($FoundryAccountName) { $FoundryAccountName } else { "$CosmosAccountName-ai" }
+    $foundryAccounts = if ($PSBoundParameters.ContainsKey('Accounts')) { $Accounts } else {
+        Invoke-Az @('cognitiveservices', 'account', 'list', '--resource-group', $ResourceGroup, '--output', 'json') | ConvertFrom-Json
+    }
+    $existingAccount = $foundryAccounts | Where-Object name -eq $name | Select-Object -First 1
+    $existingDeployments = @()
+    $existingProject = $null
+    $existingRole = $null
+
+    if ($existingAccount) {
+        if ($existingAccount.kind -ne 'AIServices' -or -not $existingAccount.properties.allowProjectManagement -or
+            $existingAccount.properties.disableLocalAuth -ne $true) {
+            throw "Foundry resource '$name' must be an AIServices resource with project management enabled and key authentication disabled. It was not changed. Choose another -FoundryAccountName."
+        }
+        if (($existingAccount.location -replace ' ', '') -ne ($FoundryLocation -replace ' ', '')) {
+            throw "Foundry resource '$name' is in '$($existingAccount.location)'. Rerun with that -FoundryLocation or choose a different -FoundryAccountName."
+        }
+        if ($existingAccount.properties.provisioningState -ne 'Succeeded') {
+            throw "Foundry resource '$name' is not ready: $($existingAccount.properties.provisioningState). Resolve its provisioning failure or wait for the active operation before rerunning."
+        }
+        $existingDeployments = @(Invoke-Az @('cognitiveservices', 'account', 'deployment', 'list', '--name', $name, '--resource-group', $ResourceGroup, '--output', 'json') | ConvertFrom-Json)
+        $projects = Invoke-Az @('rest', '--method', 'GET', '--url', "https://management.azure.com$($existingAccount.id)/projects?api-version=2025-06-01", '--output', 'json') | ConvertFrom-Json
+        $existingProject = $projects.value | Where-Object { ($_.name -split '/')[-1] -eq $FoundryProjectName } | Select-Object -First 1
+        $roles = Invoke-Az @('role', 'assignment', 'list', '--scope', $existingAccount.id, '--output', 'json') | ConvertFrom-Json
+        $existingRole = $roles | Where-Object {
+            $_.principalId -eq $PrincipalId -and $_.roleDefinitionId -like '*/53ca6127-db72-4b80-b1b0-d745d6d5456d'
+        } | Select-Object -First 1
+    }
+
+    $values = [ordered]@{
+        accountName             = @{ value = $name }
+        location                = @{ value = $FoundryLocation }
+        projectName             = @{ value = $FoundryProjectName }
+        principalId             = @{ value = $PrincipalId }
+        deployAccount           = @{ value = -not [bool]$existingAccount }
+        deployProject           = @{ value = -not [bool]$existingProject }
+        deployRoleAssignment    = @{ value = -not [bool]$existingRole }
+        deployEmbedding         = @{ value = $true }
+        deployChat              = @{ value = -not $EmbeddingOnly }
+        embeddingModel          = @{ value = $EmbeddingModel }
+        embeddingModelVersion   = @{ value = $EmbeddingModelVersion }
+        embeddingDeploymentName = @{ value = $EmbeddingModel }
+        embeddingDeploymentSku  = @{ value = $EmbeddingDeploymentSku }
+        embeddingCapacity       = @{ value = $EmbeddingCapacity }
+        chatModel               = @{ value = $ChatModel }
+        chatModelVersion        = @{ value = $ChatModelVersion }
+        chatDeploymentName      = @{ value = $ChatModel }
+        chatDeploymentSku       = @{ value = $ChatDeploymentSku }
+        chatCapacity            = @{ value = $ChatCapacity }
+    }
+
+    $requestedModels = @(@{ Name = $EmbeddingModel; Version = $EmbeddingModelVersion; Sku = $EmbeddingDeploymentSku; Flag = 'deployEmbedding' })
+    if (-not $EmbeddingOnly) {
+        $requestedModels += @{ Name = $ChatModel; Version = $ChatModelVersion; Sku = $ChatDeploymentSku; Flag = 'deployChat' }
+    }
+    foreach ($model in $requestedModels) {
+        $existing = $existingDeployments | Where-Object name -eq $model.Name | Select-Object -First 1
+        if (-not $existing) { continue }
+        if ($existing.properties.model.name -ne $model.Name -or $existing.properties.model.version -ne $model.Version -or
+            $existing.sku.name -ne $model.Sku) {
+            throw "Existing deployment '$($model.Name)' in '$name' does not match the requested model version or deployment type. It was not changed. Check the deployment or use another -FoundryAccountName."
+        }
+        if ($existing.properties.provisioningState -in @('Failed', 'Canceled')) {
+            Write-Step "Retrying model deployment '$($model.Name)' after its previous failure."
+            continue
+        }
+        if ($existing.properties.provisioningState -ne 'Succeeded') {
+            throw "Model deployment '$($model.Name)' is '$($existing.properties.provisioningState)'. Wait for that operation to finish before rerunning setup."
+        }
+        $values[$model.Flag].value = $false
+        Write-Step "Reusing model deployment '$($model.Name)' without changing its capacity."
+    }
+
+    return $values
+}
+
+function Invoke-FoundryDeployment {
+    param([string]$PrincipalId)
+
+    $values = Get-FoundryDeploymentParameters -PrincipalId $PrincipalId
+    $name = $values.accountName.value
+    $parameters = [ordered]@{
+        '$schema' = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#'
+        contentVersion = '1.0.0.0'
+        parameters = $values
+    }
+    $parameterFile = Join-Path ([IO.Path]::GetTempPath()) ('dp420-foundry-{0}.parameters.json' -f [Guid]::NewGuid().ToString('N'))
+    $parameters | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $parameterFile -Encoding utf8
+    $deploymentName = "dp420-foundry-$AccountName"
+    Write-Step "Preparing Foundry resource '$name' in $FoundryLocation."
+    try {
+        Invoke-Az @(
+            'deployment', 'group', 'create',
+            '--resource-group', $ResourceGroup,
+            '--name', $deploymentName,
+            '--template-file', $script:FoundryTemplateFile,
+            '--parameters', "@$parameterFile",
+            '--mode', 'Incremental',
+            '--output', 'none'
+        ) | Out-Null
+    }
+    catch {
+        throw "Foundry setup failed. Check model availability, quota in '$FoundryLocation', and role-assignment permission. Rerun against Cosmos account '$AccountName'; do not delete it to retry. $($_.Exception.Message)"
+    }
+    finally {
+        Remove-Item -LiteralPath $parameterFile -Force -ErrorAction SilentlyContinue
+    }
+
+    $resource = Invoke-Az @('cognitiveservices', 'account', 'show', '--name', $name, '--resource-group', $ResourceGroup, '--output', 'json') | ConvertFrom-Json
+    if ($resource.properties.provisioningState -ne 'Succeeded') {
+        throw "Foundry resource '$name' is not ready after deployment: $($resource.properties.provisioningState)."
+    }
+    $subdomain = $resource.properties.customSubDomainName
+    if (-not $subdomain) { throw "Foundry resource '$name' did not return a custom subdomain." }
+    $settings = [pscustomobject]@{
+        CosmosAccountName = $AccountName
+        ResourceGroup = $ResourceGroup
+        FoundryAccountName = $name
+        FoundryResourceId = $resource.id
+        FoundryLocation = $resource.location
+        FoundryProjectName = $FoundryProjectName
+        OpenAiEndpoint = "https://$subdomain.openai.azure.com/"
+        ProjectEndpoint = "https://$subdomain.services.ai.azure.com/api/projects/$FoundryProjectName"
+        EmbeddingDeployment = $EmbeddingModel
+        EmbeddingModelVersion = $EmbeddingModelVersion
+        EmbeddingDimensions = 1536
+        ChatDeployment = if ($EmbeddingOnly) { '' } else { $ChatModel }
+        ChatModelVersion = if ($EmbeddingOnly) { '' } else { $ChatModelVersion }
+    }
+    $settingsFile = Join-Path $script:ScriptRoot "logs/foundry-$AccountName.json"
+    $settings | ConvertTo-Json | Set-Content -LiteralPath $settingsFile -Encoding utf8
+    Write-Log "Foundry settings: $settingsFile"
+    return $settings
+}
+
 #endregion
 
 #region Seeding
@@ -929,6 +1429,7 @@ function Add-SeedData {
         foreach ($dataset in $datasets) {
             $uri = "$($Endpoint.TrimEnd('/'))/dbs/$($dataset.Target.Database)/colls/$($dataset.Target.Container)/docs"
 
+            
             foreach ($item in $dataset.Items) {
                 [pscustomobject]@{
                     Container = $dataset.Target.Container
@@ -1054,10 +1555,17 @@ function Add-SeedData {
 
 #region Main
 
+$Location = ($Location -replace '\s', '').ToLowerInvariant()
+$FoundryLocation = ($FoundryLocation -replace '\s', '').ToLowerInvariant()
+if ($SecondaryLocation) { $SecondaryLocation = ($SecondaryLocation -replace '\s', '').ToLowerInvariant() }
+
+if ($EmbeddingOnly -and -not $EnableFoundry) {
+    throw '-EmbeddingOnly requires -EnableFoundry.'
+}
 if ($AccountOnly -and $SearchFeaturesReady) {
     throw 'Choose -AccountOnly for stage one or -SearchFeaturesReady for stage two, not both.'
 }
-if ($LabProfile -in @('search', 'agentmemory') -and -not $AccountOnly) {
+if ($LabProfile -in @('search', 'agentmemory', 'aitools') -and -not $AccountOnly -and -not $PreflightOnly) {
     if (-not $SearchFeaturesReady -or -not $AccountName) {
         throw 'First run with -AccountOnly. Enable vector and full-text search in the account Features pane and wait for enrollment to complete. Then rerun with -AccountName and -SearchFeaturesReady. No databases or containers have been created by this run.'
     }
@@ -1092,27 +1600,24 @@ trap {
 
 Assert-Prerequisites
 
-Initialize-Subscription
-
 $accountCount = if ($Profiles[$LabProfile].Account.AccountCount) { $Profiles[$LabProfile].Account.AccountCount } else { 1 }
 
+if ($AccountName -and ($accountCount -gt 1 -or $AccountName -notmatch '^[a-z0-9][a-z0-9-]{1,42}[a-z0-9]$')) {
+    throw 'Use a valid 3-44 character Cosmos DB account name. Profiles that create multiple accounts require -NamePrefix instead of -AccountName.'
+}
+$resourceGroupExists = Invoke-Az @('group', 'exists', '--name', $ResourceGroup, '--output', 'json') | ConvertFrom-Json
+$existingAccounts = @()
+if ($resourceGroupExists) {
+    $existingAccounts = @(Invoke-Az @('cosmosdb', 'list', '--resource-group', $ResourceGroup, '--output', 'json') | ConvertFrom-Json)
+}
+
 if ($AccountName) {
-    if ($accountCount -gt 1) {
-        throw "The '$LabProfile' profile creates $accountCount accounts, so it can't target a named account. Omit -AccountName and pass -NamePrefix instead."
-    }
-
-    if ($AccountName -notmatch '^[a-z0-9][a-z0-9-]{1,42}[a-z0-9]$') {
-        throw "'$AccountName' isn't a valid Azure Cosmos DB account name. Use 3-44 lowercase letters, numbers, and hyphens."
-    }
-
     $accountNames = @($AccountName)
 }
 else {
     # Re-use accounts this script created earlier. Without this, a re-run after a
     # mid-script failure generates fresh names and leaves extra billable accounts behind.
-    $existing = @(& az cosmosdb list --resource-group $ResourceGroup `
-            --query "[?starts_with(name, '$NamePrefix')].name" --output tsv 2>$null |
-        Where-Object { $_ } | ForEach-Object { $_.Trim() } | Sort-Object)
+    $existing = @($existingAccounts | Where-Object { $_.name.StartsWith($NamePrefix) } | ForEach-Object { $_.name } | Sort-Object)
 
     $accountNames = @($existing | Select-Object -First $accountCount)
 
@@ -1127,7 +1632,17 @@ else {
     }
 }
 
+Assert-LabAvailability -AccountNames $accountNames -ExistingAccounts $existingAccounts -ResourceGroupExists $resourceGroupExists
+
+if ($PreflightOnly) {
+    Write-Step 'Preflight-only run complete. No Azure resources were created or changed.'
+    return
+}
+
+Initialize-Subscription
+
 $provisioned = @()
+$foundryResources = @()
 $databases = $Profiles[$LabProfile].Databases
 
 foreach ($name in $accountNames) {
@@ -1150,6 +1665,13 @@ foreach ($name in $accountNames) {
 
     $endpoint = Invoke-LabDeployment -DeployAccount (-not $existingAccount) -PrincipalId $principalId
 
+    if ($EnableFoundry) {
+        $foundryPrincipalId = if ($principalId) { $principalId } else {
+            (Invoke-Az @('ad', 'signed-in-user', 'show', '--query', 'id', '--output', 'tsv')).Trim()
+        }
+        $foundryResources += Invoke-FoundryDeployment -PrincipalId $foundryPrincipalId
+    }
+
     if (-not $AccountOnly -and -not $SkipSeed) {
         Add-SeedData -Endpoint $endpoint -Databases $databases
     }
@@ -1165,7 +1687,7 @@ Write-Log "Total run time : $totalElapsed"
 
 Write-Host ''
 if ($AccountOnly) {
-    Write-Host 'Account stage complete. Databases, containers, roles, and seed data are not provisioned yet.' -ForegroundColor Yellow
+    Write-Host 'Cosmos DB account stage complete. Cosmos databases, containers, roles, and seed data are not provisioned yet.' -ForegroundColor Yellow
     Write-Host 'Complete feature enrollment in the portal, then rerun with this AccountName and -SearchFeaturesReady.' -ForegroundColor Yellow
 }
 else {
@@ -1175,6 +1697,18 @@ Write-Host ''
 foreach ($account in $provisioned) {
     Write-Host "  Account name     : $($account.Name)" -ForegroundColor Yellow
     Write-Host "  Account endpoint : $($account.Endpoint)" -ForegroundColor Yellow
+    Write-Host ''
+}
+foreach ($foundry in $foundryResources) {
+    Write-Host "  Foundry account  : $($foundry.FoundryAccountName)" -ForegroundColor Yellow
+    Write-Host "  Foundry project  : $($foundry.FoundryProjectName)" -ForegroundColor Yellow
+    Write-Host "  Foundry region   : $($foundry.FoundryLocation)"
+    Write-Host "  OpenAI endpoint  : $($foundry.OpenAiEndpoint)" -ForegroundColor Yellow
+    Write-Host "  Project endpoint : $($foundry.ProjectEndpoint)"
+    Write-Host "  Embedding model  : $($foundry.EmbeddingDeployment) ($($foundry.EmbeddingDimensions) dimensions)" -ForegroundColor Yellow
+    if ($foundry.ChatDeployment) { Write-Host "  Chat model       : $($foundry.ChatDeployment)" -ForegroundColor Yellow }
+    Write-Host "  Foundry settings : $(Join-Path $script:ScriptRoot "logs/foundry-$($foundry.CosmosAccountName).json")"
+    Write-Host '  A new Foundry role assignment can take several minutes to propagate.'
     Write-Host ''
 }
 Write-Host "  Resource group   : $ResourceGroup"

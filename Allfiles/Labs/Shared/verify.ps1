@@ -16,6 +16,17 @@
     The profile setup.ps1 was run with. The fleet profile creates two accounts,
     so run this script once per account.
 
+.PARAMETER EnableFoundry
+    Also check the Foundry resource, project, model deployments, and user role.
+    These are management-plane checks, not a model inference test.
+
+.PARAMETER EmbeddingOnly
+    With EnableFoundry, require only the embedding deployment.
+
+.PARAMETER CheckMirroringPermissions
+    With the mirroring profile, check account-scoped readMetadata and readAnalytics
+    grants for the signed-in user after the custom-role task. This does not test Fabric.
+
 .EXAMPLE
     ./verify.ps1 -ResourceGroup dp420 -AccountName dp420-cosmos-abc123
 
@@ -30,14 +41,35 @@ param(
     [Parameter(Mandatory)]
     [string]$AccountName,
 
-    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'mirroring', 'fleet', 'search', 'agentmemory')]
-    [string]$LabProfile = 'core'
+    [ValidateSet('core', 'modeling', 'security', 'backup', 'multiregion', 'indexing', 'monitoring', 'mirroring', 'fleet', 'search', 'agentmemory', 'aitools')]
+    [string]$LabProfile = 'core',
+
+    [switch]$CheckMirroringPermissions,
+
+    [switch]$EnableFoundry,
+
+    [switch]$EmbeddingOnly,
+
+    [string]$FoundryAccountName,
+
+    [string]$FoundryProjectName = 'dp420',
+
+    [string]$EmbeddingModel = 'text-embedding-3-small',
+
+    [string]$EmbeddingModelVersion = '1',
+
+    [string]$ChatModel = 'gpt-5.4-mini',
+
+    [string]$ChatModelVersion = '2026-03-17'
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $script:Failures = 0
+
+if ($EmbeddingOnly -and -not $EnableFoundry) { throw '-EmbeddingOnly requires -EnableFoundry.' }
+if ($CheckMirroringPermissions -and $LabProfile -ne 'mirroring') { throw '-CheckMirroringPermissions requires -LabProfile mirroring.' }
 
 function Test-Condition {
     param(
@@ -54,6 +86,50 @@ function Test-Condition {
         if ($Detail) { Write-Host "        $Detail" -ForegroundColor DarkGray }
         $script:Failures++
     }
+}
+
+function Test-AccountAccessConfiguration {
+    param($Account, $Expected)
+
+    if ($Expected.RequireAllNetworks) {
+        $allNetworks = $Account.publicNetworkAccess -eq 'Enabled' -and
+            @($Account.ipRules | Where-Object { $_ }).Count -eq 0 -and
+            -not $Account.isVirtualNetworkFilterEnabled
+        Test-Condition -Name 'Public network access allows all networks' -Passed $allNetworks `
+            -Detail 'This lab uses all-network public access. Private-network mirroring needs separate Network ACL Bypass configuration; do not remove existing restrictions automatically.'
+    }
+
+    if ($Expected.RequireSingleWriteLocation) {
+        Test-Condition -Name 'Account uses a single write region' -Passed (-not $Account.enableMultipleWriteLocations) `
+            -Detail 'The mirroring lab requires single-region writes. Existing write-region settings are not changed.'
+    }
+}
+
+function Test-MirroringPermissions {
+    param([string]$PrincipalId, [string]$AccountId, [object[]]$Assignments)
+
+    $definitionJson = & az cosmosdb sql role definition list --account-name $AccountName --resource-group $ResourceGroup --output json
+    if ($LASTEXITCODE -ne 0) {
+        Test-Condition -Name 'Mirroring role definitions can be read' -Passed $false `
+            -Detail 'Unable to list Cosmos DB data-plane role definitions. Check Azure permissions and rerun verification.'
+        return
+    }
+    $definitions = $definitionJson | ConvertFrom-Json
+    $accountAssignments = @($Assignments | Where-Object {
+        $_.principalId -eq $PrincipalId -and
+        ($_.scope -eq '/' -or ([string]$_.scope).TrimEnd('/') -eq $AccountId.TrimEnd('/'))
+    })
+    $dataActions = @(foreach ($assignment in $accountAssignments) {
+        $role = $definitions | Where-Object { $_.id -eq $assignment.roleDefinitionId }
+        foreach ($permission in $role.permissions) { $permission.dataActions }
+    })
+
+    foreach ($action in 'Microsoft.DocumentDB/databaseAccounts/readMetadata', 'Microsoft.DocumentDB/databaseAccounts/readAnalytics') {
+        $granted = @($dataActions | Where-Object { $_ -and $action -like $_ }).Count -gt 0
+        Test-Condition -Name "Signed-in user has account-scoped $($action.Split('/')[-1])" -Passed $granted `
+            -Detail 'Complete the custom-role task using the identity that connects from Fabric, then rerun this check.'
+    }
+    Write-Host '  Role configuration checked. Fabric connection, propagation, and replication still require portal validation.' -ForegroundColor DarkGray
 }
 
 #region Expectations
@@ -147,7 +223,7 @@ $Expectations = @{
     }
     mirroring   = @{
         # Fabric mirroring requires continuous backup on the account.
-        Account       = @{ BackupPolicy = 'Continuous'; ContinuousTier = 'Continuous7Days' }
+        Account       = @{ BackupPolicy = 'Continuous'; ContinuousTier = 'Continuous7Days'; RequireAllNetworks = $true; RequireSingleWriteLocation = $true }
         SeededProduct = $true
         Containers    = @(
             @{ Database = 'cosmicworks'; Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; MinItems = 295 }
@@ -167,19 +243,107 @@ $Expectations = @{
         Account       = @{ Capabilities = @('EnableNoSQLVectorSearch') }
         SeededProduct = $false
         Containers    = @(
-            @{ Database = 'cosmicworks'; Name = 'productSearch'; PartitionKey = '/categoryId'; MaxThroughput = 1000 }
+            @{ Database = 'cosmicworks'; Name = 'productSearch'; PartitionKey = '/categoryId'; MaxThroughput = 1000; VectorPath = '/embedding'; VectorDimensions = 1536; VectorIndexType = 'diskANN'; TextPath = '/searchText' }
         )
     }
     agentmemory = @{
         # Both containers start empty. The exercise writes the turns and distills the
         # memories itself, so there is no cosmicworks/product to read here either.
-        Account       = @{ Capabilities = @('EnableNoSQLVectorSearch') }
+        Account       = @{ Capabilities = @('EnableNoSQLVectorSearch', 'DeleteAllItemsByPartitionKey') }
         SeededProduct = $false
         Containers    = @(
-            @{ Database = 'agentmemory'; Name = 'conversation'; PartitionKey = '/threadId'; MaxThroughput = 1000 }
-            @{ Database = 'agentmemory'; Name = 'memory'; PartitionKey = '/userId'; MaxThroughput = 1000 }
+            @{ Database = 'agentmemory'; Name = 'conversation'; PartitionKey = '/threadId'; MaxThroughput = 1000; DefaultTtl = 2592000 }
+            @{ Database = 'agentmemory'; Name = 'memory'; PartitionKey = '/userId'; MaxThroughput = 1000; DefaultTtl = -1; VectorPath = '/embedding'; VectorDimensions = 1536; VectorIndexType = 'quantizedFlat'; TextPath = '/content' }
         )
     }
+}
+
+$Expectations.aitools = @{
+    Account = @{ Capabilities = @('EnableNoSQLVectorSearch') }
+    SeededProduct = $true
+    Containers = @($Expectations.core.Containers) + @(
+        @{ Database = 'ai_memory'; Name = 'memories'; PartitionKey = @('/user_id', '/thread_id'); MaxThroughput = 1000; DefaultTtl = -1; VectorPath = '/embedding'; VectorDimensions = 1536; VectorIndexType = 'quantizedFlat'; TextPath = '/content' }
+        @{ Database = 'ai_memory'; Name = 'memories_turns'; PartitionKey = @('/user_id', '/thread_id'); MaxThroughput = 1000; DefaultTtl = 2592000; VectorPath = '/embedding'; VectorDimensions = 1536; VectorIndexType = 'quantizedFlat'; TextPath = '/content' }
+        @{ Database = 'ai_memory'; Name = 'memories_summaries'; PartitionKey = @('/user_id', '/thread_id'); MaxThroughput = 1000; DefaultTtl = -1; VectorPath = '/embedding'; VectorDimensions = 1536; VectorIndexType = 'quantizedFlat'; TextPath = '/content'; SummaryComposite = $true }
+        @{ Database = 'ai_memory'; Name = 'counter'; PartitionKey = @('/user_id', '/thread_id'); MaxThroughput = 1000 }
+        @{ Database = 'ai_memory'; Name = 'leases'; PartitionKey = '/id'; MaxThroughput = 1000 }
+    )
+}
+
+function Test-ContainerConfiguration {
+    param([object]$Resource, [hashtable]$Expected)
+
+    $label = "$($Expected.Database)/$($Expected.Name)"
+    $actualKey = @($Resource.partitionKey.paths) -join ', '
+    $expectedKey = @($Expected.PartitionKey) -join ', '
+    Test-Condition -Name "Container $label on $expectedKey" -Passed ($actualKey -eq $expectedKey) -Detail "Found $actualKey."
+    if (@($Expected.PartitionKey).Count -gt 1) {
+        Test-Condition -Name "$label hierarchical key kind and version" `
+            -Passed ($Resource.partitionKey.kind -eq 'MultiHash' -and $Resource.partitionKey.version -eq 2)
+    }
+    if ($Expected.ContainsKey('DefaultTtl')) {
+        Test-Condition -Name "$label default TTL $($Expected.DefaultTtl)" -Passed ($Resource.defaultTtl -eq $Expected.DefaultTtl)
+    }
+    if ($Expected.VectorPath) {
+        $vector = $Resource.vectorEmbeddingPolicy.vectorEmbeddings | Where-Object path -eq $Expected.VectorPath
+        Test-Condition -Name "$label vector policy" -Passed (
+            @($vector).Count -eq 1 -and $vector.dimensions -eq $Expected.VectorDimensions -and
+            $vector.dataType -eq 'float32' -and $vector.distanceFunction -eq 'cosine'
+        )
+        $index = $Resource.indexingPolicy.vectorIndexes | Where-Object { $_.path -eq $Expected.VectorPath -and $_.type -ceq $Expected.VectorIndexType }
+        Test-Condition -Name "$label vector index $($Expected.VectorIndexType)" -Passed (@($index).Count -eq 1)
+    }
+    if ($Expected.TextPath) {
+        $textPolicy = $Resource.fullTextPolicy.fullTextPaths | Where-Object { $_.path -eq $Expected.TextPath -and $_.language -eq 'en-US' }
+        $textIndex = $Resource.indexingPolicy.fullTextIndexes | Where-Object path -eq $Expected.TextPath
+        Test-Condition -Name "$label full-text policy and index" -Passed (@($textPolicy).Count -eq 1 -and @($textIndex).Count -eq 1)
+    }
+    if ($Expected.SummaryComposite) {
+        $found = $false
+        foreach ($index in $Resource.indexingPolicy.compositeIndexes) {
+            $paths = @($index | ForEach-Object { "$($_.path):$($_.order)" }) -join ','
+            if ($paths -eq '/user_id:ascending,/thread_id:ascending,/version:descending') { $found = $true }
+        }
+        Test-Condition -Name "$label summary composite index" -Passed $found
+    }
+}
+
+function Test-FoundryResources {
+    param([string]$PrincipalId)
+
+    $name = if ($FoundryAccountName) { $FoundryAccountName } else { "$AccountName-ai" }
+    $foundry = & az cognitiveservices account show --name $name --resource-group $ResourceGroup --output json 2>$null | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or -not $foundry) {
+        Test-Condition -Name "Foundry resource $name" -Passed $false -Detail 'Run setup.ps1 with -EnableFoundry, or pass the FoundryAccountName used during setup.'
+        return
+    }
+    Test-Condition -Name 'Foundry is ready and keyless' -Passed (
+        $foundry.kind -eq 'AIServices' -and $foundry.properties.allowProjectManagement -and
+        $foundry.properties.disableLocalAuth -eq $true -and $foundry.properties.provisioningState -eq 'Succeeded'
+    )
+    $projects = & az rest --method GET --url "https://management.azure.com$($foundry.id)/projects?api-version=2025-06-01" --output json 2>$null | ConvertFrom-Json
+    $project = $projects.value | Where-Object { ($_.name -split '/')[-1] -eq $FoundryProjectName }
+    Test-Condition -Name "Foundry project $FoundryProjectName" -Passed ($LASTEXITCODE -eq 0 -and @($project).Count -eq 1)
+
+    $deployments = & az cognitiveservices account deployment list --name $name --resource-group $ResourceGroup --output json 2>$null | ConvertFrom-Json
+    $deploymentListSucceeded = $LASTEXITCODE -eq 0
+    $models = @(@{ Name = $EmbeddingModel; Version = $EmbeddingModelVersion })
+    if (-not $EmbeddingOnly) { $models += @{ Name = $ChatModel; Version = $ChatModelVersion } }
+    foreach ($model in $models) {
+        $deployment = $deployments | Where-Object name -eq $model.Name | Select-Object -First 1
+        Test-Condition -Name "Model deployment $($model.Name)" -Passed (
+            $deploymentListSucceeded -and $deployment -and $deployment.properties.provisioningState -eq 'Succeeded' -and
+            $deployment.properties.model.name -eq $model.Name -and $deployment.properties.model.version -eq $model.Version -and
+            $deployment.sku.name -in @('Standard', 'GlobalStandard', 'DataZoneStandard')
+        ) -Detail 'Check the deployment state, model version, regional availability, and quota.'
+    }
+
+    $roles = & az role assignment list --scope $foundry.id --include-inherited --output json 2>$null | ConvertFrom-Json
+    $role = $roles | Where-Object {
+        $_.principalId -eq $PrincipalId -and $_.roleDefinitionId -like '*/53ca6127-db72-4b80-b1b0-d745d6d5456d'
+    }
+    Test-Condition -Name 'Signed-in user holds Foundry User' -Passed ($LASTEXITCODE -eq 0 -and @($role).Count -gt 0)
+    Write-Host '  Model resources and role assignments checked. Inference calls can still require role propagation.' -ForegroundColor DarkGray
 }
 
 # This script keeps its own copy of what each profile provisions, so it can silently fall
@@ -231,6 +395,7 @@ Test-Condition -Name 'Account exists' -Passed $true
 Test-Condition -Name 'Key-based authentication disabled' -Passed ($account.disableLocalAuth -eq $true) `
     -Detail 'Expected disableLocalAuth = true. Re-run setup.ps1 or set it with az cosmosdb update --disable-local-auth true.'
 Test-Condition -Name 'API is NoSQL' -Passed ($account.kind -eq 'GlobalDocumentDB')
+Test-AccountAccessConfiguration -Account $account -Expected $accountExpected
 
 if ($accountExpected.Serverless) {
     # setup.ps1 asks for serverless with --capabilities EnableServerless; capacityMode is the
@@ -249,7 +414,7 @@ if ($accountExpected.PublicNetworkAccess) {
 if ($accountExpected.BackupPolicy) {
     Test-Condition -Name "Backup policy is $($accountExpected.BackupPolicy)" `
         -Passed ($account.backupPolicy.type -eq $accountExpected.BackupPolicy) `
-        -Detail "Found '$($account.backupPolicy.type)'. Backup mode can only be chosen when the account is created."
+        -Detail "Found '$($account.backupPolicy.type)'. Setup does not migrate backup mode on existing accounts."
 }
 
 if ($accountExpected.ContinuousTier) {
@@ -292,6 +457,10 @@ else {
         -Detail 'Without this role every data operation returns 403.'
 }
 
+if ($CheckMirroringPermissions) {
+    Test-MirroringPermissions -PrincipalId $principalId -AccountId $account.id -Assignments @($assignments)
+}
+
 Write-Host ''
 Write-Host 'Containers' -ForegroundColor Cyan
 
@@ -313,9 +482,7 @@ foreach ($item in $expected) {
         continue
     }
 
-    $actualKey = $container.resource.partitionKey.paths[0]
-    Test-Condition -Name "Container $($item.Database)/$($item.Name) on $($item.PartitionKey)" `
-        -Passed ($actualKey -eq $item.PartitionKey) -Detail "Found $actualKey."
+    Test-ContainerConfiguration -Resource $container.resource -Expected $item
 
     if ($item.MaxThroughput) {
         $throughput = & az cosmosdb sql container throughput show `
@@ -387,9 +554,20 @@ else {
     }
 }
 
+if ($EnableFoundry) {
+    Write-Host ''
+    Write-Host 'Foundry' -ForegroundColor Cyan
+    Test-FoundryResources -PrincipalId $principalId
+}
+
 Write-Host ''
 if ($script:Failures -eq 0) {
-    Write-Host 'All checks passed. The environment is ready.' -ForegroundColor Green
+    if ($LabProfile -eq 'mirroring') {
+        Write-Host 'Cosmos DB checks passed. Fabric capacity, connection, and replication are checked in the exercise.' -ForegroundColor Green
+    }
+    else {
+        Write-Host 'All checks passed. The environment is ready.' -ForegroundColor Green
+    }
     exit 0
 }
 
