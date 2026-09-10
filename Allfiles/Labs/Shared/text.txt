@@ -1,8 +1,6 @@
 TEST LAB....
 
-In this exercise, you use both halves of the toolset against one Azure Cosmos DB account. You connect an AI assistant to the CosmicWorks catalog through a Model Context Protocol (MCP) server, give a shopping assistant durable memory with the Agent Memory Toolkit, and then inspect what each tool created so the boundary between them is concrete rather than theoretical.
-
-The two halves do different jobs. The MCP server helps *you* understand data you didn't model. The memory toolkit gives your *application* a capability it didn't have. Doing both in one sitting makes the difference hard to miss.
+In this exercise, you connect an AI assistant to the CosmicWorks product catalog through a Model Context Protocol (MCP) server. You then use the Agent Memory Toolkit to store and retrieve a shopper's preferences in Azure Cosmos DB.
 
 ## Before you start
 
@@ -14,15 +12,15 @@ You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed
 
 This exercise also requires:
 
-- A Microsoft Foundry project with a chat model deployment and a text embedding model deployment.
+- Quota for `text-embedding-3-small` and `gpt-5.4-mini` in the Foundry region. Setup creates the Foundry resource, project, and model deployments.
 - [Node.js](https://nodejs.org) 22 or later, which supplies the `npx` command the MCP server runs under.
 - Visual Studio Code with the [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension.
 
 ## Set up your Azure Cosmos DB resources
 
-The core exercises reuse an account prepared with the `core` profile, not the two-item account from the first portal exercise. Before skipping setup, open **Allfiles/Labs/Shared** in PowerShell, sign in with `az login`, and set `$resourceGroup`, `$location`, and `$accountName` to your recorded values. Run `./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile core` and continue only when it succeeds. In Data Explorer, confirm 295 items in `cosmicworks/product` and 237 in `cosmicworks/productMeta` with `SELECT VALUE COUNT(1) FROM c`.
+This exercise uses the `aitools` profile, which creates the CosmicWorks catalog and the Agent Memory Toolkit's containers. It enables vector search, so use a disposable account rather than the shared core account. You don't need an existing Foundry project.
 
-If you have no verified core account, follow the setup steps below. To add missing resources to an existing lab account, pass its explicit `-AccountName` to setup rather than using a different module's name prefix. Reseeding restores canonical items but doesn't remove extra items or reset container policies. Resolve mismatches before continuing; don't reset a shared account automatically.
+Setup runs in two stages. The first creates the Cosmos DB account and Foundry model deployments. After you confirm Cosmos DB search-feature enrollment in the portal, the second creates the databases, containers, and Cosmos DB role assignment.
 
 1. Start **Visual Studio Code**.
 
@@ -44,24 +42,25 @@ If you have no verified core account, follow the setup steps below. To add missi
     az login
     ```
 
-1. Set variables for the resource group (if your lab environment provided a resource group, use that name) and region you want to use. Change either value if you prefer a different resource group name or region.
+1. Set variables for the resource group and regions. If your lab environment provides a resource group, use that name. Otherwise, use a new group that contains only this exercise's resources. Foundry can use a different region from Cosmos DB.
 
     ```powershell
-    $resourceGroup = "dp420"
+    $resourceGroup = "dp420-ai-tools"
     $location = "westus2"
+    $foundryLocation = "eastus"
     ```
 
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile core
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile aitools -AccountOnly -EnableFoundry -FoundryLocation $foundryLocation
     ```
 
     Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab08a7f3k9`.
 
-1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
+1. Wait for the account and model deployments to finish. Deployment time varies by region and available capacity.
 
-1. Record the **Account name** and **Account endpoint** values the script prints. Every code file in this exercise needs the endpoint, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
+1. Record the **Account name**, **Account endpoint**, **Foundry account**, and **OpenAI endpoint** values the script prints. The Cosmos DB endpoint looks like `https://<your-account-name>.documents.azure.com:443/`. Setup also saves the Foundry settings in `logs/foundry-<account-name>.json`.
 
 1. Set a variable for the account name so the Azure CLI commands in this exercise can use it.
 
@@ -69,14 +68,47 @@ If you have no verified core account, follow the setup steps below. To add missi
     $accountName = "<your-account-name>"
     ```
 
-The script creates the following resources:
+1. Open that Cosmos DB account in the Azure portal. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled, then enable **Full Text & Hybrid Search for NoSQL API**. Allow up to 15 minutes for enrollment and confirm both features are enabled before continuing.
+
+1. Resume setup against the same account, then verify the resources. The confirmation switch records your portal check; it doesn't enable or independently verify feature enrollment.
+
+    ```powershell
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -AccountName $accountName -LabProfile aitools -SearchFeaturesReady -EnableFoundry -FoundryLocation $foundryLocation
+    ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile aitools -EnableFoundry
+    ```
+
+    Continue only after both commands succeed. If Foundry deployment fails because of model availability or quota, resolve the issue and retry against this Cosmos DB account. Keep any `-FoundryLocation` or `-FoundryAccountName` overrides consistent on both setup stages.
+
+1. Load the saved model settings in the **Allfiles/Labs/Shared** terminal.
+
+    ```powershell
+    $foundry = Get-Content "./logs/foundry-$accountName.json" -Raw | ConvertFrom-Json
+    $openAiName = $foundry.FoundryAccountName
+    $foundry | Format-List FoundryAccountName, OpenAiEndpoint, EmbeddingDeployment, EmbeddingDimensions, ChatDeployment
+    ```
+
+After both stages, setup creates these resources:
 
 | Resource | Configuration |
 | :--- | :--- |
-| Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
-| `cosmicworks` database | Holds every container this learning path uses |
-| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 request units per second, loaded with 295 CosmicWorks products |
-| Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
+| Azure Cosmos DB account | API for NoSQL, key-based authentication disabled, vector search enabled |
+| `cosmicworks` database | Holds the catalog and the core profile's supporting containers |
+| `cosmicworks/product` | `/categoryId`, autoscale maximum of 1,000 request units per second, 295 products |
+| `cosmicworks/productMeta` | `/type`, autoscale maximum of 1,000 request units per second, 237 category and tag documents |
+| `cosmicworks/leases` | `/id`, 400 request units per second, empty |
+| `cosmicworks/operations` and `cosmicworks/bulkload` | `/categoryId`, each with an autoscale maximum of 1,000 request units per second, empty |
+| `ai_memory` database | Holds the five Agent Memory Toolkit containers |
+| `ai_memory/memories` | Hierarchical `/user_id`, `/thread_id` key, autoscale maximum of 1,000 request units per second, TTL enabled without default expiry |
+| `ai_memory/memories_turns` | Same key and throughput, 30-day default TTL |
+| `ai_memory/memories_summaries` | Same key and throughput, TTL enabled without default expiry, summary composite index |
+| `ai_memory/counter` | Hierarchical `/user_id`, `/thread_id` key, autoscale maximum of 1,000 request units per second |
+| `ai_memory/leases` | `/id`, autoscale maximum of 1,000 request units per second |
+| Cosmos DB role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
+| Microsoft Foundry resource and project | Key-based authentication disabled; project named `dp420` |
+| Model deployments | `text-embedding-3-small` version `1` on Standard and `gpt-5.4-mini` version `2026-03-17` on GlobalStandard, each with 30 capacity units |
+| Foundry role assignment | Foundry User, granted to your signed-in identity on the Foundry resource |
+
+The three memory data containers use a full-text policy and index on `/content` and a `quantizedFlat` vector index on `/embedding`, with 1,536 dimensions and cosine distance. The embedding model produces that vector length. Time to live (TTL) removes expired turns; the other memory records have no default expiry.
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
@@ -187,26 +219,7 @@ Before moving on, note what didn't happen. You asked the assistant about your da
 
 The assistant helped you understand the catalog. It did nothing for the application, which still forgets a shopper between messages.
 
-Your identity also needs data-plane access to the Foundry deployment, which the Cosmos DB role from Task 1 doesn't cover. Owning the subscription isn't enough, because Azure's Owner role carries no data actions and so doesn't authorize inference calls made with Microsoft Entra ID:
-
-```azurecli
-$foundryResourceGroup = "<foundry-resource-group>"
-
-$principalId = az ad signed-in-user show --query id --output tsv
-
-$foundryResourceId = az cognitiveservices account show `
-    --name "<foundry-resource-name>" `
-    --resource-group $foundryResourceGroup `
-    --query id `
-    --output tsv
-
-az role assignment create `
-    --assignee $principalId `
-    --role "53ca6127-db72-4b80-b1b0-d745d6d5456d" `
-    --scope $foundryResourceId
-```
-
-That definition ID is the **Foundry User** role. Use the ID rather than the display name, because these role names are being renamed. If you created the project yourself in the Foundry portal, you might already hold it; running the command again is harmless.
+Setup grants the **Foundry User** role separately from the Cosmos DB data-plane role. Both are required: the application stores memory in Cosmos DB and calls the Foundry models to extract and embed it.
 
 Install the memory toolkit:
 
@@ -217,90 +230,9 @@ pip install azure-cosmos-agent-memory==0.3.0b2
 > [!IMPORTANT]
 > Pin the version. This package is in preview, its public surface is still changing between releases, and the toolkit's own guidance is to pin when integrating.
 
-### Provision the memory containers
+The `aitools` profile provisions the database and containers through Azure Resource Manager. The application only connects to them. Microsoft Entra ID doesn't authorize database or container creation through the Cosmos DB data-plane SDK, so don't move that setup into the application.
 
-Microsoft Entra ID doesn't authorize database or container creation through the Cosmos DB data-plane SDK. Assigning a control-plane role doesn't make those SDK creation calls work. Before running the memory client, use the Azure portal to provision the memory store in your existing lab account. Your identity needs a control-plane role that permits database and container creation, in addition to the data-plane role from setup.
-
-In the account's **Features** pane, enable [vector search](/azure/cosmos-db/vector-search#enable-the-vector-indexing-and-search-feature) and confirm enrollment for [full-text search](/azure/cosmos-db/gen-ai/full-text-search). Wait for enrollment to complete before creating containers with these policies. This step doesn't add indexes to the existing `product` container.
-
-In **Data Explorer**, use **New Container** to create the `ai_memory` database and the following containers. For each container, select dedicated autoscale throughput with a maximum of 1,000 RU/s. Use **Add hierarchical partition key** to add the second key level where the table specifies one. The [hierarchical partition key guide](/azure/cosmos-db/hierarchical-partition-keys#create-a-container-by-using-hierarchical-partition-keys) describes this creation flow.
-
-| Container | Partition key paths, in order | Default time to live |
-| :--- | :--- | :--- |
-| `memories` | `/user_id`, `/thread_id` | On, with no default expiry (`-1`) |
-| `memories_turns` | `/user_id`, `/thread_id` | 2,592,000 seconds (30 days) |
-| `memories_summaries` | `/user_id`, `/thread_id` | On, with no default expiry (`-1`) |
-| `counter` | `/user_id`, `/thread_id` | Off |
-| `leases` | `/id` | Off |
-
-For the three memory data containers, configure the following vector embedding policy. The 1,536 dimensions match the toolkit's default. Use a deployment of `text-embedding-3-large` or `text-embedding-3-small`, both of which support this dimension setting.
-
-```json
-{
-    "vectorEmbeddings": [
-        {
-            "path": "/embedding",
-            "dataType": "float32",
-            "distanceFunction": "cosine",
-            "dimensions": 1536
-        }
-    ]
-}
-```
-
-Use this full-text policy for those same three containers:
-
-```json
-{
-    "defaultLanguage": "en-US",
-    "fullTextPaths": [
-        { "path": "/content", "language": "en-US" }
-    ]
-}
-```
-
-Configure their indexing policy with the vector and full-text indexes:
-
-```json
-{
-    "indexingMode": "consistent",
-    "automatic": true,
-    "includedPaths": [
-        { "path": "/*" }
-    ],
-    "excludedPaths": [
-        { "path": "/source_memory_ids/*" },
-        { "path": "/supersedes_ids/*" },
-        { "path": "/\"_etag\"/?" }
-    ],
-    "vectorIndexes": [
-        { "path": "/embedding", "type": "quantizedFlat" }
-    ],
-    "fullTextIndexes": [
-        { "path": "/content" }
-    ]
-}
-```
-
-For `memories_summaries`, also add the following `compositeIndexes` property to that indexing policy. Keep the preceding vector and full-text settings when you add it.
-
-```json
-{
-    "compositeIndexes": [
-        [
-            { "path": "/user_id", "order": "ascending" },
-            { "path": "/thread_id", "order": "ascending" },
-            { "path": "/version", "order": "descending" }
-        ]
-    ]
-}
-```
-
-Keep the default indexing policy for `counter` and `leases`. If the memory containers already exist, verify their keys, policies, and retention settings before continuing. Don't overwrite existing policies or delete shared data to repeat the exercise.
-
-### Write and retrieve memory
-
-Collect the Foundry values you need, then save the following code as `shopper_memory.py`. For the endpoint, use either the account-level inference endpoint (`https://<resource>.openai.azure.com/`) or the project endpoint the Foundry portal shows (`https://<resource>.services.ai.azure.com/api/projects/<project>`); the toolkit accepts both.
+Save the following code as `shopper_memory.py`. Replace `<foundry-endpoint>` with **OpenAiEndpoint** from the saved settings, and replace `<cosmos-endpoint>` with the Cosmos DB account endpoint. The model deployment names match the setup defaults.
 
 ```python
 from azure.cosmos.agent_memory import CosmosMemoryClient
@@ -309,8 +241,9 @@ memory = CosmosMemoryClient(
     cosmos_database="ai_memory",
     cosmos_container="memories",
     ai_foundry_endpoint="<foundry-endpoint>",
-    embedding_deployment_name="<embedding-deployment-name>",
-    chat_deployment_name="<chat-deployment-name>",
+    embedding_deployment_name="text-embedding-3-small",
+    embedding_dimensions=1536,
+    chat_deployment_name="gpt-5.4-mini",
     use_default_credential=True,
 )
 
@@ -363,7 +296,7 @@ The search is scoped to the user rather than the thread, so a brand-new conversa
 
 ## Task 4: Separate what the tools own from what you own
 
-Go back to the assistant in Visual Studio Code and point it at what the toolkit built:
+Go back to the assistant in Visual Studio Code and inspect what the toolkit stored:
 
 ```text
 List the containers in the ai_memory database, and infer the schema
@@ -375,25 +308,26 @@ The loop closes here: the design-time tool inspecting the run-time tool's output
 Now answer three questions from what you observed, not from recall:
 
 1. **Which container holds the raw turns, and which holds the extracted facts?** The toolkit chose that split and the partition key underneath it. Would you choose the same key for the `product` container in Task 1?
-2. **Which settings did you supply before connecting?** You configured throughput and indexing when you provisioned the memory containers. The toolkit uses those resources; your team remains responsible for their capacity and indexing choices.
+2. **Which settings did setup supply before connecting?** The setup profile configured throughput and indexing for the memory containers. The toolkit uses those resources; your team remains responsible for their capacity and indexing choices.
 3. **What ran that you didn't call?** Task 3 called `process_now` once, but writing turns also triggers embedding and extraction on a turn-count cadence. Each one is a model call billed to your Foundry deployment.
 
 The pattern arrived complete. The decisions underneath it didn't move.
 
 ## Clean up resources
 
-When you finish the course, delete resources you no longer need. Delete the resource group only if you created it for the course and every resource in it can be removed:
+When you finish this exercise, delete its resources if you no longer need them. Delete the resource group only if you created it for this exercise and every resource in it can be removed:
 
 ```azurecli
 az group delete --name $resourceGroup --yes --no-wait
 ```
 
-If your lab environment provided the resource group, delete only the Azure Cosmos DB account instead:
+If your lab environment provided the resource group, keep it. Delete only the Cosmos DB and Foundry resources you created for this exercise, after confirming that no other application uses them:
 
 ```azurecli
 az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
+az cognitiveservices account delete --name $openAiName --resource-group $resourceGroup
 ```
 
-Apply the same rule to the resource group holding your Microsoft Foundry project. Keep shared and lab-provided resource groups, and remove only the lab resources you created and no longer need. Don't delete a shared Foundry account or deployments that other applications use.
+Keep shared and lab-provided resource groups. Don't delete a reused Foundry account or deployments that other applications use.
 
 The provisioned-throughput containers in this exercise incur throughput and storage charges while they exist. Serverless accounts instead charge for consumed request units and storage. Pay-per-token model deployments charge for inference usage, but provisioned model deployments incur capacity charges even while idle.
