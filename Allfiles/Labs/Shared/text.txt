@@ -1,8 +1,11 @@
 TEST LAB....
 
-In this exercise, you connect an AI assistant to the CosmicWorks product catalog through a Model Context Protocol (MCP) server. You then use the Agent Memory Toolkit to store and retrieve a shopper's preferences in Azure Cosmos DB.
+In this exercise, you connect an AI assistant to the CosmicWorks product catalog through a Model Context Protocol (MCP) server. You inspect and query the catalog with natural-language requests, then verify the tool calls and results.
 
 ## Before you start
+
+> [!IMPORTANT]
+> You need a **GitHub account with access to GitHub Copilot** for the Copilot tasks in this exercise. If you don't have an account, [create a free GitHub account](https://github.com/signup) and verify your email address before starting. [GitHub Copilot Free](https://docs.github.com/en/copilot/get-started/plans) is available with usage limits.
 
 To complete this exercise, you need an [Azure subscription](https://azure.microsoft.com/free/) with permission to create resources and assign roles.
 
@@ -68,7 +71,7 @@ To create the lab resources and load the catalog data, run setup once. The scrip
     $accountName = "<your-account-name>"
     ```
 
-1. Verify the resources.
+1. (Optional)Invoke verification to check the resources.
 
     ```powershell
     ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile aitools -EnableFoundry
@@ -112,63 +115,15 @@ Because key-based authentication is disabled, no key or connection string appear
 > [!NOTE]
 > A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
-## Task 1: Set up the project and confirm the catalog
+## Task 1: Configure and start Azure MCP Server
 
-The setup script grants **Cosmos DB Built-in Data Contributor**, which allows writes. The MCP server you configure next only reads, so in a production deployment it would take **Cosmos DB Built-in Data Reader** instead.
+The tasks use the existing **cosmicworks/product** catalog. You interact with its data through the Azure MCP Server tools in Chat.
 
-Create a project folder and set up a virtual environment:
+1. In **Explorer**, under **Allfiles/Labs/Shared**, create a folder called **ai-tools-lab**. If the folder already exists, reuse it.
 
-```bash
-mkdir ai-tools-lab
-cd ai-tools-lab
-python -m venv .venv
-```
+1. If **ai-tools-lab** isn't already the open workspace folder, select **File > Open Folder** and choose it. Changing the terminal's directory doesn't change the VS Code workspace.
 
-Activate the environment. On Windows:
-
-```powershell
-.venv\Scripts\activate
-```
-
-On macOS or Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-Install the packages:
-
-```bash
-pip install azure-cosmos azure-identity
-```
-
-Confirm the catalog loaded. In the **ai-tools-lab** folder, alongside the **.venv** folder rather than inside it, save the following code as `check_catalog.py`, replacing the endpoint:
-
-```python
-from azure.cosmos import CosmosClient
-from azure.identity import DefaultAzureCredential
-
-ENDPOINT = "<cosmos-endpoint>"
-
-client = CosmosClient(ENDPOINT, credential=DefaultAzureCredential())
-container = client.get_database_client("cosmicworks").get_container_client("product")
-
-count = list(container.query_items(query="SELECT VALUE COUNT(1) FROM c"))[0]
-
-print(f"Catalog holds {count} products")
-```
-
-Run it:
-
-```bash
-python check_catalog.py
-```
-
-The output reports 295 products.
-
-## Task 2: Connect an AI assistant with the Azure MCP Server
-
-Create a `.vscode` folder in the project, and add a file named `mcp.json`:
+Under the **ai-tools-lab** folder, create a folder called **.vscode**. Inside **.vscode**, create a file called **mcp.json** and add this configuration:
 
 ```json
 {
@@ -181,134 +136,108 @@ Create a `.vscode` folder in the project, and add a file named `mcp.json`:
 }
 ```
 
-Open the folder in Visual Studio Code, open GitHub Copilot, and switch to **Agent** mode. Refresh the tools list and confirm the Azure MCP Server appears. The server authenticates with the credentials your `az login` already established, so nothing else needs configuring.
+1. If the Chat pane isn't open, select **View > Chat** from the menu bar.
 
-Now work the catalog through the assistant. Start with the question you'd otherwise answer by opening documents by hand:
+1. Check the mode selector in the chat input area. If **Agent** is already selected, keep it selected. Otherwise, open the selector showing the current mode, such as **Ask**, and choose **Agent**.
+
+1. Open the model picker in the chat input area. It can display **Models**, **Auto**, or a model name. If it shows **Sign in to use Copilot**, select that option and sign in with a GitHub account that has access to Copilot. After signing in, reopen the model picker. Keep an existing model or **Auto** selection. If no model is selected, choose a model available for Agent mode.
+
+1. Press **Ctrl+Shift+P**, enter **MCP: List Servers**, and select the command. Choose **Azure MCP Server**. If it isn't running, select **Start Server**. Review any server-trust prompt before continuing. If the server is missing or disabled, use the recovery steps in this task.
+
+1. Open **Configure Tools** for the chat session. If the control appears as an unlabeled icon, hover over it to read its tooltip. Search for **Azure MCP Server** and ensure its checkbox is selected.
+
+The [tool-selection controls](https://code.visualstudio.com/docs/agents/run/tools#select-tools-for-a-request) can differ by session type. If your session uses the **Tools** tab in the chat customization view, enable the server's tools there.
+
+If no chat model is available, complete the sign-in or [model-provider setup](https://code.visualstudio.com/docs/agent-customization/language-models) required by your environment before continuing.
+
+If **Azure MCP Server** isn't listed, or the MCP marketplace is unavailable, use the manual configuration from this task. You don't need a marketplace installation:
+
+1. In **Explorer**, check that **ai-tools-lab** is the open folder. If not, select **File > Open Folder** and choose **ai-tools-lab**. Changing the terminal's directory doesn't change the VS Code workspace.
+
+1. Check that **ai-tools-lab/.vscode/mcp.json** contains the configuration from this task and has no JSON errors.
+
+1. Press **Ctrl+Shift+P**, enter **MCP: List Servers**, and select the command. Choose **Azure MCP Server**. If it is disabled, select **Enable**, then select the server again through **MCP: List Servers**.
+
+1. If the server isn't running, select **Start Server**. Review any trust prompt before continuing. On the first start, `npx` downloads the server package if needed, so the environment needs access to the npm registry.
+
+1. Return to **Configure Tools** and select the **Azure MCP Server** tools.
+
+If startup fails, run **MCP: List Servers**, choose **Azure MCP Server**, and select **Show Output**. If the error says `node` or `npx` isn't found, confirm that Node.js 22 or later is installed, then restart VS Code. For download or network errors, ask your lab provider or administrator to check access to the npm registry.
+
+> [!IMPORTANT]
+> An unavailable marketplace is different from a policy that blocks MCP servers. If your organization disables MCP or allows only an approved registry, ask your administrator or lab provider for an approved Azure MCP Server installation. Manual configuration doesn't override those restrictions.
+
+The Azure MCP Server uses the Azure identity from your earlier `az login`. That Azure sign-in is separate from access to the chat model.
+
+Continue only when the Azure MCP Server is running and its tools are available in Chat.
+
+## Task 2: Inspect and query the catalog through MCP
+
+Keep the same Chat conversation for these requests. Replace **<your-account-name>** with the account name recorded during setup. If the assistant asks for a subscription or resource group, provide the values you used for this exercise.
+
+Start by checking the catalog count through MCP:
+
+```text
+Use the Azure MCP Server to count all items in the product container
+in the cosmicworks database for account <your-account-name>.
+Return the total count, not a sample of documents. Use this account
+and database for my remaining requests.
+```
+
+Review the tool call and approve it if prompted. Confirm that it targets your lab account and returns a count of **295**. If the count differs, check the target account, database, and container against your setup values before continuing. Don't change the data to match the expected count.
+
+Next, ask the assistant to inspect the document structure:
 
 ```text
 Infer the schema of the product container in the cosmicworks database
 for my Azure Cosmos DB account.
 ```
 
-The assistant reports the top-level properties and how many sampled documents carried each one. Compare those properties against the shape you know from earlier in this learning path: `id`, `categoryId`, `categoryName`, `sku`, `name`, `description`, `price`, and `tags`.
+Note that this might ask for confirmation or additional information depending on the assistant's configuration and the state of your Azure Cosmos DB account.
 
-Ask for recent writes, which is how you'd confirm a load succeeded without writing a query:
+The schema tool samples documents and reports top-level properties, inferred types, and property occurrence counts. Compare the result with the catalog fields: `id`, `categoryId`, `categoryName`, `sku`, `name`, `description`, `price`, and `tags`. The sample is not a guarantee that every document has the same structure.
+
+Ask for the most recently modified items:
 
 ```text
 Show me the 5 most recently modified items in the product container.
 ```
 
-Then ask a real question about the data:
+Inspect the returned documents and their `_ts` values. The recent-items tool orders documents by this system timestamp in descending order. Documents can share a timestamp, so the exact items and their order can vary. Keep one returned item's `id` and `categoryId` for Task 3.
+
+Then filter the catalog and request only the fields you need:
 
 ```text
 Query the product container for items where categoryId is
 3E4CEACD-D007-46EB-82D7-31F6141752B2, and return only name and price.
 ```
 
-Approve each tool call when prompted. Notice what the assistant reports back: the tool it chose, and the results it got.
+Review and approve each tool call when prompted. For the filtered request, check that the query uses the specified category ID and projects `name` and `price`. Inspect the returned values, not just the assistant's statement that it ran a query.
 
 > [!NOTE]
 > The server also carries text search and vector similarity search. Neither is exercised here, because text search needs a full-text index on the target property and vector search needs both a vector index and an embedding deployment. The `product` container has neither. That constraint belongs to the tools, not to your prompt: they operate on the indexing policy you configured.
 
-Before moving on, note what didn't happen. You asked the assistant about your data several times and it never offered to change it. Every Azure Cosmos DB tool in the server is read-only.
+## Task 3: Verify the results and the tool's scope
 
-## Task 3: Add durable memory with the Agent Memory Toolkit
+An assistant's explanation is not a substitute for checking the tool output. Verify one catalog item and identify what the tool does and doesn't establish.
 
-The assistant helped you understand the catalog. It did nothing for the application, which still forgets a shopper between messages.
+1. Expand a tool call from Task 2. Confirm that it comes from **Azure MCP Server** and targets your account, **cosmicworks**, and **product**. A Query Editor extension or another database tool is not the Azure MCP Server used in this exercise. If a different tool ran, return to Task 1 and confirm the server is available before repeating the request.
 
-Setup grants the **Foundry User** role separately from the Cosmos DB data-plane role. Both are required: the application stores memory in Cosmos DB and calls the Foundry models to extract and embed it.
+1. Use the `id` and `categoryId` you recorded from the recent-items result. Replace both placeholders in this request:
 
-Install the memory toolkit:
+    ```text
+    Retrieve item <item-id> from the product container in the cosmicworks
+    database for the same account, using the Azure MCP Server.
+    Use partition key <category-id>. Show its id, categoryId, name, and price.
+    ```
 
-```bash
-pip install azure-cosmos-agent-memory==0.3.0b2
-```
+1. Inspect the tool's arguments and returned document. Confirm that the partition key matches the item's `categoryId` and that `name` and `price` agree with the earlier result. Supplying the partition key scopes the item lookup to that partition.
 
-> [!IMPORTANT]
-> Pin the version. This package is in preview, its public surface is still changing between releases, and the toolkit's own guidance is to pin when integrating.
+1. Explain the limits of the schema result. Which properties appear in the sample? Does a top-level `array` or `object` type describe all nested fields? The schema tool doesn't inspect nested structures recursively. Use the retrieved document to inspect any nested values it contains.
 
-The `aitools` profile provisions the database and containers through Azure Resource Manager. The application only connects to them. Microsoft Entra ID doesn't authorize database or container creation through the Cosmos DB data-plane SDK, so don't move that setup into the application.
+The catalog tools used here are read-only. Other tools enabled in Copilot can have different permissions, so inspect the tool source and requested action before approval. The setup script grants **Cosmos DB Built-in Data Contributor** to load the data; that role allows writes even though these MCP calls only read.
 
-Save the following code as `shopper_memory.py`. Replace `<foundry-endpoint>` with **OpenAiEndpoint** from the saved settings, and replace `<cosmos-endpoint>` with the Cosmos DB account endpoint. The model deployment names match the setup defaults.
-
-```python
-from azure.cosmos.agent_memory import CosmosMemoryClient
-
-memory = CosmosMemoryClient(
-    cosmos_database="ai_memory",
-    cosmos_container="memories",
-    ai_foundry_endpoint="<foundry-endpoint>",
-    embedding_deployment_name="text-embedding-3-small",
-    embedding_dimensions=1536,
-    chat_deployment_name="gpt-5.4-mini",
-    use_default_credential=True,
-)
-
-memory.connect_cosmos(endpoint="<cosmos-endpoint>")
-
-USER = "shopper-4471"
-THREAD = "thread-001"
-
-turns = [
-    ("user", "I ride a road bike and I only want components that fit a carbon frame."),
-    ("agent", "Understood. I'll keep recommendations to carbon-compatible parts."),
-    ("user", "Also, my budget tops out around 900 dollars per component."),
-]
-
-for role, content in turns:
-    memory.upsert_memory(user_id=USER, thread_id=THREAD, role=role, content=content)
-
-memory.process_now(user_id=USER, thread_id=THREAD)
-print("Turns stored and processed.")
-```
-
-Run it:
-
-```bash
-python shopper_memory.py
-```
-
-`connect_cosmos` opens the preprovisioned containers without creating resources. The constructor deliberately omits `cosmos_endpoint`: supplying it invokes `create_memory_store` automatically, which uses data-plane creation calls. `process_now` then runs the pipeline that turns those raw turns into durable memory. Fact extraction already runs on its own cadence by this point; the explicit call is what produces the thread and user summaries, which otherwise wait for much higher turn counts.
-
-> [!NOTE]
-> The role on each turn is `user` or `agent`. The toolkit accepts `user`, `agent`, `tool`, and `system`, and rejects anything else, so `assistant` fails validation.
-
-Now recall from a different conversation. Comment out the whole `for role, content in turns:` block, including the indented line beneath it, so the same turns aren't written a second time. Then add the following code to the end of the file and run it again:
-
-```python
-hits = memory.search_cosmos(
-    search_terms="frame material and budget preferences",
-    user_id=USER,
-    top_k=5,
-    min_confidence=0.7,
-)
-
-for hit in hits:
-    print(hit.get("type"), "-", hit["content"])
-
-print("\nProfile:", memory.get_user_summary(user_id=USER))
-```
-
-The search is scoped to the user rather than the thread, so a brand-new conversation recalls everything learned earlier. What comes back is extracted facts, not the original sentences: the toolkit decided what was worth keeping. The `min_confidence` filter excludes memories with scores below 0.7. Inferred facts can still meet that threshold, and a confidence score doesn't prove that a memory is correct or explicitly stated.
-
-## Task 4: Separate what the tools own from what you own
-
-Go back to the assistant in Visual Studio Code and inspect what the toolkit stored:
-
-```text
-List the containers in the ai_memory database, and infer the schema
-of the memories container.
-```
-
-The loop closes here: the design-time tool inspecting the run-time tool's output. You should see the toolkit's containers, and memory documents carrying `type`, `content`, `confidence`, `user_id`, and `thread_id` among other properties.
-
-Now answer three questions from what you observed, not from recall:
-
-1. **Which container holds the raw turns, and which holds the extracted facts?** The toolkit chose that split and the partition key underneath it. Would you choose the same key for the `product` container in Task 1?
-2. **Which settings did setup supply before connecting?** The setup profile configured throughput and indexing for the memory containers. The toolkit uses those resources; your team remains responsible for their capacity and indexing choices.
-3. **What ran that you didn't call?** Task 3 called `process_now` once, but writing turns also triggers embedding and extraction on a turn-count cadence. Each one is a model call billed to your Foundry deployment.
-
-The pattern arrived complete. The decisions underneath it didn't move.
+Identify one decision the MCP tools don't make for you, such as choosing the partition key, setting throughput, or granting access. Describe what evidence you need before making that decision. The tools help inspect data, but your team remains responsible for database design and access control.
 
 ## Clean up resources
 
