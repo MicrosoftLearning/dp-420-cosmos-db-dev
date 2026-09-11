@@ -1,6 +1,6 @@
 TEST LAB....
 
-In this exercise, you connect an AI assistant to the CosmicWorks product catalog through a Model Context Protocol (MCP) server. You inspect and query the catalog with natural-language requests, then verify the tool calls and results.
+IIn this exercise, you connect an AI assistant to the CosmicWorks product catalog through a Model Context Protocol (MCP) server. You inspect and query the catalog with natural-language requests, then verify the tool calls and results.
 
 ## Before you start
 
@@ -48,7 +48,7 @@ To create the lab resources and load the catalog data, run setup once. The scrip
 1. Set variables for the resource group and regions. If your lab environment provides a resource group, use that name. Otherwise, use a new group that contains only this exercise's resources. Foundry can use a different region from Cosmos DB.
 
     ```powershell
-    $resourceGroup = "dp420-ai-tools"
+    $resourceGroup = "ResourceGroup1"
     $location = "westus2"
     $foundryLocation = "eastus"
     ```
@@ -212,7 +212,7 @@ Query the product container for items where categoryId is
 3E4CEACD-D007-46EB-82D7-31F6141752B2, and return only name and price.
 ```
 
-Review and approve each tool call when prompted. For the filtered request, check that the query uses the specified category ID and projects `name` and `price`. Inspect the returned values, not just the assistant's statement that it ran a query.
+Review and approve each tool call when prompted. For the filtered request, check that the query uses the specified category ID and projects `name` and `price`. Inspect the returned values, not only the assistant's statement that it ran a query.
 
 > [!NOTE]
 > The server also carries text search and vector similarity search. Neither is exercised here, because text search needs a full-text index on the target property and vector search needs both a vector index and an embedding deployment. The `product` container has neither. That constraint belongs to the tools, not to your prompt: they operate on the indexing policy you configured.
@@ -233,7 +233,7 @@ An assistant's explanation is not a substitute for checking the tool output. Ver
 
 1. Inspect the tool's arguments and returned document. Confirm that the partition key matches the item's `categoryId` and that `name` and `price` agree with the earlier result. Supplying the partition key scopes the item lookup to that partition.
 
-1. Explain the limits of the schema result. Which properties appear in the sample? Does a top-level `array` or `object` type describe all nested fields? The schema tool doesn't inspect nested structures recursively. Use the retrieved document to inspect any nested values it contains.
+1. Explain the limits of the schema result. Which properties appear in the sample? Does a top-level `array` or `object` type describe all nested fields? The schema tool doesn't inspect nested structures recursively. To inspect any nested values it contains, use the retrieved document.
 
 The catalog tools used here are read-only. Other tools enabled in Copilot can have different permissions, so inspect the tool source and requested action before approval. The setup script grants **Cosmos DB Built-in Data Contributor** to load the data; that role allows writes even though these MCP calls only read.
 
