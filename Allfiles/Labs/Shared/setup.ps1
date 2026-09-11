@@ -1256,7 +1256,7 @@ function Invoke-LabDeployment {
 
     if (-not $accountOnlyDeployment) {
         $databaseNames = @(@($Profiles[$LabProfile].Databases) | ForEach-Object { $_.Name })
-        $containers = Get-DeploymentContainers -AccountExists (-not $DeployAccount)
+        $containers = @(Get-DeploymentContainers -AccountExists (-not $DeployAccount))
     }
 
     $values = [ordered]@{
