@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Secure an account in Python
+
 Contoso needs evidence that its product reader can't write products and respects network restrictions. You host a client in Azure Container Instances (ACI) with a system-assigned managed identity and test container-scoped access. Your local Azure CLI identity manages resources. Only the hosted identity accesses data.
 
 Key rotation and dynamic data masking aren't part of this exercise.

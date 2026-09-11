@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Mirror an Azure Cosmos DB database and query it in Microsoft Fabric
+
 In this exercise, you mirror an Azure Cosmos DB for NoSQL database into Microsoft Fabric and query the replicated copy. You grant Fabric the one permission no built-in role provides, create the mirrored database, read the replication status, run T-SQL aggregates and nested-JSON expansions against the mirrored tables, watch a single edit in Azure Cosmos DB reach the analytical copy, and finish by reading the same tables from a Spark notebook.
 
 The account this exercise creates is configured for continuous backup, because mirroring requires it. That setting can't be turned off once it's on, which is why the exercise builds its own account and deletes it at the end.

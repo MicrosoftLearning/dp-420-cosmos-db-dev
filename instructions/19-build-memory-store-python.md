@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Build a durable agent memory store in Python
+
 In this exercise, you build a durable agent memory store for the Contoso product assistant on two Azure Cosmos DB for NoSQL containers. You write conversation turns that expire on their own, distill durable facts out of those turns, recall a fact by meaning in a session that has never seen the conversation it came from, inject that memory into a prompt and measure what it costs, then retire a contradiction and erase the user completely.
 
 The two containers are deliberately different. Conversation state is partitioned on the thread, because a live conversation reads one thread at a time. Long-term memory is partitioned on the user, because recall crosses every thread that person ever opened. Watching the same information move from one to the other is the point of the exercise.

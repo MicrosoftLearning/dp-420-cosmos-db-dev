@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Design a model and partition strategy
+
 In this exercise, you measure what a data model costs and then build the partitioning strategy that lets it scale. You compare the request charge of assembling a customer from three containers against reading the same customer as one embedded item. You compare the cost of rendering a product page from four containers against reading it from one denormalized container. Then you create a subpartitioned container for a multitenant catalog and measure how query routing changes depending on which levels of the hierarchy a query names.
 
 Every measurement in this exercise happens in Data Explorer. A setup script provisions the account and loads the sample data, so no application code is required.

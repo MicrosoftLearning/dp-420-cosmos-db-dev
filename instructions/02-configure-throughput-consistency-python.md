@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Configure throughput and consistency in Python
+
 In this exercise, you apply the three levers from this module. Provision autoscale throughput for the Contoso workload's bursty traffic. Set an account default consistency level, then relax an individual read below it when needed. Configure time to live so temporary records expire on their own, without a cleanup job. Use a disposable container for the container-wide expiration test to protect the shared product catalog. Along the way, you read the actual request-unit charge of an operation, which is the measurement that turns a throughput estimate into a real number.
 
 This exercise takes approximately **30** minutes to complete.

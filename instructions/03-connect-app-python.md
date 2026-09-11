@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Connect an app to Azure Cosmos DB in Python
+
 In this exercise, you set up an Azure Cosmos DB SDK project, connect to the local emulator, validate the connection, add a logging handler to observe SDK traffic, and then point the same app at a cloud account by changing nothing but the connection.
 
 ## Before you start

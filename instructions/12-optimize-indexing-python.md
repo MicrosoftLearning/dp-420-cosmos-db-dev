@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Optimize an indexing strategy in Python
+
 In this exercise, you tune the indexing on a product catalog and measure what each change costs. You start by recording a baseline for three operations, then trim the indexing policy, add a composite index, and finally create a global secondary index that turns a cross-partition lookup into a single-partition one.
 
 Every task ends with a request charge you can compare against the one before it. Those numbers are the point of the exercise, so record them as you go.

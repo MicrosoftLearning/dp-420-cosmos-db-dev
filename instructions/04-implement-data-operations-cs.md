@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Implement Data Operations in C#
+
 In this exercise, you build a small data layer against an Azure Cosmos DB for NoSQL container and exercise every operation from this module. You read an item with a point read and compare its cost with the cost of an equivalent query. You then run the full set of write operations. You apply a conditional patch and protect a replace operation with an ETag. You set a time to live (TTL) value to expire an item. You commit a transactional batch. You finish with a bulk load. Throughout, you print the request charge so you can see what each choice costs.
 
 ## Before you start

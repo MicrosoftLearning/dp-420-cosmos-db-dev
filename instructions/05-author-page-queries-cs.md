@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Author and Page Queries in C#
+
 In this exercise, you build a query layer against an Azure Cosmos DB for NoSQL catalog container and run every query technique from this module. You load the CosmicWorks product catalog, then write a parameterized query that projects a custom shape. You reach into a nested tags array with a correlated subquery, expand that array with a cross-product query, and finish by paging a result set with continuation tokens. Throughout, you print the request charge so you can see what each choice costs.
 
 ## Before you start

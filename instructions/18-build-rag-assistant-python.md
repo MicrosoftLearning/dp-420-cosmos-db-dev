@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Build a grounded RAG assistant in Python
+
 In this exercise, you build a retrieval-augmented generation assistant on one Azure Cosmos DB for NoSQL container. You load the CosmicWorks product catalog with a searchable text property and an embedding for every product, ask a chat model a catalog question with no grounding, then add retrieval and check the answer and its citations against the retrieved data. You finish by planting an instruction inside a product record and checking whether your prompt structure treats it as evidence or as a command.
 
 The catalog is chosen to make the difference visible. The three lighting products carry the names *Headlights* and *Taillights* rather than *light*. Their stock keeping units and prices are in the public CosmicWorks dataset, so an ungrounded answer could match them without reading your container. Retrieval supplies records from your container so you can check the answer against them.

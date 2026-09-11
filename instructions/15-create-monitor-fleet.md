@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Create and Monitor a Fleet
+
 In this exercise, you build the fleet structure end to end. You create a fleet, add a fleetspace with a shared throughput pool, enroll two Azure Cosmos DB accounts into it, read the pool's throughput and the dedicated-versus-pooled split in Azure Monitor, and send fleet analytics to an Azure Data Lake Storage Gen2 account.
 
 Two things about the shape of this exercise are worth knowing before you start. Resource and fleet management use the control plane, but seeding the accounts and creating the storage filesystem use data-plane operations. You don't write application code, but the setup script requires PowerShell 7 and the Azure CLI. And the accounts you enroll are idle lab accounts, so nothing draws from the pool. What you can observe is where the evidence lives and what each number means, which is what you need when the accounts aren't idle.

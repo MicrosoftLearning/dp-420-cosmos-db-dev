@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Process changes and copy data in C#
+
 In this exercise, you build the pipeline described throughout this module. You load the CosmicWorks catalog and run a consumer. The consumer keeps the denormalized category name current. You then run the same logic in an Azure Function. Finally, you copy the data to a container that uses a different partition key.
 
 The category name that products carry is a copy. Renaming a category in one container leaves that copy stale everywhere else until something reconciles it, and the change feed is what makes the reconciliation possible without polling.

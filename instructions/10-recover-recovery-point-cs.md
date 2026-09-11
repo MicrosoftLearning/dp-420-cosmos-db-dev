@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Recover from a recovery point in C#
+
 In this exercise, you protect an Azure Cosmos DB for NoSQL account with continuous backup, destroy data the way an accidental operation would, and recover it to a point in time you choose. You work with the real CosmicWorks product catalog, so the verification steps compare against actual data rather than placeholder values.
 
 You load 295 products into an account provisioned at the `Continuous7Days` tier, capture a verified restore point, delete an item and then the container that held it, and restore the container into the same account. You finish by testing the boundary that same-account restore doesn't cross, and by removing everything you created.

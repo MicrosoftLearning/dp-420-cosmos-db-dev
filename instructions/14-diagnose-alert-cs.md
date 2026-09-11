@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Diagnose throttling and configure an alert in C#
+
 In this exercise, you work an incident end to end. You enable diagnostic logging on an Azure Cosmos DB account, drive a container past its provisioned throughput until it starts rate limiting, then confirm what happened from three separate vantage points: the client's own exception handling, Azure Monitor metrics, and a Kusto query over the diagnostic logs. You finish by creating an alert rule so the same condition announces itself next time.
 
 The order of the tasks matters. Diagnostic logs take several minutes to reach Log Analytics after the requests that produce them, so you enable logging first and query it last, with the metrics and alerting work filling the interval.

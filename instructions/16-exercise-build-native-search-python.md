@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Build Native Search Over a Product Catalog in Python
+
 In this exercise, you build both retrieval methods on one Azure Cosmos DB for NoSQL container. You load the CosmicWorks product catalog with a searchable text property and an embedding for every product, run BM25 keyword queries against a full-text index, run similarity queries with `VectorDistance`, and then use the change feed to refresh an embedding after the product it describes is renamed.
 
 The container you work with already carries a full-text policy, a vector policy, and both indexes. The setup script configures these settings before you load data. What the container doesn't carry is data. Building the text that gets indexed and calling the model that produces the vectors are application decisions, and they're the decisions this exercise is about.

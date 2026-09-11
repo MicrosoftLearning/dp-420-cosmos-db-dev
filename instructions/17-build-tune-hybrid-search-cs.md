@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Build and Tune Hybrid Search in C#
+
 In this exercise, you build a hybrid retrieval pipeline on one Azure Cosmos DB for NoSQL container and tune it with measurements rather than impressions. You load the CosmicWorks product catalog with a searchable text property and an embedding for every product, run the keyword and semantic halves separately so you can see what each one misses, fuse them with `RRF`, bias the fusion with weights, and then measure what each optimization does to the request charge.
 
 The catalog is chosen to make both failure modes visible. No product name or category name in the 295 products contains the word *see* or the word *night*, while 96 of them contain the word *road*, so a keyword query for *something to see the road at night* has exactly one usable term and it points away from the answer. The catalog also holds four size variants of the same touring bike, differing by two characters and priced identically, so a semantic query for one of them has almost nothing to separate them by.

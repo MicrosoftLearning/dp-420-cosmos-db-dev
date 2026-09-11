@@ -13,6 +13,8 @@ lab:
     - Azure MCP Server
 ---
 
+# Inspect Azure Cosmos DB with Azure MCP Server
+
 In this exercise, you connect an AI assistant to the CosmicWorks product catalog through a Model Context Protocol (MCP) server. You inspect and query the catalog with natural-language requests, then verify the tool calls and results.
 
 ## Before you start

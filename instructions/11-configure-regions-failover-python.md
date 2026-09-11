@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Configure Regions and Failover in Python
+
 In this exercise, you configure an Azure Cosmos DB for NoSQL account that spans two regions, move its write region while both regions are healthy, enable writes in both regions, and finally take a region offline the way you would during a real outage. Each step is verified against the account's own region topology rather than against an assumption about it.
 
 The account this exercise creates is disposable, which matters more here than in any other exercise in this learning path. The last task takes a region offline, and **a region that goes offline stays offline until Microsoft brings it back**, which can take days and needs a support request after a drill. Running that against an account you care about would be a genuine outage.

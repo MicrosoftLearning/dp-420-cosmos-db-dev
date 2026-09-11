@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Tune a high-cost query in Python
+
 In this exercise, you diagnose an expensive query the way the metrics ask you to: measure first, read the evidence, then change one thing at a time. You start by recording a baseline for three operations against a product catalog, then use the server-side query metrics to prove that one of them scans the container, rewrite it so the index serves the filter, add a composite index for a two-property filter, and finish by comparing a query that fans out with the same query scoped to a single partition.
 
 Every task produces a number you can compare against the one before it. Those comparisons are the point of the exercise, so write your numbers down as you go. Request charges depend on your data and query configuration, so treat the sample values in this exercise as illustrations of shape rather than targets to match.

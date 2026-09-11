@@ -12,6 +12,8 @@ lab:
     - Azure Portal
 ---
 
+# Create an Azure Cosmos DB for NoSQL account
+
 In this exercise, you provision your first Azure Cosmos DB for NoSQL account and use the Data Explorer to create a database, a container, and a few items. You then run a query to confirm the resources work as expected. These operations are the same as those operations you learned about in the previous unit, now performed hands-on. Most of this exercise takes place in the Azure portal, with a few commands run in Azure Cloud Shell to grant yourself access to the data.
 
 This exercise should take approximately **25** minutes to complete.
