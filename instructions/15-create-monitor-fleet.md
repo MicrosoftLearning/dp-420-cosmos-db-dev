@@ -26,8 +26,7 @@ If your lab environment isn't set up yet, follow [Set up your lab environment](h
 
 This exercise runs no local application code, so no .NET or Python installation is required.
 
-> [!WARNING]
-> A throughput pool has a minimum of 100,000 RU/s, and an idle pool is billed at its minimum for every hour and every region it covers. That charge is far more than any other resource in this course. Complete the exercise in one sitting, and delete the fleetspace as soon as you finish Task 5 rather than leaving it in place.
+> &#9888; A throughput pool has a minimum of 100,000 RU/s, and an idle pool is billed at its minimum for every hour and every region it covers. That charge is far more than any other resource in this course. Complete the exercise in one sitting, and delete the fleetspace as soon as you finish Task 5 rather than leaving it in place.
 
 ## Set up your Azure Cosmos DB resources
 
@@ -83,11 +82,9 @@ The script creates the following resources:
 
 Both accounts are created with an identical single-region configuration on purpose. Accounts can share a throughput pool only when their regions and their write configuration match, so two accounts that differ in either respect can't be enrolled in the same fleetspace.
 
-> [!IMPORTANT]
-> Fleets are available in a subset of Azure regions. When you create the fleet in Task 1, use a region the portal offers in its **Region** list. The fleet's region is independent of where your accounts live, so it doesn't have to match `$location`.
+> &#10071; Fleets are available in a subset of Azure regions. When you create the fleet in Task 1, use a region the portal offers in its **Region** list. The fleet's region is independent of where your accounts live, so it doesn't have to match `$location`.
 
-> [!WARNING]
-> Use only the accounts this script creates for this exercise. Never point this exercise at a shared training or production account.
+> &#9888; Use only the accounts this script creates for this exercise. Never point this exercise at a shared training or production account.
 
 ## Task 1: Create the fleet
 

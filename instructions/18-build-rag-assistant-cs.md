@@ -103,8 +103,7 @@ After both stages, the script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. The setup script uses the identity from your `az login` session. The application uses `DefaultAzureCredential`, which can select another configured identity before trying Azure CLI. The identity it selects needs the data-access roles on both resources. Microsoft Entra ID authentication is the recommended approach.
 
-> [!WARNING]
-> Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and the container's vector policy settings can't be edited directly. Never point this exercise at a shared training or production account.
+> &#9888; Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and the container's vector policy settings can't be edited directly. Never point this exercise at a shared training or production account.
 
 1. Set variables for the account name and its endpoint so later commands can use them.
 
@@ -138,8 +137,7 @@ Setup deploys both models through `foundry.bicep` and grants your identity acces
 
     Confirm that `text-embedding-3-small` and `gpt-5.4-mini` report `Succeeded`. Use **OpenAiEndpoint**, not the project endpoint, in the application code that follows. The embedding model's default output length matches the container's 1,536 dimensions.
 
-> [!NOTE]
-> If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. If you specify `-FoundryAccountName` during setup, pass the same value to `verify.ps1`. A new role assignment can take several minutes to propagate before inference succeeds.
+> &#128221; If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. If you specify `-FoundryAccountName` during setup, pass the same value to `verify.ps1`. A new role assignment can take several minutes to propagate before inference succeeds.
 
 ## Task 2: Load the catalog with searchable text and embeddings
 
@@ -240,8 +238,7 @@ Retrieval needs something to retrieve. In this task, you read the CosmicWorks pr
     Loaded 295 of 295
     ```
 
-> [!NOTE]
-> The container holds 295 vectors and the `diskANN` index takes effect at 1,000, so every similarity query in this exercise runs a full scan. The results are correct and the request charges aren't representative of a production catalog. Read them as a comparison between two queries rather than as a capacity figure.
+> &#128221; The container holds 295 vectors and the `diskANN` index takes effect at 1,000, so every similarity query in this exercise runs a full scan. The results are correct and the request charges aren't representative of a production catalog. Read them as a comparison between two queries rather than as a capacity figure.
 
 ## Task 3: Ask the model a catalog question with no grounding
 

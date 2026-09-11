@@ -83,8 +83,7 @@ The script creates the following resources, with throughput measured in request 
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ---
 
@@ -157,8 +156,7 @@ A value of `-1` expires only the items that set their own `ttl`.
 
     Keeping the types in their own file leaves **Program.cs** holding nothing but top-level statements, so you can append to the end of it without worrying about declaration order.
 
-    > [!IMPORTANT]
-    > Each task that follows replaces only the code **below the marker comment**. The lines above it, including your endpoint, stay put for the whole exercise. That way every run does only the work of the task you're on, instead of repeating everything before it.
+    > &#10071; Each task that follows replaces only the code **below the marker comment**. The lines above it, including your endpoint, stay put for the whole exercise. That way every run does only the work of the task you're on, instead of repeating everything before it.
 
 1. Run the project and confirm the output reads `Container ready.`:
 

@@ -83,8 +83,7 @@ The script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ## Review the autoscale range
 
@@ -123,8 +122,7 @@ The account default applies to every read unless a client or request relaxes it.
 
 1. Wait for the change to apply before continuing.
 
-    > [!NOTE]
-    > Strong consistency requires a read from more than one replica to guarantee the latest write. That extra work shows up directly in the request charge you measure next.
+    > &#128221; Strong consistency requires a read from more than one replica to guarantee the latest write. That extra work shows up directly in the request charge you measure next.
 
 ## Measure the request charge at each consistency level
 
@@ -292,8 +290,7 @@ Finally, configure automatic data retention on the container.
 
 1. In the **product** container's **Scale and Settings**, change **Time to Live** back to **Off** and select **Save**. Wait for the update to finish.
 
-    > [!WARNING]
-    > Don't set a positive default TTL on the shared product catalog. Expiration is measured from each item's last modification, not from when TTL is enabled. Existing items older than the default TTL can expire immediately.
+    > &#9888; Don't set a positive default TTL on the shared product catalog. Expiration is measured from each item's last modification, not from when TTL is enabled. Existing items older than the default TTL can expire immediately.
 
 1. Run the temporary-item query again after TTL is **Off**. An expired item can reappear if background deletion is incomplete when you disable TTL. If `temp-record-001` reappears, open **Items**, filter for `WHERE c.id = "temp-record-001"`, and select that item. Verify its ID and **categoryId** match the test item, then select **Delete** and confirm. Run the query again and confirm that no item remains. Don't delete catalog products.
 

@@ -86,8 +86,7 @@ The script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> [!WARNING]
-> Use a dedicated lab account. Continuous backup can't be disabled after enablement. Setup doesn't migrate backup mode or remove network restrictions from existing accounts. Never point this exercise at a shared training or production account. If your environment requires private networking, stop and resolve that setup separately before continuing.
+> &#9888; Use a dedicated lab account. Continuous backup can't be disabled after enablement. Setup doesn't migrate backup mode or remove network restrictions from existing accounts. Never point this exercise at a shared training or production account. If your environment requires private networking, stop and resolve that setup separately before continuing.
 
 1. Set a variable for the account name so the Azure CLI commands in this exercise can use it.
 
@@ -139,8 +138,7 @@ Fabric connects to the source account as your Microsoft Entra ID identity, and i
         --body "@mirroring-role.json"
     ```
 
-    > [!IMPORTANT]
-    > Keep the quotation marks around `"@mirroring-role.json"`. Passing the definition from a file avoids shell quoting problems with inline JSON, and `@` is a PowerShell special character.
+    > &#10071; Keep the quotation marks around `"@mirroring-role.json"`. Passing the definition from a file avoids shell quoting problems with inline JSON, and `@` is a PowerShell special character.
 
 1. Read back the ID of the role you created.
 
@@ -188,8 +186,7 @@ Fabric connects to the source account as your Microsoft Entra ID identity, and i
 
     This command checks the assigned role definitions for `readMetadata` and `readAnalytics`. It doesn't test the Fabric connection or replication.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If Fabric reports an authorization problem in the next task, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If Fabric reports an authorization problem in the next task, wait a moment and try again.
 
 ## Task 2: Create the mirrored database in Fabric
 
@@ -239,8 +236,7 @@ Before trusting any query result, confirm the copy is healthy and complete. In t
 
 1. Select **View**, then **Source database**, to open the read-only Azure Cosmos DB data explorer, then return to the mirrored database.
 
-    > [!NOTE]
-    > Reads from this source view are routed to Azure and consume request units on your account. Queries against the SQL analytics endpoint or lakehouse shortcuts read the replicated copy in OneLake and don't consume source request units.
+    > &#128221; Reads from this source view are routed to Azure and consume request units on your account. Queries against the SQL analytics endpoint or lakehouse shortcuts read the replicated copy in OneLake and don't consume source request units.
 
 ## Task 4: Query the mirrored data with T-SQL
 

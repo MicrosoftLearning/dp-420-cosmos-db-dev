@@ -93,11 +93,9 @@ The script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
-> [!IMPORTANT]
-> Container copy jobs in Task 4 run in the account's write region and are available in a subset of Azure regions. The setup script warns you if the region you chose doesn't support them. Check the [supported regions](/azure/cosmos-db/container-copy) if you need to pick a different one.
+> &#10071; Container copy jobs in Task 4 run in the account's write region and are available in a subset of Azure regions. The setup script warns you if the region you chose doesn't support them. Check the [supported regions](/azure/cosmos-db/container-copy) if you need to pick a different one.
 
 ## Task 1: Set up the project and confirm the catalog
 
@@ -262,8 +260,7 @@ Two behaviors are worth noticing:
 - **The `type` filter is doing real work.** `productMeta` holds 200 tag documents alongside the categories. Without the filter, a tag rename would write a tag's name into `categoryName` on unrelated products.
 - **The consumer starts from now.** Changes made before it first ran are invisible to it, because the start position applies only until a lease or continuation token exists.
 
-> [!IMPORTANT]
-> This pull-mode sample keeps its continuation token only in memory. If you stop it, rename the category, and restart it, it starts from `Now` and doesn't replay the intervening change. Rename again while it is running to confirm processing. A production pull consumer must persist its token after successful processing and reload it on restart; this sample doesn't provide durable checkpoints.
+> &#10071; This pull-mode sample keeps its continuation token only in memory. If you stop it, rename the category, and restart it, it starts from `Now` and doesn't replay the intervening change. Rename again while it is running to confirm processing. A production pull consumer must persist its token after successful processing and reload it on restart; this sample doesn't provide durable checkpoints.
 
 ## Task 3: React to changes with an Azure Function
 
@@ -332,8 +329,7 @@ Start the function in a new terminal on this folder:
 func start
 ```
 
-> [!NOTE]
-> Select **Allow** if the function requests network access.
+> &#128221; Select **Allow** if the function requests network access.
 
 
 The connection setting names an endpoint but no credential, so `DefaultAzureCredential` falls back to your `az login` session. Note what's absent from the trigger configuration: `CreateLeaseContainerIfNotExists` stays at its default, because creating a container is a control-plane operation that a data-plane role assignment doesn't permit. The `leases` container from Task 1 is already there.
@@ -352,15 +348,13 @@ Now watch the whole pipeline run:
 
 Two consumers are now reading two different feeds from the same account, and one feeds the other. The Task 2 consumer watches `productMeta` and writes to `product`. The function watches `product`, so the consumer's writes are what trigger it.
 
-> [!NOTE]
-> Both consumers share the `leases` container without colliding, because they monitor different containers and use different processor identities. Two consumers on the *same* monitored container would compete for the same leases, and one of them would sit idle. That case needs a distinct lease container prefix.
+> &#128221; Both consumers share the `leases` container without colliding, because they monitor different containers and use different processor identities. Two consumers on the *same* monitored container would compete for the same leases, and one of them would sit idle. That case needs a distinct lease container prefix.
 
 ## Task 4: Copy a container onto a new partition key
 
 Moving a container to a different partition key means copying its data into a container created with the new key. This task runs that copy yourself, with the CLI.
 
-> [!NOTE]
-> Container copy jobs are in preview. The jobs run on a best-effort basis with no service-level agreement.
+> &#128221; Container copy jobs are in preview. The jobs run on a best-effort basis with no service-level agreement.
 
 Stop everything still running from the previous tasks, then close those terminals. An offline copy job requires writes on the source to be stopped, and the Task 2 consumer is the process writing to `product`. Updates made after the job starts might not be captured.
 

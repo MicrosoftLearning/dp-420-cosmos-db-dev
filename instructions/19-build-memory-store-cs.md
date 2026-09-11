@@ -104,11 +104,9 @@ After both stages, the script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> [!WARNING]
-> Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and a container's vector policy can't be changed after creation. Never point this exercise at a shared training or production account.
+> &#9888; Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and a container's vector policy can't be changed after creation. Never point this exercise at a shared training or production account.
 
-> [!NOTE]
-> The setup script creates both containers for you. The Cosmos DB data-plane SDK can't create databases or containers when it authenticates with Microsoft Entra ID. Provision these resources through the control plane with the required permissions, as the setup script does.
+> &#128221; The setup script creates both containers for you. The Cosmos DB data-plane SDK can't create databases or containers when it authenticates with Microsoft Entra ID. Provision these resources through the control plane with the required permissions, as the setup script does.
 
 1. Set variables for the account name and its endpoint so later commands can use them.
 
@@ -144,8 +142,7 @@ Setup deploys both models through `foundry.bicep` and grants your identity acces
 
     Confirm that `text-embedding-3-small` and `gpt-5.4-mini` report `Succeeded`. Use **OpenAiEndpoint**, not the project endpoint, in the application code that follows. The embedding model's default output length matches the container's 1,536 dimensions.
 
-> [!NOTE]
-> If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. A new role assignment can take several minutes to propagate before inference succeeds.
+> &#128221; If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. A new role assignment can take several minutes to propagate before inference succeeds.
 
 ## Task 2: Write conversation state and read it back
 
@@ -479,8 +476,7 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
 
 The keyword query searches only the explicit fact and returns zero, because its controlled wording contains none of *pay*, *willing*, or *much*. Generated facts might contain those words, so they aren't part of that deterministic check. The vector query searches all active facts and returns results for the same question. Record which fact ranks first rather than assuming the explicit budget fact does.
 
-> [!NOTE]
-> Your memory container holds a handful of vectors, and a `quantizedFlat` index takes effect only once a container holds at least 1,000 of them. Every similarity query in this exercise therefore runs a full scan. The results are correct, and the request charges aren't representative of the same query at production scale.
+> &#128221; Your memory container holds a handful of vectors, and a `quantizedFlat` index takes effect only once a container holds at least 1,000 of them. Every similarity query in this exercise therefore runs a full scan. The results are correct, and the request charges aren't representative of the same query at production scale.
 
 Note what this proves and what it doesn't. Vector search found a fact stated in words the question never used, which is the recall behavior long-term memory exists for. It found it in a process that never read the conversation that produced it, which is the cross-session behavior.
 

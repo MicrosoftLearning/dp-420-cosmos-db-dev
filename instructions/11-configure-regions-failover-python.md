@@ -87,11 +87,9 @@ The script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. The programs use `AzureCliCredential` to authenticate as the identity from your `az login` session.
 
-> [!WARNING]
-> Use only the account this script creates for this exercise. Later steps change the write region and then take a region offline. Never point this exercise at a shared training or production account.
+> &#9888; Use only the account this script creates for this exercise. Later steps change the write region and then take a region offline. Never point this exercise at a shared training or production account.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ## Task 1: Read the account's region topology
 
@@ -265,15 +263,13 @@ A single-write-region account concentrates every write in one place. Enabling mu
 
     The container was created without a conflict resolution policy, so it carries the default: last writer wins on the system timestamp. Changing that requires creating a new container, because the policy is fixed at creation.
 
-> [!NOTE]
-> This exercise doesn't produce an actual write conflict. A conflict needs two regions to change the same item inside the replication window, which isn't reliably reproducible from a single machine. What you can verify is the policy that would resolve one, which is the configuration a production account depends on.
+> &#128221; This exercise doesn't produce an actual write conflict. A conflict needs two regions to change the same item inside the replication window, which isn't reliably reproducible from a single machine. What you can verify is the policy that would resolve one, which is the configuration a production account depends on.
 
 ## Task 4: Take a region offline
 
 This is the outage operation. Every step so far is reversible in minutes; this task isn't. Read the whole task before running the first command.
 
-> [!WARNING]
-> A region taken offline stays offline until Microsoft brings it back, which can take several days, and a region taken offline for a drill needs a support request to restore. Only run this against the disposable account this exercise created, which you delete in the next section.
+> &#9888; A region taken offline stays offline until Microsoft brings it back, which can take several days, and a region taken offline for a drill needs a support request to restore. Only run this against the disposable account this exercise created, which you delete in the next section.
 
 1. Take the account's first region offline, simulating a regional outage.
 

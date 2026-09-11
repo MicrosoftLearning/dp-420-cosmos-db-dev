@@ -17,8 +17,7 @@ In this exercise, you connect an AI assistant to the CosmicWorks product catalog
 
 ## Before you start
 
-> [!IMPORTANT]
-> You need a **GitHub account with access to GitHub Copilot** for the Copilot tasks in this exercise. If you don't have an account, [create a free GitHub account](https://github.com/signup) and verify your email address before starting. [GitHub Copilot Free](https://docs.github.com/en/copilot/get-started/plans) is available with usage limits.
+> &#10071; You need a **GitHub account with access to GitHub Copilot** for the Copilot tasks in this exercise. If you don't have an account, [create a free GitHub account](https://github.com/signup) and verify your email address before starting. [GitHub Copilot Free](https://docs.github.com/en/copilot/get-started/plans) is available with usage limits.
 
 To complete this exercise, you need an [Azure subscription](https://azure.microsoft.com/free/) with permission to create resources and assign roles.
 
@@ -104,8 +103,7 @@ Setup creates these resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ## Task 1: Configure and start Azure MCP Server
 
@@ -185,8 +183,7 @@ Query the product container for items where categoryId is
 
 Review and approve each tool call when prompted. For the filtered request, check that the query uses the specified category ID and projects `name` and `price`. Inspect the returned values, not only the assistant's statement that it ran a query.
 
-> [!NOTE]
-> The server also carries text search and vector similarity search. Neither is exercised here, because text search needs a full-text index on the target property and vector search needs both a vector index and an embedding deployment. The `product` container has neither. That constraint belongs to the tools, not to your prompt: they operate on the indexing policy you configured.
+> &#128221; The server also carries text search and vector similarity search. Neither is exercised here, because text search needs a full-text index on the target property and vector search needs both a vector index and an embedding deployment. The `product` container has neither. That constraint belongs to the tools, not to your prompt: they operate on the indexing policy you configured.
 
 ## Task 3: Verify the results and the tool's scope
 

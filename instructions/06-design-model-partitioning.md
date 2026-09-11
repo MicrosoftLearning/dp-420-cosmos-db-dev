@@ -26,8 +26,7 @@ If your lab environment isn't set up yet, follow [Set up your lab environment](h
 
 This exercise needs the CosmicWorks data at four stages of modeling, which the other exercises in this learning path don't provision. Run the setup script with the `modeling` profile to create a dedicated account, even if you already have an account from an earlier exercise. Use the resource group supplied by your lab environment.
 
-> [!WARNING]
-> This exercise deletes its modeling resources when you finish. Keep lab-provided and shared resource groups. Delete only the modeling account when using one of those groups.
+> &#9888; This exercise deletes its modeling resources when you finish. Keep lab-provided and shared resource groups. Delete only the modeling account when using one of those groups.
 
 1. Start **Visual Studio Code**.
 
@@ -81,8 +80,7 @@ The script creates the following resources:
 
 Every container is provisioned with autoscale up to 1,000 request units per second (RU/s), and every one is loaded with the CosmicWorks data for its modeling stage.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ---
 
@@ -146,8 +144,7 @@ When a customer signs in to the CosmicWorks store, the application needs the cus
     | Customer password | 2.83 |
     | **Total** | **8.49** |
 
-> [!NOTE]
-> Your figures vary slightly from run to run and from account to account, usually within a range of 0.1 RU. Record what you measure rather than the number we published here.
+> &#128221; Your figures vary slightly from run to run and from account to account, usually within a range of 0.1 RU. Record what you measure rather than the number we published here.
 
 ### Measure the embedded model
 
@@ -171,8 +168,7 @@ Two notes are worth reviewing before you move on.
 
 - The embedded item is larger than any single item in the normalized model. That cost lands on writes, which is the trade you accepted. A profile update now rewrites the addresses and the credential too.
 
-> [!TIP]
-> An application that knows both the item identifier and the partition key can read this item with a point read rather than a query. A point read of a 1-KB item costs 1 RU, and the charge rises with item size from there. Data Explorer runs queries, not point reads. Therefore, you can't measure the request charge for a point read here. A point read is the least expensive way to retrieve a known item. Embedding allows one point read to return all required data under one identifier.
+> &#128161; An application that knows both the item identifier and the partition key can read this item with a point read rather than a query. A point read of a 1-KB item costs 1 RU, and the charge rises with item size from there. Data Explorer runs queries, not point reads. Therefore, you can't measure the request charge for a point read here. A point read is the least expensive way to retrieve a known item. Embedding allows one point read to return all required data under one identifier.
 
 ---
 

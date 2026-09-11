@@ -88,11 +88,9 @@ The container uses manual throughput rather than autoscale on purpose. A fixed 4
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. The examples authenticate with Microsoft Entra ID through `DefaultAzureCredential`. This credential can use your `az login` session, but it checks other credential sources first. Make sure the identity it selects has the data-plane role assignment.
 
-> [!WARNING]
-> Use only the account this script creates for this exercise. Later steps attach a diagnostic setting and an alert rule. Never point this exercise at a shared training or production account.
+> &#9888; Use only the account this script creates for this exercise. Later steps attach a diagnostic setting and an alert rule. Never point this exercise at a shared training or production account.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ## Task 1: Send diagnostic logs to a Log Analytics workspace
 

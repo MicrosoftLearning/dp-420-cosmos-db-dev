@@ -88,8 +88,7 @@ The four autoscale containers each have their own 1,000 RU/s maximum. The `lease
 
 Because key-based authentication is disabled, this exercise doesn't use a cloud account key or connection string. The public emulator key is used only for local development. Every operation against the cloud account uses `AzureCliCredential` to authenticate with the identity from your `az login` session.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ---
 
@@ -118,8 +117,7 @@ Because key-based authentication is disabled, this exercise doesn't use a cloud 
     using Microsoft.Azure.Cosmos.Fluent;
     ```
 
-> [!IMPORTANT]
-> You build up a single file across Tasks 2 through 6. The block that creates the client is marked with `==== CLIENT ====` comments. Type those markers along with the code. Task 6 replaces that block, changes the endpoint, and removes the emulator key. The account read, container access, logging handler, and error handling remain unchanged.
+> &#10071; You build up a single file across Tasks 2 through 6. The block that creates the client is marked with `==== CLIENT ====` comments. Type those markers along with the code. Task 6 replaces that block, changes the endpoint, and removes the emulator key. The account read, container access, logging handler, and error handling remain unchanged.
 
 ---
 
@@ -180,8 +178,7 @@ To verify the connection, now point the SDK at that endpoint and read the accoun
 
     The two constants sit outside the markers because they don't change until Task 6.
 
-    > [!WARNING]
-    > `DangerousAcceptAnyServerCertificateValidator` disables SSL certificate validation. ***Use this setting only for the local emulator; never use it in production code***. Alternatively, import the emulator certificate as described in [Import the emulator's TLS/SSL certificate](/azure/cosmos-db/how-to-develop-emulator#import-the-emulators-tlsssl-certificate) and omit the custom `HttpClientFactory`.
+    > &#9888; `DangerousAcceptAnyServerCertificateValidator` disables SSL certificate validation. ***Use this setting only for the local emulator; never use it in production code***. Alternatively, import the emulator certificate as described in [Import the emulator's TLS/SSL certificate](/azure/cosmos-db/how-to-develop-emulator#import-the-emulators-tlsssl-certificate) and omit the custom `HttpClientFactory`.
 
 1. To verify the connection, read account properties. These lines stay in the file for the whole exercise:
 
@@ -282,8 +279,7 @@ Add logging so you can see request methods, URIs, status codes, and request-unit
 
     Leave the `endpoint` and `key` lines above the marker alone.
 
-    > [!NOTE]
-    > `CosmosClientBuilder` is in the `Microsoft.Azure.Cosmos.Fluent` namespace, which is already included in the using directives you added in Task 1.
+    > &#128221; `CosmosClientBuilder` is in the `Microsoft.Azure.Cosmos.Fluent` namespace, which is already included in the using directives you added in Task 1.
 
 1. Run the project again. Requests that pass through the custom handler now log their method, URI, final status code, and RU charge to the console. Internal retries and some metadata requests don't produce separate entries in this handler.
 

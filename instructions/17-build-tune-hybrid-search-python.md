@@ -102,8 +102,7 @@ After both stages, the script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. The setup script uses your Azure CLI identity. The application uses `DefaultAzureCredential`, which can select another configured identity before trying Azure CLI. Make sure the selected identity has the required role assignments. Microsoft Entra ID authentication is the recommended approach for new accounts.
 
-> [!WARNING]
-> Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and the container's vector policy settings can't be edited in place. Never point this exercise at a shared training or production account.
+> &#9888; Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and the container's vector policy settings can't be edited in place. Never point this exercise at a shared training or production account.
 
 1. Set variables for the account name and its endpoint so later commands can use them.
 
@@ -137,8 +136,7 @@ Setup deploys the embedding model through `foundry.bicep` and grants your identi
 
     Confirm that `text-embedding-3-small` reports `Succeeded`. Use **OpenAiEndpoint**, not the project endpoint, in the application code that follows. The model's default output length matches the container's 1,536 dimensions.
 
-> [!NOTE]
-> If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. For a custom Foundry account name, also pass `-FoundryAccountName` to `verify.ps1`. A new role assignment can take several minutes to propagate before inference succeeds.
+> &#128221; If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. For a custom Foundry account name, also pass `-FoundryAccountName` to `verify.ps1`. A new role assignment can take several minutes to propagate before inference succeeds.
 
 ## Task 2: Load the catalog with searchable text and embeddings
 
@@ -399,8 +397,7 @@ An unweighted fusion treats both rankings as equally credible. In this task, you
 
 In this task, you apply the cheapest optimizations in order and record what each one does to the request charge.
 
-> [!NOTE]
-> The container holds 295 vectors, and the `diskANN` index takes effect only once at least 1,000 vectors are indexed. Every similarity and hybrid query in this exercise runs a full scan instead, so the results are correct and the request charges are not representative of production. Read the numbers as a comparison between two queries in the same container rather than as a capacity figure.
+> &#128221; The container holds 295 vectors, and the `diskANN` index takes effect only once at least 1,000 vectors are indexed. Every similarity and hybrid query in this exercise runs a full scan instead, so the results are correct and the request charges are not representative of production. Read the numbers as a comparison between two queries in the same container rather than as a capacity figure.
 
 1. Restore the unweighted `TOP 5` hybrid query from task 4, with the original shopper phrase and terms. Run it and record its request charge as your baseline.
 

@@ -34,8 +34,7 @@ The in-account restore commands need [Azure CLI](/cli/azure/install-azure-cli) v
 
 This exercise creates its own Azure Cosmos DB account and deletes it at the end, so it doesn't use the shared account from the rest of this learning path. Enabling continuous backup on an existing account is a one-way migration, and this exercise deletes and restores the container it works in.
 
-> [!WARNING]
-> Use only the account this script creates for this exercise. Later steps delete a container and then restore it. Never point this exercise at a shared training or production account.
+> &#9888; Use only the account this script creates for this exercise. Later steps delete a container and then restore it. Never point this exercise at a shared training or production account.
 
 1. Start **Visual Studio Code**.
 
@@ -101,8 +100,7 @@ The script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. The SDK examples use `AzureCliCredential` to select the identity from your `az login` session. Microsoft Entra ID authentication is the recommended approach for new accounts.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 This exercise creates billable resources. The `Continuous7Days` tier has no backup storage charge, but the account itself, its provisioned throughput, and the restore operation are billable. Complete the cleanup task when you finish.
 

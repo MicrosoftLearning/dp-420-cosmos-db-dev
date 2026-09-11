@@ -16,8 +16,7 @@ In this exercise, you provision your first Azure Cosmos DB for NoSQL account and
 
 This exercise should take approximately **25** minutes to complete.
 
-> [!NOTE]
-> You need your own Azure subscription to complete this exercise, because creating an Azure Cosmos DB account isn't supported in the free sandbox. If you don't have a subscription, you can create a [free account](https://azure.microsoft.com/free/) before you begin. Provisioned throughput incurs charges while the account exists, so follow the clean-up steps at the end to avoid unnecessary costs.
+> &#128221; You need your own Azure subscription to complete this exercise, because creating an Azure Cosmos DB account isn't supported in the free sandbox. If you don't have a subscription, you can create a [free account](https://azure.microsoft.com/free/) before you begin. Provisioned throughput incurs charges while the account exists, so follow the clean-up steps at the end to avoid unnecessary costs.
 
 ## Register the Azure Cosmos DB resource provider
 
@@ -37,8 +36,7 @@ Before you can create a resource type, the resource provider that owns it must b
 
 1. Select **Refresh** until the **Status** column shows **Registered**. Registration takes a minute or two.
 
-> [!NOTE]
-> If the status already shows **Registered**, you don't need to register this provider again. Registering this provider requires the `Microsoft.DocumentDB/register/action` permission at the subscription scope. The Owner and Contributor roles include this permission.
+> &#128221; If the status already shows **Registered**, you don't need to register this provider again. Registering this provider requires the `Microsoft.DocumentDB/register/action` permission at the subscription scope. The Owner and Contributor roles include this permission.
 
 You might also need to register **Microsoft.CloudShell** in the same subscription by repeating these steps. Azure Cloud Shell requires this provider.
 
@@ -77,13 +75,11 @@ You now have an Azure Cosmos DB for NoSQL account ready to hold data.
 
 The account uses Microsoft Entra ID rather than account keys, so your Azure role doesn't grant access to the data inside it. Azure Cosmos DB controls data access with its own set of roles, and you assign one to yourself before the Data Explorer can read or write items.
 
-> [!NOTE]
-> Data plane role assignments can't be made in the Azure portal, so you use the Azure CLI for this step. Creating an assignment requires permissions to read SQL role definitions and to read and write SQL role assignments. The Owner and Contributor roles include these permissions.
+> &#128221; Data plane role assignments can't be made in the Azure portal, so you use the Azure CLI for this step. Creating an assignment requires permissions to read SQL role definitions and to read and write SQL role assignments. The Owner and Contributor roles include these permissions.
 
 1. In the Azure portal toolbar, select the **Cloud Shell** icon (`>_`) to open Azure Cloud Shell, and choose the **Bash** experience if you're prompted.
 
-    > [!NOTE]
-    > If you haven't set up Cloud Shell, in **Getting started**, select **No storage account required**, select the subscription you use for this exercise, and then select **Apply**. Wait for the Bash prompt before running the following commands.
+    > &#128221; If you haven't set up Cloud Shell, in **Getting started**, select **No storage account required**, select the subscription you use for this exercise, and then select **Apply**. Wait for the Bash prompt before running the following commands.
 
 1. Run the following commands, replacing `<account-name>` with the account you created. If your lab provides a different resource group name, replace `ResourceGroup1` with that name. The third command looks up your own identity:
 

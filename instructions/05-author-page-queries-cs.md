@@ -78,8 +78,7 @@ The script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 ---
 
@@ -175,8 +174,7 @@ Query one category with a price filter and a prefix match, then project the resu
 
 The category for this task is **Components, Road Frames**, which holds 33 products.
 
-> [!TIP]
-> Each task appends to the same file, so every run repeats the queries from the earlier tasks. Comment out the earlier queries once you see their output.
+> &#128161; Each task appends to the same file, so every run repeats the queries from the earlier tasks. Comment out the earlier queries once you see their output.
 
 1. Append the following code, above the record declarations. It defines the query with three parameters:
 

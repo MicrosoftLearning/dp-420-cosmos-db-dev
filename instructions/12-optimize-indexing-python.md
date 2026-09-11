@@ -82,11 +82,9 @@ The script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> [!WARNING]
-> Use only the account this script creates for this exercise. Later steps change the account's indexing configuration. Never point this exercise at a shared training or production account.
+> &#9888; Use only the account this script creates for this exercise. Later steps change the account's indexing configuration. Never point this exercise at a shared training or production account.
 
-> [!NOTE]
-> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+> &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
 1. Set variables for the account name and your subscription so the Azure CLI commands in this exercise can use them.
 

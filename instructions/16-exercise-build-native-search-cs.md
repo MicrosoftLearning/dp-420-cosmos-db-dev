@@ -102,8 +102,7 @@ After both stages, the script creates the following resources:
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Azure operations use Microsoft Entra ID authentication, which is the recommended approach for new accounts. The application code uses `DefaultAzureCredential`, which can select another configured identity before your Azure CLI identity. Confirm that the selected identity has the required roles.
 
-> [!WARNING]
-> Use only the resource group and account this script creates. Vector indexing and search can't be disabled on a container after enablement, and vector policy settings can't be edited directly. Never point this exercise at a shared training or production account.
+> &#9888; Use only the resource group and account this script creates. Vector indexing and search can't be disabled on a container after enablement, and vector policy settings can't be edited directly. Never point this exercise at a shared training or production account.
 
 1. Set variables for the account name and its endpoint so later commands can use them.
 
@@ -137,8 +136,7 @@ Setup deploys the embedding model through `foundry.bicep` and grants your identi
 
     Confirm that `text-embedding-3-small` reports `Succeeded`. Use **OpenAiEndpoint**, not the project endpoint, in the application code that follows. The model's default output length matches the container's 1,536 dimensions.
 
-> [!NOTE]
-> If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. A new role assignment can take several minutes to propagate before inference succeeds.
+> &#128221; If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. A new role assignment can take several minutes to propagate before inference succeeds.
 
 ## Task 2: Load the catalog with searchable text and embeddings
 
@@ -384,8 +382,7 @@ The search phrase contains none of the words *helmet*, *Sport-100*, or *Accessor
 
     The equality filter targets one logical partition and routes to its physical partition. It can reduce the request charge, but a small container can already occupy one physical partition, so a reduction isn't guaranteed.
 
-> [!NOTE]
-> This container holds 295 vectors, and `diskANN` needs at least 1,000 before its index takes effect. Every similarity query you just ran used a full scan. The queries still rank the stored vectors, but these request charges don't predict the cost of searching a larger, indexed container. Treat the numbers as a comparison between the two queries you ran rather than as a figure to plan capacity from.
+> &#128221; This container holds 295 vectors, and `diskANN` needs at least 1,000 before its index takes effect. Every similarity query you just ran used a full scan. The queries still rank the stored vectors, but these request charges don't predict the cost of searching a larger, indexed container. Treat the numbers as a comparison between the two queries you ran rather than as a figure to plan capacity from.
 
 ## Task 5: Refresh an embedding from the change feed
 

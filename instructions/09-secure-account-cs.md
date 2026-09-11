@@ -38,8 +38,7 @@ Charges include ACI uptime and Azure Cosmos DB serverless request units (RUs) an
 
 This exercise creates its own Azure Cosmos DB account and deletes it at the end, so it doesn't use the shared account from the rest of this learning path. Later steps switch public network access off and back on, which would interrupt every other exercise running against a shared account.
 
-> [!WARNING]
-> Use only the account this script creates for this exercise. The network test deliberately blocks all public data access to that account. Never point this exercise at a shared training or production account.
+> &#9888; Use only the account this script creates for this exercise. The network test deliberately blocks all public data access to that account. Never point this exercise at a shared training or production account.
 
 1. Start **Visual Studio Code**.
 
@@ -366,8 +365,7 @@ Adding Reader doesn't cancel Contributor. Remove the temporary grant, then test 
 
 Change only public-network access. Keep the role, principal, container, cache, and item address unchanged. This change tests a public-network restriction, not an IP allowlist or private endpoint deployment.
 
-> [!WARNING]
-> This isolated account has no private endpoint. Disabling public access creates a complete data-access outage for this exercise, not proof of working private connectivity. Restore the public baseline only on this disposable account.
+> &#9888; This isolated account has no private endpoint. Disabling public access creates a complete data-access outage for this exercise, not proof of working private connectivity. Restore the public baseline only on this disposable account.
 
 ### Verify the blocked read
 
