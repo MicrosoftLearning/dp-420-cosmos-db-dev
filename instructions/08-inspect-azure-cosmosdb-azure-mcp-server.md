@@ -1,6 +1,19 @@
-TEST LAB....
+---
+lab:
+  title: Inspect Azure Cosmos DB with Azure MCP Server
+  module: Module 8 - Implement AI-Assisted Development Tools for Azure Cosmos DB
+  description: Use Azure MCP Server in Visual Studio Code to inspect the CosmicWorks catalog, query items, and verify the tool calls and results.
+  duration: 45 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
+    - Azure Portal
+    - Azure MCP Server
+---
 
-IIn this exercise, you connect an AI assistant to the CosmicWorks product catalog through a Model Context Protocol (MCP) server. You inspect and query the catalog with natural-language requests, then verify the tool calls and results.
+In this exercise, you connect an AI assistant to the CosmicWorks product catalog through a Model Context Protocol (MCP) server. You inspect and query the catalog with natural-language requests, then verify the tool calls and results.
 
 ## Before you start
 
@@ -11,19 +24,18 @@ To complete this exercise, you need an [Azure subscription](https://azure.micros
 
 If your lab environment isn't set up yet, follow [Set up your lab environment](https://github.com/MicrosoftLearning/dp-420-cosmos-db-dev/blob/main/Allfiles/Labs/Shared/00-setup-local-environment.md) to install Visual Studio Code, Git, the Azure CLI, and PowerShell 7.
 
-You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed.
-
 This exercise also requires:
 
-- Quota for `text-embedding-3-small` and `gpt-5.4-mini` in the Foundry region. Setup creates the Foundry resource, project, and model deployments.
 - [Node.js](https://nodejs.org) 22 or later, which supplies the `npx` command the MCP server runs under.
 - Visual Studio Code with the [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension.
 
+GitHub Copilot supplies the model for Chat. You don't deploy a chat or embedding model for this exercise.
+
 ## Set up your Azure Cosmos DB resources
 
-This exercise uses the `aitools` profile, which creates the CosmicWorks catalog and the Agent Memory Toolkit's containers. It enables vector search, so use a disposable account rather than the shared core account. You don't need an existing Foundry project.
+This exercise uses the `core` profile, which creates the CosmicWorks catalog and supporting containers. The MCP tasks inspect and query only the `cosmicworks/product` container.
 
-To create the lab resources and load the catalog data, run setup once. The script configures the search policies and handles vector-search activation before completing container setup.
+To create the lab resources and load the catalog data, run setup once.
 
 1. Start **Visual Studio Code**.
 
@@ -45,25 +57,24 @@ To create the lab resources and load the catalog data, run setup once. The scrip
     az login
     ```
 
-1. Set variables for the resource group and regions. If your lab environment provides a resource group, use that name. Otherwise, use a new group that contains only this exercise's resources. Foundry can use a different region from Cosmos DB.
+1. Set variables for the resource group and region. If your lab environment provides a resource group, use that name. Otherwise, use a new group that contains only this exercise's resources.
 
     ```powershell
     $resourceGroup = "ResourceGroup1"
     $location = "westus2"
-    $foundryLocation = "eastus"
     ```
 
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile aitools -EnableFoundry -FoundryLocation $foundryLocation
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab08 -LabProfile core
     ```
 
     Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab08a7f3k9`.
 
-1. Wait for **Setup complete** in the terminal. If Azure reports that vector search is not ready, setup retries container creation for up to 15 minutes. Other deployment failures stop setup and appear in the log.
+1. Wait for **Setup complete** in the terminal. Deployment failures stop setup and appear in the log.
 
-1. Record the **Account name**, **Account endpoint**, **Foundry account**, and **OpenAI endpoint** values the script prints. The Cosmos DB endpoint looks like `https://<your-account-name>.documents.azure.com:443/`. Setup also saves the Foundry settings in `logs/foundry-<account-name>.json`.
+1. Record the **Account name** and **Account endpoint** values the script prints. The Cosmos DB endpoint looks like `https://<your-account-name>.documents.azure.com:443/`.
 
 1. Set a variable for the account name so the Azure CLI commands in this exercise can use it.
 
@@ -71,44 +82,25 @@ To create the lab resources and load the catalog data, run setup once. The scrip
     $accountName = "<your-account-name>"
     ```
 
-1. (Optional)Invoke verification to check the resources.
+1. Run verification to check the resources.
 
     ```powershell
-    ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile aitools -EnableFoundry
+    ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile core
     ```
 
-    Continue only after setup and verification succeed. To resume a failed setup, replace `-NamePrefix dp420lab08` with `-AccountName <your-account-name>` in the setup command. Keep the resource group, profile, and Foundry options unchanged.
-
-1. Load the saved model settings in the **Allfiles/Labs/Shared** terminal.
-
-    ```powershell
-    $foundry = Get-Content "./logs/foundry-$accountName.json" -Raw | ConvertFrom-Json
-    $openAiName = $foundry.FoundryAccountName
-    $foundry | Format-List FoundryAccountName, OpenAiEndpoint, EmbeddingDeployment, EmbeddingDimensions, ChatDeployment
-    ```
+    Continue only after setup and verification succeed. To resume a failed setup, replace `-NamePrefix dp420lab08` with `-AccountName <your-account-name>` in the setup command. Keep the resource group and profile unchanged.
 
 Setup creates these resources:
 
 | Resource | Configuration |
 | :--- | :--- |
-| Azure Cosmos DB account | API for NoSQL, key-based authentication disabled, vector search enabled |
+| Azure Cosmos DB account | API for NoSQL, key-based authentication disabled |
 | `cosmicworks` database | Holds the catalog and the core profile's supporting containers |
 | `cosmicworks/product` | `/categoryId`, autoscale maximum of 1,000 request units per second, 295 products |
 | `cosmicworks/productMeta` | `/type`, autoscale maximum of 1,000 request units per second, 237 category and tag documents |
 | `cosmicworks/leases` | `/id`, 400 request units per second, empty |
 | `cosmicworks/operations` and `cosmicworks/bulkload` | `/categoryId`, each with an autoscale maximum of 1,000 request units per second, empty |
-| `ai_memory` database | Holds the five Agent Memory Toolkit containers |
-| `ai_memory/memories` | Hierarchical `/user_id`, `/thread_id` key, autoscale maximum of 1,000 request units per second, TTL enabled without default expiry |
-| `ai_memory/memories_turns` | Same key and throughput, 30-day default TTL |
-| `ai_memory/memories_summaries` | Same key and throughput, TTL enabled without default expiry, summary composite index |
-| `ai_memory/counter` | Hierarchical `/user_id`, `/thread_id` key, autoscale maximum of 1,000 request units per second |
-| `ai_memory/leases` | `/id`, autoscale maximum of 1,000 request units per second |
 | Cosmos DB role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
-| Microsoft Foundry resource and project | Key-based authentication disabled; project named `dp420` |
-| Model deployments | `text-embedding-3-small` version `1` on Standard and `gpt-5.4-mini` version `2026-03-17` on GlobalStandard, each with 30 capacity units |
-| Foundry role assignment | Foundry User, granted to your signed-in identity on the Foundry resource |
-
-The three memory data containers use a full-text policy and index on `/content` and a `quantizedFlat` vector index on `/embedding`, with 1,536 dimensions and cosine distance. The embedding model produces that vector length. Time to live (TTL) removes expired turns; the other memory records have no default expiry.
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
@@ -144,30 +136,7 @@ Under the **ai-tools-lab** folder, create a folder called **.vscode**. Inside **
 
 1. Press **Ctrl+Shift+P**, enter **MCP: List Servers**, and select the command. Choose **Azure MCP Server**. If it isn't running, select **Start Server**. Review any server-trust prompt before continuing. If the server is missing or disabled, use the recovery steps in this task.
 
-1. Open **Configure Tools** for the chat session. If the control appears as an unlabeled icon, hover over it to read its tooltip. Search for **Azure MCP Server** and ensure its checkbox is selected.
-
-The [tool-selection controls](https://code.visualstudio.com/docs/agents/run/tools#select-tools-for-a-request) can differ by session type. If your session uses the **Tools** tab in the chat customization view, enable the server's tools there.
-
-If no chat model is available, complete the sign-in or [model-provider setup](https://code.visualstudio.com/docs/agent-customization/language-models) required by your environment before continuing.
-
-If **Azure MCP Server** isn't listed, or the MCP marketplace is unavailable, use the manual configuration from this task. You don't need a marketplace installation:
-
-1. In **Explorer**, check that **ai-tools-lab** is the open folder. If not, select **File > Open Folder** and choose **ai-tools-lab**. Changing the terminal's directory doesn't change the VS Code workspace.
-
-1. Check that **ai-tools-lab/.vscode/mcp.json** contains the configuration from this task and has no JSON errors.
-
-1. Press **Ctrl+Shift+P**, enter **MCP: List Servers**, and select the command. Choose **Azure MCP Server**. If it is disabled, select **Enable**, then select the server again through **MCP: List Servers**.
-
-1. If the server isn't running, select **Start Server**. Review any trust prompt before continuing. On the first start, `npx` downloads the server package if needed, so the environment needs access to the npm registry.
-
-1. Return to **Configure Tools** and select the **Azure MCP Server** tools.
-
-If startup fails, run **MCP: List Servers**, choose **Azure MCP Server**, and select **Show Output**. If the error says `node` or `npx` isn't found, confirm that Node.js 22 or later is installed, then restart VS Code. For download or network errors, ask your lab provider or administrator to check access to the npm registry.
-
-> [!IMPORTANT]
-> An unavailable marketplace is different from a policy that blocks MCP servers. If your organization disables MCP or allows only an approved registry, ask your administrator or lab provider for an approved Azure MCP Server installation. Manual configuration doesn't override those restrictions.
-
-The Azure MCP Server uses the Azure identity from your earlier `az login`. That Azure sign-in is separate from access to the chat model.
+1. If the **Azure MCP Server** isn't listed, select **Add Server** and follow the prompts to add it. If you still don't see it, select **Browse MCP Server** (Enable the Marketplace if needed) and search and install it.
 
 Continue only when the Azure MCP Server is running and its tools are available in Chat.
 
@@ -176,6 +145,8 @@ Continue only when the Azure MCP Server is running and its tools are available i
 Keep the same Chat conversation for these requests. Replace **<your-account-name>** with the account name recorded during setup. If the assistant asks for a subscription or resource group, provide the values you used for this exercise.
 
 Start by checking the catalog count through MCP:
+
+In the chat input area, enter the following request, allow access if needed:
 
 ```text
 Use the Azure MCP Server to count all items in the product container
@@ -247,13 +218,12 @@ When you finish this exercise, delete its resources if you no longer need them. 
 az group delete --name $resourceGroup --yes --no-wait
 ```
 
-If your lab environment provided the resource group, keep it. Delete only the Cosmos DB and Foundry resources you created for this exercise, after confirming that no other application uses them:
+If your lab environment provided the resource group, keep it. Delete only the Cosmos DB account you created for this exercise, after confirming that no other application uses it:
 
 ```azurecli
 az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
-az cognitiveservices account delete --name $openAiName --resource-group $resourceGroup
 ```
 
-Keep shared and lab-provided resource groups. Don't delete a reused Foundry account or deployments that other applications use.
+Keep shared and lab-provided resource groups. Don't delete a reused Cosmos DB account that other exercises or applications use.
 
-The provisioned-throughput containers in this exercise incur throughput and storage charges while they exist. Serverless accounts instead charge for consumed request units and storage. Pay-per-token model deployments charge for inference usage, but provisioned model deployments incur capacity charges even while idle.
+The provisioned-throughput containers in this exercise incur throughput and storage charges while they exist.

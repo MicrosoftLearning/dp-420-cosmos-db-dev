@@ -1,0 +1,603 @@
+---
+lab:
+  title: Implement Data Operations in Python
+  module: Module 4 - Implement Azure Cosmos DB Operations with the SDK
+  description: Perform point reads, writes, a conditional patch, an ETag-guarded replace, item time to live, a transactional batch, and a bulk load, comparing request-unit costs.
+  duration: 45 minutes
+  level: 300
+  islab: true
+  primarytopics:
+    - Azure
+    - Azure Cosmos DB
+    - Azure Portal
+---
+
+In this exercise, you build a small data layer against an Azure Cosmos DB for NoSQL container and exercise every operation from this module. You read an item with a point read and compare its cost with the cost of an equivalent query. You then run the full set of write operations. You apply a conditional patch and protect a replace operation with an ETag. You set a time to live (TTL) value to expire an item. You commit a transactional batch. You finish with a bulk load. Throughout, you print the request charge so you can see what each choice costs.
+
+## Before you start
+
+To complete this exercise, you need an [Azure subscription](https://azure.microsoft.com/free/) with permission to create resources and assign roles.
+
+If your lab environment isn't set up yet, follow [Set up your lab environment](https://github.com/MicrosoftLearning/dp-420-cosmos-db-dev/blob/main/Allfiles/Labs/Shared/00-setup-local-environment.md) to install Visual Studio Code, Git, the Azure CLI, and PowerShell 7.
+
+You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed.
+
+## Set up your Azure Cosmos DB resources
+
+The core exercises reuse an account prepared with the `core` profile, not the two-item account from the first portal exercise. Before skipping setup, open **Allfiles/Labs/Shared** in PowerShell, sign in with `az login`, and set `$resourceGroup`, `$location`, and `$accountName` to your recorded values. Run `./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile core` and continue only when it succeeds. In Data Explorer, confirm 295 items in `cosmicworks/product` and 237 in `cosmicworks/productMeta` with `SELECT VALUE COUNT(1) FROM c`.
+
+If you have no verified core account, follow the setup steps below. To add missing resources to an existing lab account, pass its explicit `-AccountName` to setup rather than using a different module's name prefix. Reseeding restores canonical items but doesn't remove extra items or reset container policies. Resolve mismatches before continuing; don't reset a shared account automatically.
+
+1. Start **Visual Studio Code**.
+
+1. If you don't have the lab code yet, clone the repository for DP-420: open the command palette with Ctrl+Shift+P, run Git: Clone, and enter the following URL. Choose a local folder when prompted. Otherwise, open the folder from your previous clone.
+
+    ```
+    https://github.com/microsoftlearning/dp-420-cosmos-db-dev
+    ```
+
+1. Once the repository is cloned, open that local folder in **Visual Studio Code**.
+
+1. In the **Explorer** pane, browse to the **Allfiles/Labs/Shared** folder.
+
+1. Open the context menu for the folder and select **Open in Integrated Terminal**. If the terminal isn't PowerShell, select the dropdown beside the **+** in the terminal toolbar and choose **PowerShell**.
+
+1. Sign in to the Azure CLI. A browser window opens so you can sign in to Azure.
+
+    ```azurecli
+    az login
+    ```
+
+1. Set variables for the resource group (If a resource group was provided by your lab environment, use that name) and region you want to use. Change either value if you prefer a different resource group name or region.
+
+    ```powershell
+    $resourceGroup = "ResourceGroup1"
+    $location = "westus2"
+    ```
+
+1. Run the setup script.
+
+    ```powershell
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab04 -LabProfile core
+    ```
+
+    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab04a7f3k9`.
+
+1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
+
+1. Record the **Account name** and **Account endpoint** values the script prints. You need the endpoint throughout this exercise, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
+
+The script creates the following resources, with throughput measured in request units per second (RU/s):
+
+| Resource | Configuration |
+| :--- | :--- |
+| Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
+| `cosmicworks` database | Holds every container this learning path uses |
+| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, seeded with 295 items |
+| `productMeta` container | Partitioned on `/type`, autoscale up to 1,000 RU/s, seeded with 237 items |
+| `leases` container | Partitioned on `/id`, manual throughput of 400 RU/s, empty |
+| `operations` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, empty. Tasks 2 through 6 work here |
+| `bulkload` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, empty. Task 7 writes to it |
+| Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
+
+
+Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
+
+> [!NOTE]
+> A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
+
+---
+
+## Task 1: Set up the project and connect to the container
+
+Task 5 expires an item with time to live (TTL), so enable it on the container now. Replace <your-account-name> with your actual account name:
+
+```azurecli
+az cosmosdb sql container update `
+    --account-name <your-account-name> `
+    --resource-group $resourceGroup `
+    --database-name cosmicworks `
+    --name operations `
+    --ttl -1
+```
+
+A value of `-1` expires only the items that set their own `ttl`.
+
+1. Open a terminal, create a project folder, and set up a virtual environment:
+
+    ```bash
+    mkdir cosmos-operations-exercise
+    cd cosmos-operations-exercise
+    python -m venv .venv
+    ```
+
+1. Activate the environment. On Windows:
+
+    ```powershell
+    .venv\Scripts\activate
+    ```
+
+    On macOS or Linux:
+
+    ```bash
+    source .venv/bin/activate
+    ```
+
+1. Install the SDK packages:
+
+    ```bash
+    pip install azure-cosmos azure-identity
+    ```
+
+1. In the **cosmos-operations-exercise** folder, alongside the **.venv** folder rather than inside it, create a file named **app.py** with the following contents. Set `endpoint` to the account endpoint the setup script printed:
+
+    ```python
+    import time
+
+    from azure.core import MatchConditions
+    from azure.cosmos import CosmosClient, exceptions
+    from azure.identity import DefaultAzureCredential
+
+    endpoint = "<cosmos-endpoint>"
+
+    client = CosmosClient(url=endpoint, credential=DefaultAzureCredential())
+    container = client.get_database_client("cosmicworks").get_container_client("operations")
+
+    # ---- Each task replaces everything below this line ----
+
+    print("Container ready.")
+    ```
+
+    `get_container_client` builds a client-side reference without calling the service, so it needs no control-plane permission.
+
+    > [!IMPORTANT]
+    > Each task that follows replaces only the code **below the marker comment**. The lines above it, including your endpoint, stay put for the whole exercise. That way every run does only the work of the task you're on, instead of repeating everything before it.
+
+1. Run the script and confirm the output reads `Container ready.`:
+
+    ```bash
+    python app.py
+    ```
+
+---
+
+## Task 2: Compare a point read against a query
+
+Create one item, then read it back two ways and compare the request charge.
+
+1. In **app.py**, replace everything below the marker comment with the following code. It creates the saddle item that the rest of this exercise works with:
+
+    ```python
+    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    saddle = {
+        "id": item_id,
+        "categoryId": category_id,
+        "categoryName": "Components, Saddles",
+        "sku": "SE-R581",
+        "name": "LL Road Seat/Saddle",
+        "price": 27.12,
+        "tags": [
+            {"id": "0573D684-9140-4DEE-89AF-4E4A90E65666", "name": "Tag-113"},
+            {"id": "6C2F05C8-1E61-4912-BE1A-C67A378429BB", "name": "Tag-5"},
+        ],
+    }
+
+    try:
+        container.create_item(body=saddle)
+        print("Create:      item created")
+    except exceptions.CosmosResourceExistsError:
+        print("Create:      item already exists")
+    ```
+
+1. Add the point read and print its charge:
+
+    ```python
+    read_item = container.read_item(item=item_id, partition_key=category_id)
+    print(f"Point read:  {read_item.get_response_headers()['x-ms-request-charge']} RU")
+    ```
+
+1. Add an equivalent query that filters on the same two values. A `response_hook` captures the charge from each page of results:
+
+    ```python
+    query_charge = 0.0
+
+    def capture_charge(headers, results):
+        global query_charge
+        query_charge += float(headers["x-ms-request-charge"])
+
+    results = list(container.query_items(
+        query="SELECT * FROM c WHERE c.id = @id AND c.categoryId = @categoryId",
+        parameters=[
+            {"name": "@id", "value": item_id},
+            {"name": "@categoryId", "value": category_id},
+        ],
+        partition_key=category_id,
+        response_hook=capture_charge,
+    ))
+
+    print(f"Query:       {query_charge:.2f} RU")
+    ```
+
+1. Run the script and compare the two read charges:
+
+    ```bash
+    python app.py
+    ```
+
+    ```output
+    Create:      item created
+    Point read:  1.00 RU
+    Query:       2.92 RU
+    ```
+
+A point read costs about 1 request unit (RU). Fetching the same item by query costs two to three times as much, because it goes through the query engine. Use a point read whenever your code already knows the `id` and the partition key.
+
+---
+
+## Task 3: Run the write operations
+
+Replace, upsert, and delete the item, then recreate it for the tasks that follow.
+
+1. In **app.py**, replace everything below the marker comment with the following code. It reads the item created in Task 2 and replaces it with a new price:
+
+    ```python
+    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    saddle = container.read_item(item=item_id, partition_key=category_id)
+
+    saddle["price"] = 32.55
+
+    replaced = container.replace_item(item=item_id, body=saddle)
+    print(f"Replace:     {replaced.get_response_headers()['x-ms-request-charge']} RU")
+    ```
+
+    `replace_item` raises `CosmosResourceNotFoundError` if the item no longer exists.
+
+1. Add an upsert that suppresses the response payload:
+
+    ```python
+    saddle["price"] = 30.00
+
+    upserted = container.upsert_item(body=saddle, no_response=True)
+    charge = upserted.get_response_headers()["x-ms-request-charge"]
+    print(f"Upsert:      {charge} RU (no payload returned)")
+    ```
+
+    With `no_response=True`, the returned `CosmosDict` is empty, but it still carries the response headers, so the charge is still there to read.
+
+1. Add a delete, then recreate the item so later tasks have something to work with:
+
+    ```python
+    container.delete_item(item=item_id, partition_key=category_id)
+    charge = container.client_connection.last_response_headers["x-ms-request-charge"]
+    print(f"Delete:      {charge} RU")
+
+    saddle["price"] = 27.12
+    container.create_item(body=saddle)
+    ```
+
+1. Run the script and compare the write charges against the read charges from Task 2:
+
+    ```output
+    Replace:     10.67 RU
+    Upsert:      10.67 RU (no payload returned)
+    Delete:      9.52 RU
+    ```
+
+A write costs several times a point read, because the charge covers the document itself plus every index term the container's indexing policy maintains. The replace is the most expensive of the three: it deletes the existing document and inserts the new one, paying the document cost twice, while the delete pays it once. Request charges are deterministic for a given operation over a given dataset, so rerunning the project reproduces these numbers, though your values depend on item size and the container's indexing policy. Suppressing the response payload saves network bandwidth, not request units, which is why the replace and the upsert cost the same.
+
+---
+
+## Task 4: Apply a conditional patch and guard a replace with an ETag
+
+Change one property without rewriting the whole document, and make that change conditional. Patch and replace express a condition differently: a patch uses a filter predicate, and a replace uses an ETag. You use both here.
+
+1. In **app.py**, replace everything below the marker comment with the following code. It patches two properties, guarded by a filter predicate that tests the current price:
+
+    ```python
+    item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    try:
+        patched = container.patch_item(
+            item=item_id,
+            partition_key=category_id,
+            patch_operations=[
+                {"op": "set", "path": "/name", "value": "LL Road Seat/Saddle, Clearance"},
+                {"op": "incr", "path": "/price", "value": 5.00},
+            ],
+            filter_predicate="FROM c WHERE c.price < 100",
+        )
+        print(f"Patch:       {patched.get_response_headers()['x-ms-request-charge']} RU")
+    except exceptions.CosmosAccessConditionFailedError:
+        print("Patch:       412 Precondition Failed")
+    ```
+
+1. Run the script. The predicate holds, so the patch succeeds and the price is now 32.12. Record its request charge alongside the replace charge from Task 3. Patch doesn't guarantee a lower write charge; its benefits include a smaller request payload and avoiding a preceding read when the changes are already known.
+
+1. Now force the condition to fail. Append the following code, which uses a predicate the item no longer satisfies:
+
+    ```python
+    try:
+        container.patch_item(
+            item=item_id,
+            partition_key=category_id,
+            patch_operations=[{"op": "incr", "path": "/price", "value": 5.00}],
+            filter_predicate="FROM c WHERE c.price < 30",
+        )
+        print("Failed patch: unexpectedly succeeded")
+    except exceptions.CosmosAccessConditionFailedError:
+        print("Failed patch: 412 Precondition Failed, as expected")
+    ```
+
+1. Now guard a replace with an ETag instead. Append the following code, which reads the item, keeps its ETag, and writes with that ETag attached:
+
+    ```python
+    current = container.read_item(item=item_id, partition_key=category_id)
+    etag = current["_etag"]
+
+    current["price"] = 45.00
+    container.replace_item(
+        item=item_id,
+        body=current,
+        etag=etag,
+        match_condition=MatchConditions.IfNotModified,
+    )
+
+    print("Replace:     succeeded with a current ETag")
+    ```
+
+1. Reuse the same, now stale, ETag on a second replace:
+
+    ```python
+    try:
+        current["price"] = 50.00
+        container.replace_item(
+            item=item_id,
+            body=current,
+            etag=etag,
+            match_condition=MatchConditions.IfNotModified,
+        )
+        print("Stale replace: unexpectedly succeeded")
+    except exceptions.CosmosAccessConditionFailedError:
+        print("Stale replace: 412 Precondition Failed, as expected")
+    ```
+
+1. Run the script. The first replace succeeds and changes the item's ETag, so the second one fails.
+
+This exercise conditions the patch with a filter predicate and the replace with an ETag. The .NET standalone `PatchItemAsync` method doesn't support `IfMatchEtag`, so don't substitute that option for the patch predicate. A replace supports an ETag precondition, but not a filter predicate. Both conditions demonstrated here reject a conflicting write with 412 Precondition Failed. Re-read the item and decide whether to reapply the change. Patch operations inside a transactional batch have separate request options; don't infer their behavior from the standalone method.
+
+---
+
+## Task 5: Expire an item with time to live
+
+Write a transient item, give it a short lifetime, and watch it disappear.
+
+1. In **app.py**, replace everything below the marker comment with the following code. It creates a session item with a 30-second lifetime:
+
+    ```python
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    container.upsert_item(body={
+        "id": "session-9f21",
+        "categoryId": category_id,
+        "state": "active",
+        "ttl": 30,
+    })
+    print("Session created with a 30 second TTL.")
+    ```
+
+    Using an upsert rather than a create lets you rerun the task without a conflict.
+
+1. Add two reads, one before the lifetime elapses and one after, so you can see the item disappear rather than find it missing:
+
+    ```python
+    def read_session(label):
+        try:
+            container.read_item(item="session-9f21", partition_key=category_id)
+            print(f"{label} session still present")
+        except exceptions.CosmosResourceNotFoundError:
+            print(f"{label} session expired")
+
+    time.sleep(10)
+    read_session("After 10s:")
+
+    time.sleep(25)
+    read_session("After 35s:")
+    ```
+
+    To leave a margin, the second read lands at 35 seconds rather than exactly 30. An expired item stops appearing in results as soon as its lifetime elapses, even though the physical delete happens later, as a background task.
+
+1. Run the script. The first read succeeds and the second raises a not-found error:
+
+    ```output
+    Session created with a 30 second TTL.
+    After 10s: session still present
+    After 35s: session expired
+    ```
+
+A container TTL of `-1` turns on expiration without giving anything a default lifetime. Only items that set their own `ttl` expire: the session item did, and the product item from Task 2 didn't.
+
+---
+
+## Task 6: Commit a transactional batch
+
+To see how the failure reports itself, write two related items atomically, then break the same-partition rule on purpose.
+
+1. In **app.py**, replace everything below the marker comment with the following code. Both items share the partition key value used throughout this exercise:
+
+    ```python
+    category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
+
+    batch_operations = [
+        ("upsert", ({"id": "201D0D79-81AD-43D2-AD6E-F09EEE6AC2D7", "categoryId": category_id,
+                     "categoryName": "Components, Saddles", "sku": "SE-M798",
+                     "name": "ML Mountain Seat/Saddle", "price": 39.14, "tags": []},)),
+        ("upsert", ({"id": "3FE1A99E-DE14-4D11-B635-F5D39258A0B9", "categoryId": category_id,
+                     "categoryName": "Components, Saddles", "sku": "SE-T924",
+                     "name": "HL Touring Seat/Saddle", "price": 52.64, "tags": []},)),
+    ]
+
+    batch_response = container.execute_item_batch(
+        batch_operations=batch_operations,
+        partition_key=category_id,
+    )
+
+    for index, result in enumerate(batch_response):
+        print(f"  Operation {index}: {result.get('statusCode')}")
+    ```
+
+    The batch upserts rather than creates, so rerunning the task doesn't fail on items that already exist.
+
+1. Run the script. Every operation reports a success status, and both items exist in the container.
+
+1. Now build a batch that mixes partition key values. Append the following code:
+
+    ```python
+    bad_operations = [
+        ("create", ({"id": "5996B5E0-6EC7-4CB7-A924-7B5A053AE980", "categoryId": category_id,
+                     "categoryName": "Components, Saddles", "sku": "SE-M236",
+                     "name": "LL Mountain Seat/Saddle", "price": 27.12, "tags": []},)),
+        ("create", ({"id": "47ED1C3B-C205-4507-94EE-3B69A744B261",
+                     "categoryId": "14A1AD5D-59EA-4B63-A189-67B077783B0E",
+                     "categoryName": "Accessories, Helmets", "sku": "HL-U509",
+                     "name": "Sport-100 Helmet, Black", "price": 34.99, "tags": []},)),
+    ]
+
+    try:
+        container.execute_item_batch(bad_operations, partition_key=category_id)
+        print("Bad batch:   unexpectedly succeeded")
+    except exceptions.CosmosBatchOperationError as e:
+        print(f"Bad batch:   operation {e.error_index} failed with status {e.status_code}")
+    ```
+
+1. Run the script. The batch fails, and `error_index` identifies which operation caused it. Confirm in the Azure portal's **Data Explorer** that neither item was written.
+
+---
+
+## Task 7: Load items in bulk
+
+Write a few thousand independent items and measure how long the load takes.
+
+This task writes to the `bulkload` container rather than `operations`, so the items you created in earlier tasks stay out of the timing measurement.
+
+1. Install the async transport dependency:
+
+    ```bash
+    pip install aiohttp
+    ```
+
+1. Create a second file named **bulk_load.py** with the following contents. Set the endpoint to the same value you used earlier:
+
+    ```python
+    import asyncio
+    import time
+    import uuid
+    from azure.cosmos import exceptions
+    from azure.cosmos.aio import CosmosClient
+    from azure.identity.aio import DefaultAzureCredential
+
+    endpoint = "<cosmos-endpoint>"
+
+    async def main():
+        items = [
+            {
+                "id": str(uuid.uuid4()),
+                "categoryId": f"bulk-category-{i % 20}",
+                "categoryName": f"Bulk Category {i % 20}",
+                "sku": f"BL-{i:05d}",
+                "name": f"Bulk Product {i}",
+                "price": 10.00 + i % 500,
+                "tags": [],
+            }
+            for i in range(2000)
+        ]
+
+        async with DefaultAzureCredential() as credential:
+            async with CosmosClient(endpoint, credential) as client:
+                container = client.get_database_client("cosmicworks").get_container_client("bulkload")
+
+                semaphore = asyncio.Semaphore(100)
+
+                async def create(item):
+                    async with semaphore:
+                        return await container.create_item(body=item)
+
+                start = time.perf_counter()
+
+                pending = items
+                first_pass_failures = 0
+
+                for attempt in range(3):
+                    results = await asyncio.gather(
+                        *(create(item) for item in pending), return_exceptions=True)
+
+                    for result in results:
+                        if isinstance(result, BaseException) and (
+                            not isinstance(result, exceptions.CosmosHttpResponseError)
+                            or result.status_code not in (429, 449)
+                        ):
+                            raise result
+
+                    pending = [item for item, result in zip(pending, results)
+                               if isinstance(result, Exception)]
+
+                    if attempt == 0:
+                        first_pass_failures = len(pending)
+
+                    if not pending:
+                        break
+
+                    await asyncio.sleep(2)
+
+                elapsed = time.perf_counter() - start
+
+                print(f"Bulk load:   {len(items) - len(pending)} of {len(items)} written in {elapsed:.1f} seconds")
+                print(f"Retried:     {first_pass_failures} on the first pass, {len(pending)} still outstanding")
+
+    asyncio.run(main())
+    ```
+
+    The semaphore caps how many requests are in flight, and `return_exceptions=True` collects each outcome. The handler retries only 429 and 449 responses. Cancellation, nonretryable errors, and ambiguous outcomes such as timeouts propagate. A timed-out create might already have committed, so resolve its outcome before replaying it. Because `gather` preserves order, zipping the results against `pending` identifies the items whose requests were rejected with retryable errors.
+
+    The 20 partition key values create logical partitions, not physical partitions. This small container can have only one physical partition. Distributing keys supports parallelism across physical partitions when the container scales out.
+
+1. Run the script and note the elapsed time:
+
+    ```bash
+    python bulk_load.py
+    ```
+
+    ```output
+    Bulk load:   2000 of 2000 written in 21.4 seconds
+    Retried:     22 on the first pass, 0 still outstanding
+    ```
+
+    This output is an example; elapsed time and retry counts vary. The SDK might handle all throttling without surfacing any first-pass failures. If retryable rejections remain, the next pass retries those items, but success isn't guaranteed. Check the final outstanding count. Restarting the whole load creates fresh `uuid4()` values and can write 2,000 more items instead of finishing the first 2,000.
+
+1. When you finish testing, deactivate the Python environment:
+
+    ```bash
+    deactivate
+    ```
+
+Bulk mode doesn't make each write cheaper. Every item costs the same RU charge it would cost on its own. What changes is how many requests are in flight at once, so the load finishes in a fraction of the time the same writes would take one after another. Elapsed time is bounded by the container's provisioned throughput, which is why ingest jobs raise RU/s during a load and lower it afterward.
+
+---
+
+## Clean up resources
+
+When you finish the course, delete the resource group only if you created it and every resource in it can be removed. If your lab provided `ResourceGroup1`, skip this command and delete only the exercise resources you no longer need:
+
+```azurecli
+az group delete --name $resourceGroup --yes --no-wait
+```
+
+If your lab environment provided the resource group, delete only the Azure Cosmos DB account instead:
+
+```azurecli
+az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --yes
+```
