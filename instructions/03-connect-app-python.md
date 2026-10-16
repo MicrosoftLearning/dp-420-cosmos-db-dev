@@ -171,6 +171,7 @@ To verify the connection, now point the SDK at that endpoint and read the accoun
 1. To verify the connection, read account properties. Add the `main` function and the call to it at the bottom of the file:
 
     ```python
+    # This reads account metadata from the service, not an item in a container.
     def main():
         account = client.get_database_account()
         # DatabaseAccount exposes PascalCase attributes
@@ -217,6 +218,7 @@ Because the app only ever *references* resources, the code you write here's the 
 1. In `main`, below the marker comment you added in Task 2, add the following code. Keep the four-space indentation so the code stays inside `main`:
 
     ```python
+        # These calls build references; read() below makes the service request.
         database = client.get_database_client("cosmicworks")
         container = database.get_container_client("product")
 
@@ -239,6 +241,8 @@ Add logging so you can see request methods, URIs, status codes, and request-unit
 1. Between the `# ==== END CLIENT ====` marker and the `def main():` line, configure the `azure.cosmos` logger to `DEBUG`. This code is at the top level of the file, not indented inside `main`:
 
     ```python
+    # Send SDK diagnostics to the console for this development exercise.
+    # DEBUG logging is deliberately more verbose than normal production logging.
     logging.basicConfig(
         stream=sys.stdout,
         level=logging.DEBUG,
@@ -261,11 +265,13 @@ Attempt to read an item that doesn't exist, then inspect the resulting exception
 
     ```python
         try:
+            # A nonexistent ID and partition key deliberately exercise error handling.
             container.read_item(
                 item="nonexistent-id",
                 partition_key="nonexistent-category"
             )
         except exceptions.CosmosResourceNotFoundError as ex:
+            # Report the failure; this block doesn't implement a retry loop.
             print(f"\nCaught CosmosResourceNotFoundError:")
             print(f"  Status code:    {ex.status_code}")
             print(f"  Is retryable:   {ex.status_code in (429, 503)}")
@@ -296,6 +302,7 @@ One detail differs, and it isn't the endpoint. The emulator accepts a key; the c
 
     ```python
     # ==== CLIENT ====
+    # Explicitly use az login and restore normal TLS certificate validation.
     client = CosmosClient(url=endpoint, credential=AzureCliCredential())
     # ==== END CLIENT ====
     ```
@@ -338,4 +345,3 @@ In this exercise you:
 - Added a logging handler to observe SDK HTTP traffic and request-unit charges.
 - Caught a `CosmosException` / `CosmosResourceNotFoundError` and distinguished a permanent 404 from transient retryable errors.
 - Pointed the same app at a cloud account by changing the endpoint and client construction and removing the emulator key. The data operations stayed unchanged, while provisioning remained separate from the data-plane application.
-

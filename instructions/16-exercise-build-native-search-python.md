@@ -184,6 +184,8 @@ The searchable text matters more than it sounds. The CosmicWorks `description` p
     DEPLOYMENT = "text-embedding-3-small"
     DATA_URL = "https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data/database-v4/product"
 
+    # Reuse a credential for both services. The token provider requests
+    # the Azure OpenAI audience, not the Cosmos DB audience.
     credential = DefaultAzureCredential()
 
     openai_client = AzureOpenAI(
@@ -202,10 +204,12 @@ The searchable text matters more than it sounds. The CosmicWorks `description` p
 
 
     def build_search_text(product):
+        # Both keyword search and embeddings use this same text representation.
         return f"{product['name']} {product['categoryName']}"
 
 
     def content_hash(text):
+        # Detect changes to the embedding input without comparing entire vectors.
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
@@ -214,12 +218,15 @@ The searchable text matters more than it sounds. The CosmicWorks `description` p
 
     print(f"Downloaded {len(products)} products.")
 
+    # Batch embedding requests, then write the enriched products individually.
+    # This isn't a Cosmos DB transactional batch.
     for start in range(0, len(products), 50):
         batch = products[start:start + 50]
         texts = [build_search_text(product) for product in batch]
 
         embeddings = openai_client.embeddings.create(input=texts, model=DEPLOYMENT)
 
+        # Keep each vector with its source text and original product identity.
         for product, text, data in zip(batch, texts, embeddings.data):
             product["searchText"] = text
             product["contentHash"] = content_hash(text)
@@ -354,9 +361,13 @@ In this task, you run a similarity query whose search terms appear nowhere in th
 
     search_text = "something to protect my head"
 
+    # Use the same embedding deployment as ingestion so query and stored vectors
+    # share a vector space and match the container's configured dimensions.
     response = openai_client.embeddings.create(input=search_text, model=DEPLOYMENT)
     query_vector = response.data[0].embedding
 
+    # Although the alias says similarityScore, the projected value is a distance.
+    # ORDER BY returns the nearest vectors first; it isn't a confidence percentage.
     query = """
         SELECT TOP 5 c.name, c.categoryName,
             VectorDistance(c.embedding, @queryVector) AS similarityScore
@@ -455,16 +466,19 @@ Renaming a product doesn't update its stored `searchText` or embedding. The full
     scanned = 0
     refreshed = 0
 
+    # This one-off scan starts at the beginning; it doesn't persist a checkpoint.
     for page in container.query_items_change_feed(start_time="Beginning").by_page():
         for change in page:
             scanned += 1
             text = build_search_text(change)
 
+            # Skip unchanged embedding inputs, including this refresher's own writes.
             if content_hash(text) == change.get("contentHash"):
                 continue
 
             response = openai_client.embeddings.create(input=text, model=DEPLOYMENT)
 
+            # Refresh text, hash, and vector together so the search fields agree.
             change["searchText"] = text
             change["contentHash"] = content_hash(text)
             change["embedding"] = response.data[0].embedding

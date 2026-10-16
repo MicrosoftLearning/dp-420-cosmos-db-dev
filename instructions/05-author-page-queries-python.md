@@ -145,6 +145,8 @@ The catalog holds 295 products. Each one looks like this:
 
     endpoint = "<cosmos-endpoint>"
 
+    # Reuse one credential-backed client; the container reference doesn't create
+    # resources or make a service request.
     client = CosmosClient(url=endpoint, credential=DefaultAzureCredential())
 
     container = client.get_database_client("cosmicworks").get_container_client("product")
@@ -175,6 +177,8 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
     ```python
     ROAD_FRAMES = "3E4CEACD-D007-46EB-82D7-31F6141752B2"
 
+    # Project only the card fields. scannerData is a new nested result object,
+    # and STARTSWITH's third argument enables case-insensitive matching.
     sql = """
         SELECT
             p.name,
@@ -186,6 +190,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
           AND STARTSWITH(p.name, @prefix, true)
     """
 
+    # Bind values separately from SQL instead of interpolating user input.
     parameters = [
         {"name": "@category", "value": ROAD_FRAMES},
         {"name": "@max", "value": 400},
@@ -202,8 +207,10 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
         charges = []
 
         def record_charge(headers, _results):
+            # Capture each page's RU charge, not just the final response's.
             charges.append(float(headers["x-ms-request-charge"]))
 
+        # Keep SQL and parameters identical; only request scoping changes.
         scope = (
             {"partition_key": partition_key}
             if partition_key
@@ -218,6 +225,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
             response_hook=record_charge,
             **scope,
         ).by_page():
+            # Consume each lazy page before summing the charges recorded by the hook.
             count += len(list(page))
 
         return count, sum(charges)
@@ -250,6 +258,8 @@ CosmicWorks tags are merchandising-assigned identifiers rather than descriptive 
 1. Append the following code. `EXISTS` filters items by the contents of the array, and the `ARRAY` expression projects the tag names alongside each match:
 
     ```python
+    # EXISTS decides which products match. ARRAY shapes the tags returned for
+    # each match, without producing a separate result row for every tag.
     subquery = """
         SELECT
             p.id,
@@ -316,6 +326,8 @@ Ask a different question of the same data. A `JOIN` returns one result per array
 1. Append the following code. It expands every tag in the category and counts both the rows returned and the distinct products behind them:
 
     ```python
+    # This JOIN expands one product into one row per tag; an empty tags array
+    # produces no rows. It isn't a relational join between two containers.
     cross_product = """
         SELECT p.name, t.name AS tag
         FROM product p
@@ -323,6 +335,7 @@ Ask a different question of the same data. A `JOIN` returns one result per array
         WHERE p.categoryId = @category
     """
 
+    # Count distinct product names separately from product/tag pairs.
     names_in_join = set()
     pairs = 0
     join_charges = []
@@ -353,6 +366,7 @@ Now watch the same effect against three products elsewhere in the catalog that c
     ```python
     untagged = ["Road Tire Tube", "Classic Vest, S", "ML Mountain Pedal"]
 
+    # SELECT VALUE returns scalar names, not objects with a name property.
     direct = "SELECT VALUE p.name FROM product p WHERE ARRAY_CONTAINS(@names, p.name)"
 
     joined = """
@@ -392,6 +406,8 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
     def get_page(continuation_token=None):
         charges = []
 
+        # The requested page size isn't a guarantee: a page can contain fewer
+        # than 10 items while a continuation token still indicates more results.
         results = container.query_items(
             query="SELECT p.id, p.name, p.price FROM product p WHERE p.categoryId = @category",
             parameters=[{"name": "@category", "value": ROAD_FRAMES}],
@@ -402,6 +418,8 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
             ),
         )
 
+        # Treat the token as opaque and reuse it with the same query, parameters,
+        # and partition scope. Fetch only one page in this stateless helper.
         pager = results.by_page(continuation_token)
         page = list(next(pager))
 
@@ -420,6 +438,7 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
 
         print(f"Page {page_number}: {count} items, {charge:.2f} RU, token: {'present' if token else 'none'}")
 
+        # Stop on token exhaustion, not on a short or empty page.
         if token is None:
             break
     ```

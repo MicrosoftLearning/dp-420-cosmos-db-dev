@@ -190,16 +190,19 @@ The .NET client disables automatic retries on rate limiting. This setting makes 
 
     string endpoint = "<cosmos-endpoint>";
 
+    // DefaultAzureCredential can use your developer sign-in, such as az login.
     CosmosClient client = new(
         accountEndpoint: endpoint,
         tokenCredential: new DefaultAzureCredential(),
         clientOptions: new CosmosClientOptions
         {
+            // Expose HTTP 429 responses for the lab instead of retrying them.
             MaxRetryAttemptsOnRateLimitedRequests = 0
         });
 
     Container container = client.GetContainer("cosmicworks", "product");
 
+    // Load every catalog page once so the load loop performs writes, not queries.
     List<dynamic> products = new();
     using (FeedIterator<dynamic> iterator = container.GetItemQueryIterator<dynamic>("SELECT * FROM c"))
     {
@@ -224,6 +227,7 @@ The .NET client disables automatic retries on rate limiting. This setting makes 
 
     while (DateTime.UtcNow < deadline)
     {
+        // Overlap writes to exceed 400 RU/s while preserving each item's identity.
         await Task.WhenAll(products.Select(async product =>
         {
             try
@@ -232,11 +236,14 @@ The .NET client disables automatic retries on rate limiting. This setting makes 
                     product,
                     new PartitionKey((string)product.categoryId));
 
+                // Concurrent tasks share these counters; update them atomically.
                 Interlocked.Increment(ref succeeded);
                 lock (chargeLock) { charge += response.RequestCharge; }
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
             {
+                // Only throttling is expected. Other failures still surface.
+                // Keep an activity ID to correlate the failure with diagnostic logs.
                 Interlocked.Increment(ref throttled);
                 lastActivityId = ex.ActivityId;
             }

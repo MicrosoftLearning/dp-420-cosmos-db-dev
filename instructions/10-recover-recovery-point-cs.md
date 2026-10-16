@@ -16,7 +16,7 @@ lab:
 
 In this exercise, you protect an Azure Cosmos DB for NoSQL account with continuous backup, destroy data the way an accidental operation would, and recover it to a point in time you choose. You work with the real CosmicWorks product catalog, so the verification steps compare against actual data rather than placeholder values.
 
-You load 295 products into an account provisioned at the `Continuous7Days` tier, capture a verified restore point, delete an item and then the container that held it, and restore the container into the same account. You finish by testing the boundary that same-account restore doesn't cross, and by removing everything you created.
+You load 295 products into an account provisioned at the `Continuous7Days` tier, capture a verified restore point, delete an item and then the container that held it, and restore the container into the same account. You finish by testing whether repeating that restore recovers another deleted item from the live container, and by removing everything you created.
 
 This exercise takes approximately **45** minutes to complete.
 
@@ -108,9 +108,9 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
 ## Task 1: Load the catalog and capture a restore point
 
-1. Create the console project and add the packages.
+1. In your Windows PowerShell terminal, create the console project and add the packages.
 
-    ```bash
+    ```powershell
     dotnet new console -o catalog-recovery
     cd catalog-recovery
     dotnet add package Microsoft.Azure.Cosmos
@@ -120,7 +120,11 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
     `Microsoft.Azure.Cosmos` requires an explicit `Newtonsoft.Json` reference. Without it, the build fails with a message naming the missing package rather than a problem in your code.
 
+    The `Microsoft.Azure.Cosmos` package provides the client for item operations and queries. The `Azure.Identity` package provides `AzureCliCredential`, which authenticates those requests with your Azure CLI sign-in.
+
 1. Replace the contents of `Program.cs` with the following code. Replace `<cosmos-endpoint>` with the account endpoint the setup script printed.
+
+    This helper uses the SDK to load, inspect, and delete catalog data. It doesn't configure backups or restore resources; you use Azure CLI commands for those management operations later in the exercise.
 
     ```csharp
     using System.Net;
@@ -131,10 +135,15 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
     string endpoint = "<cosmos-endpoint>";
 
     const string DataUrl = "https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data/database-v4/product";
+
+    // Together, the item ID and /categoryId partition key value identify the
+    // product used to verify recovery. An item ID alone isn't unique across partitions.
     const string ItemId = "063F1A00-8CA1-4DB9-8298-BEAC4B8CC238";
     const string CategoryId = "AE48F0AA-4F65-4734-A4CF-D48B8F82267F";
 
+    // Use the identity from az login, not an account key.
     using CosmosClient client = new(endpoint, new AzureCliCredential());
+    // GetContainer references an existing container; it doesn't create or restore it.
     Container container = client.GetContainer("cosmicworks", "product");
 
     string command = args.Length > 0 ? args[0] : "count";
@@ -143,10 +152,14 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
     {
         case "seed":
         {
+            // On Windows, HttpClient already uses native certificate validation.
             using HttpClient http = new();
             string json = await http.GetStringAsync(DataUrl);
+            // Map the downloaded JSON to the record types defined below.
             List<Product> products = JsonSerializer.Deserialize<List<Product>>(json)!;
 
+            // Upsert creates an item or replaces one with the same ID and partition key.
+            // Pass each product's categoryId value because the container uses /categoryId.
             foreach (Product product in products)
             {
                 await container.UpsertItemAsync(product, new PartitionKey(product.categoryId));
@@ -160,12 +173,16 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
         {
             try
             {
+                // A point read goes directly to the product's logical partition.
+                // Resource contains the product deserialized from the SDK response.
                 ItemResponse<Product> response =
                     await container.ReadItemAsync<Product>(ItemId, new PartitionKey(CategoryId));
                 Console.WriteLine($"Found {response.Resource.name} priced at {response.Resource.price}.");
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
+                // A not-found response is expected after the intentional item deletion.
+                // Other errors, such as authorization failures, still surface.
                 Console.WriteLine("The item was not found.");
             }
             break;
@@ -180,6 +197,8 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
         default:
         {
+            // With no partition key filter, the count covers all category partitions.
+            // SELECT VALUE returns an integer rather than a JSON object.
             FeedResponse<int> counted = await container
                 .GetItemQueryIterator<int>("SELECT VALUE COUNT(1) FROM c")
                 .ReadNextAsync();
@@ -188,6 +207,8 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
         }
     }
 
+    // Keep property names aligned with the catalog JSON for both deserialization
+    // and SDK writes. These records preserve the product fields, including nested tags.
     public record Tag(string id, string name);
 
     public record Product(
@@ -201,17 +222,30 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
         List<Tag> tags);
     ```
 
+    The first command-line argument selects the operation:
+
+    | Command | SDK behavior | Purpose in this exercise |
+    | :--- | :--- | :--- |
+    | `seed` | Downloads the catalog and upserts each product | Establishes the data to back up |
+    | `read` | Reads one product by its item ID and partition key | Checks the product's name and price before deletion and after restore |
+    | `delete` | Deletes only that product, not the container | Simulates the first accidental data loss |
+    | `count` (or no argument) | Counts items across the container | Checks that the catalog contains 295 products before deletion and after restore |
+
+    Run `seed` only when loading the initial catalog. Running it after a restore would recreate missing products and could hide an incomplete recovery. The count checks the catalog size, while the point read checks the selected product's values; neither check alone validates every restored product.
+
 1. Load the catalog.
 
-    ```bash
+    ```powershell
     dotnet run seed
     ```
 
     The command reports `Loaded 295 products.`
 
+    If the download fails with a certificate-chain error, it fails before any products are written. Ask your lab administrator to check the VM's trusted certificates and any HTTPS-inspecting proxy. Don't disable certificate verification to continue the exercise.
+
 1. Read the product you recover later, and confirm the count.
 
-    ```bash
+    ```powershell
     dotnet run read
     dotnet run count
     ```
@@ -237,7 +271,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
 1. Delete the product, then confirm it's gone.
 
-    ```bash
+    ```powershell
     dotnet run delete
     dotnet run read
     ```
@@ -255,34 +289,37 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
         --yes
     ```
 
-1. Find the account's instance identifier, which the enumeration commands need.
+1. Find the account's instance identifier and save it in `$instanceId`.
 
-    ```azurecli
-    az cosmosdb restorable-database-account list --account-name $accountName
+    ```powershell
+    $instanceId = az cosmosdb restorable-database-account list `
+        --account-name $accountName `
+        --query "[?deletionTime==null].name | [0]" `
+        --output tsv
     ```
 
-    Copy the `name` value from the response. It's a GUID, and it isn't the account name.
+1. Find the `cosmicworks` database's resource identifier and save it in `$ownerResourceId`.
 
-1. List the restorable databases to get the database's resource identifier.
-
-    ```azurecli
-    az cosmosdb sql restorable-database list `
-        --instance-id "<instance-id>" `
-        --location $location
+    ```powershell
+    $ownerResourceId = az cosmosdb sql restorable-database list `
+        --instance-id $instanceId `
+        --location $location `
+        --query "[?resource.ownerId=='cosmicworks'].resource.ownerResourceId | [0]" `
+        --output tsv
     ```
-
-    Find the entry for `cosmicworks` and copy its `ownerResourceId`.
 
 1. List the container events and locate the deletion you just performed.
 
     ```azurecli
     az cosmosdb sql restorable-container list `
-        --instance-id "<instance-id>" `
-        --database-rid "<owner-resource-id>" `
-        --location $location
+        --instance-id $instanceId `
+        --database-rid $ownerResourceId `
+        --location $location `
+        --query "[].{Container:resource.ownerId,Operation:resource.operationType,EventTimeUTC:resource.eventTimestamp}" `
+        --output table
     ```
 
-    The response includes an event with an `operationType` of `Delete` and an `eventTimestamp`. Choose a timestamp when the container existed in the account's current write region and its data was backed up, within the retention window and before deletion. The verified post-seed timestamp from Task 1 meets these conditions and predates both deletions.
+    Find the `product` row with **Operation** set to `Delete`. **EventTimeUTC** shows when the deletion occurred. Choose a restore timestamp before that deletion, when the container existed in the account's current write region and its data was backed up, within the retention window. The verified post-seed timestamp from Task 1 meets these conditions and predates both deletions.
 
 1. Restore the container into the same account, targeting the timestamp from Task 1.
 
@@ -296,13 +333,13 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
         --disable-ttl True
     ```
 
-    The container has no time-to-live policy, so `--disable-ttl True` changes nothing here. Include it as a habit: restoring a container that does have an expiry policy can delete the recovered items almost immediately.
+    > &#128221; The restore could take 5 minutes or more. The container reports a status of `Creating` while it runs. Wait for the restore to finish before running the verification commands in the next step.
 
-    The restore takes a few minutes. The container reports a status of `Creating` while it runs.
+    The container has no time-to-live policy, so `--disable-ttl True` changes nothing here. Include it as a habit: restoring a container that does have an expiry policy can delete the recovered items almost immediately.
 
 1. Verify that both the container and the deleted product came back.
 
-    ```bash
+    ```powershell
     dotnet run count
     dotnet run read
     ```
@@ -311,11 +348,33 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
     The account-scoped data-plane role assignment the setup script made continues to apply after this same-account restore. If either command fails with an authorization error, check the error details, your signed-in identity, and its data-plane role assignment. Also check the account's network access settings. Each command starts a new SDK client, so it doesn't reuse session or continuation tokens from the earlier run.
 
-## Task 3: Test the boundary that same-account restore doesn't cross
+## Task 3: Test the limits of same-account restore
 
-Same-account restore recovers deleted resources. Confirm what it refuses to do, so you know which restore target a real incident needs.
+Same-account restore recovers deleted containers, not individual deleted items in a live container. Test the effect of repeating the restore by comparing container history and checking the item, rather than relying on the command's success or failure.
 
-1. Attempt a same-account restore of the container that now exists.
+1. After the first restore has finished, list the container events again.
+
+    ```azurecli
+    az cosmosdb sql restorable-container list `
+        --instance-id $instanceId `
+        --database-rid $ownerResourceId `
+        --location $location `
+        --query "[].{Container:resource.ownerId,Operation:resource.operationType,EventTimeUTC:resource.eventTimestamp}" `
+        --output table
+    ```
+
+    Record the latest creation or recreation event's **EventTimeUTC** for `product`. You compare this history with the output after the second restore request.
+
+1. Delete only the recovered product item, and confirm it's gone. Don't delete the container or run `seed`.
+
+    ```powershell
+    dotnet run delete
+    dotnet run read
+    ```
+
+    The read reports `The item was not found.` The `product` container still exists.
+
+1. Repeat the original restore command, using the same restore timestamp from Task 1.
 
     ```azurecli
     az cosmosdb sql container restore `
@@ -327,7 +386,28 @@ Same-account restore recovers deleted resources. Confirm what it refuses to do, 
         --disable-ttl True
     ```
 
-    The service rejects the operation. Record the message you receive. Same-account restore recovers deleted resources only: it doesn't roll back a live container to an earlier state and it doesn't overwrite one.
+    Wait for the command to finish. It can return a successful response, but that alone doesn't show that the container or its data was restored again.
+
+1. List the container events again and compare them with the history you recorded.
+
+    ```azurecli
+    az cosmosdb sql restorable-container list `
+        --instance-id $instanceId `
+        --database-rid $ownerResourceId `
+        --location $location `
+        --query "[].{Container:resource.ownerId,Operation:resource.operationType,EventTimeUTC:resource.eventTimestamp}" `
+        --output table
+    ```
+
+    The recorded creation or recreation timestamp should be unchanged, with no additional creation or recreation event for `product`.
+
+1. Read the deleted product again.
+
+    ```powershell
+    dotnet run read
+    ```
+
+    The read should still report `The item was not found.` Together, the unchanged container creation history and the missing item show that the repeated request didn't recreate the container or recover the item you just deleted. A successful command response isn't proof of data recovery.
 
 1. Consider what the alternative costs. To recover a live container holding wrong data, you restore into a new account with `az cosmosdb restore`, then reconcile the recovered data back into production yourself. That path creates a second billable account, takes considerably longer, and charges a restore fee based on the volume of data restored. Don't run it in this exercise.
 
@@ -347,4 +427,4 @@ Deleting the resource group removes the account, the database, the container, an
 az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
 ```
 
-You enabled continuous backup, captured a verified restore point, recovered a deleted container and the item inside it, and confirmed the boundary that decides which restore target a real incident needs.
+You enabled continuous backup, captured a verified restore point, recovered a deleted container and the item inside it, and tested a repeated restore request by checking container history and item data.

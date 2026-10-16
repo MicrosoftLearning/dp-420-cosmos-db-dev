@@ -186,8 +186,10 @@ Short-term memory is the log every agent needs. In this task, you write six turn
         public const string ThreadId = "thread-1042";
         public const string BudgetFactId = "explicit-headlight-budget";
 
+        // Use the az login identity for both services, without storing service keys.
         private static readonly AzureCliCredential Credential = new();
         private static readonly CosmosClient Cosmos = new(CosmosEndpoint, Credential);
+        // The v1 client uses a renewable Entra bearer-token policy.
         private static readonly OpenAIClient Models = new(
             new BearerTokenPolicy(Credential, "https://ai.azure.com/.default"),
             new OpenAIClientOptions
@@ -195,6 +197,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
                 Endpoint = new Uri(OpenAiEndpoint.TrimEnd('/') + "/openai/v1/")
             });
 
+        // Conversation is partitioned by threadId; durable memory by userId.
         public static Container Conversation { get; } = Cosmos.GetContainer("agentmemory", "conversation");
         public static Container Memory { get; } = Cosmos.GetContainer("agentmemory", "memory");
         public static ChatClient Chat { get; } = Models.GetChatClient("gpt-5.4-mini");
@@ -202,6 +205,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
 
         public static async Task<float[]> EmbedAsync(string text)
         {
+            // Reuse this deployment for stored facts and later recall queries.
             OpenAIEmbedding result = await Embeddings.GenerateEmbeddingAsync(text);
             return result.ToFloats().ToArray();
         }
@@ -209,6 +213,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
         public static async Task<(List<T> Items, double RequestCharge)> QueryAsync<T>(
             Container container, QueryDefinition query, string partitionKey)
         {
+            // Route to one logical partition; callers supply a thread or user ID.
             using FeedIterator<T> iterator = container.GetItemQueryIterator<T>(
                 query, requestOptions: new QueryRequestOptions
                 {
@@ -216,6 +221,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
                 });
             List<T> items = [];
             double charge = 0;
+            // Include every page in both the results and the query's total RU charge.
             while (iterator.HasMoreResults)
             {
                 FeedResponse<T> page = await iterator.ReadNextAsync();
@@ -236,6 +242,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     ```csharp
     using Microsoft.Azure.Cosmos;
 
+    // Item TTL is in seconds from the last modification, not the timestamp property.
     const int turnTtlSeconds = 60 * 60 * 24 * 30;
     (string Question, string Reply)[] turns =
     [
@@ -253,6 +260,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
          "Happy to help when you're ready to compare them.")
     ];
 
+    // Stable IDs make reruns replace the same turns in the thread's partition.
     for (int index = 0; index < turns.Length; index++)
     {
         var turn = new
@@ -290,6 +298,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     using Microsoft.Azure.Cosmos;
     using Newtonsoft.Json.Linq;
 
+    // TOP with descending turnIndex selects the newest turns within one thread.
     QueryDefinition query = new QueryDefinition("""
         SELECT TOP @k c.turnIndex, c.messages
         FROM c
@@ -301,6 +310,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
 
     var (turns, charge) = await Shared.QueryAsync<JObject>(
         Shared.Conversation, query, Shared.ThreadId);
+    // Reverse only the selected window so it displays in conversation order.
     turns.Reverse();
     foreach (JObject turn in turns)
     {
@@ -353,6 +363,8 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
         public static async Task<string> StoreFactAsync(
             string text, string category, double confidence, string? itemId = null)
         {
+            // One document per fact permits independent retrieval and retirement.
+            // A supplied ID updates that fact; otherwise a new ID is generated.
             itemId ??= Guid.NewGuid().ToString();
             JObject fact = new()
             {
@@ -373,6 +385,7 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
 
         public static async Task ExtractAsync()
         {
+            // Distill turns in chronological order from this thread's partition.
             QueryDefinition query = new QueryDefinition("""
                 SELECT c.turnIndex, c.messages FROM c
                 WHERE c.threadId = @threadId ORDER BY c.turnIndex
@@ -382,6 +395,8 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
             string transcript = string.Join("\n", turns.SelectMany(turn =>
                 turn["messages"]!.Select(message => $"{message["role"]}: {message["content"]}")));
 
+            // JSON mode requests valid JSON, not a validated schema or verified facts.
+            // Confidence is the model's estimate, not a calibrated probability.
             ChatCompletion completion = await Shared.Chat.CompleteChatAsync(
                 [new SystemChatMessage(ExtractionPrompt), new UserChatMessage(transcript)],
                 new ChatCompletionOptions
@@ -420,6 +435,7 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
 1. Replace **Program.cs** with the following code to store one fact with controlled wording and a stable identifier. Run `dotnet run` again.
 
     ```csharp
+    // Keep this controlled fact stable so recall isn't dependent on extraction wording.
     await Distillation.StoreFactAsync(
         "The shopper rides a touring bike and won't spend more than 40 dollars on a headlight.",
         "requirement",
@@ -445,6 +461,7 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
     using Newtonsoft.Json.Linq;
 
     const string question = "how much is this person willing to pay for lights";
+    // Restrict the lexical check to the controlled fact, not variable model output.
     QueryDefinition keywordQuery = new QueryDefinition("""
         SELECT c.content FROM c
         WHERE c.userId = @userId AND c.id = @budgetId
@@ -456,6 +473,8 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
         Shared.Memory, keywordQuery, Shared.UserId);
     Console.WriteLine($"Keyword matches: {keywordHits.Count}");
 
+    // Search only this user's active facts. Superseded records remain stored
+    // but are excluded from recall; distance isn't the fact's confidence value.
     QueryDefinition vectorQuery = new QueryDefinition("""
         SELECT TOP 3 c.content, c.category, c.confidence,
                VectorDistance(c.embedding, @queryVector) AS score
@@ -509,6 +528,7 @@ Memory has to fit a budget. In this task, you answer the same question with and 
         string block = "";
         if (withMemory)
         {
+            // Retrieve a bounded set of active facts, not the full conversation.
             QueryDefinition query = new QueryDefinition("""
                 SELECT TOP 4 c.content
                 FROM c
@@ -518,6 +538,7 @@ Memory has to fit a budget. In this task, you answer the same question with and 
                 .WithParameter("@userId", Shared.UserId)
                 .WithParameter("@queryVector", await Shared.EmbedAsync(question));
             var (hits, _) = await Shared.QueryAsync<JObject>(Shared.Memory, query, Shared.UserId);
+            // Facts are background data, separate from the system's behavioral rules.
             block = "KNOWN ABOUT THE USER\n" +
                 string.Join("\n", hits.Select(hit => $"- {hit["content"]}")) + "\n\n";
         }
@@ -530,6 +551,7 @@ Memory has to fit a budget. In this task, you answer the same question with and 
                 MaxOutputTokenCount = 250
             });
         string label = withMemory ? "with memory" : "no memory";
+        // Prompt tokens exclude the embedding call, database query, and output tokens.
         Console.WriteLine($"--- {label} ({completion.Usage.InputTokenCount} prompt tokens) ---");
         Console.WriteLine(completion.Content[0].Text);
         Console.WriteLine();
@@ -563,6 +585,7 @@ People change their minds, and eventually they ask to be forgotten. In this task
         Console.WriteLine($"{fact["id"]}: {fact["content"]}");
     }
 
+    // Human review catches paraphrases of the old budget; exact matching wouldn't.
     Console.Write("Enter comma-separated IDs of any other facts containing the old headlight budget, or press Enter: ");
     string selection = Console.ReadLine() ?? "";
     HashSet<string> activeIds = active.Select(fact => fact["id"]!.Value<string>()!).ToHashSet();
@@ -577,9 +600,12 @@ People change their minds, and eventually they ask to be forgotten. In this task
         throw new InvalidOperationException("Every selected ID must identify an active fact. Check the list before retrying.");
     }
 
+    // A stable replacement ID avoids duplicate revised-budget records on reruns.
     string newId = await Distillation.StoreFactAsync(
         "The shopper raised their headlight budget to 60 dollars after comparing options.",
         "requirement", 0.95, "revised-headlight-budget");
+    // Retire old facts without deleting history. These are separate writes,
+    // not an atomic reconciliation; recall excludes records with supersededBy set.
     foreach (string obsoleteId in obsoleteIds)
     {
         ItemResponse<JObject> response = await Shared.Memory.ReadItemAsync<JObject>(
@@ -595,6 +621,7 @@ People change their minds, and eventually they ask to be forgotten. In this task
     QueryDefinition totalQuery = new QueryDefinition("SELECT c.id FROM c WHERE c.userId = @userId")
         .WithParameter("@userId", Shared.UserId);
     var (total, _) = await Shared.QueryAsync<JObject>(Shared.Memory, totalQuery, Shared.UserId);
+    // Verify retirement by querying again, not just by trusting successful writes.
     if (remainingActive.Any(fact => obsoleteIds.Contains(fact["id"]!.Value<string>()!)))
     {
         throw new InvalidOperationException("A selected obsolete fact is still active.");
@@ -616,6 +643,8 @@ People change their minds, and eventually they ask to be forgotten. In this task
     ```csharp
     using Microsoft.Azure.Cosmos;
 
+    // The containers use different partition keys. This lab has one known thread;
+    // erasing a real user's history must cover every thread belonging to that user.
     using ResponseMessage memoryDelete = await Shared.Memory.DeleteAllItemsByPartitionKeyStreamAsync(
         new PartitionKey(Shared.UserId));
     memoryDelete.EnsureSuccessStatusCode();
@@ -623,6 +652,8 @@ People change their minds, and eventually they ask to be forgotten. In this task
         new PartitionKey(Shared.ThreadId));
     conversationDelete.EnsureSuccessStatusCode();
 
+    // Deletion runs in the background. A successful response accepts the operation;
+    // query afterward to check whether the data has actually disappeared.
     QueryDefinition query = new QueryDefinition("SELECT VALUE COUNT(1) FROM c WHERE c.userId = @userId")
         .WithParameter("@userId", Shared.UserId);
     var (remaining, _) = await Shared.QueryAsync<int>(Shared.Memory, query, Shared.UserId);

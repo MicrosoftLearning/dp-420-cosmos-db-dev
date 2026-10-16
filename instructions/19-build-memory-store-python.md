@@ -188,13 +188,16 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     THREAD_ID = "thread-1042"
     BUDGET_FACT_ID = "explicit-headlight-budget"
 
+    # Use the az login identity for both services, without storing service keys.
     credential = AzureCliCredential()
 
     cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
     database = cosmos_client.get_database_client("agentmemory")
+    # Conversation is partitioned by threadId; durable memory is partitioned by userId.
     conversation = database.get_container_client("conversation")
     memory = database.get_container_client("memory")
 
+    # api_key receives a renewable Entra token provider for the v1 endpoint.
     openai_client = OpenAI(
         base_url=OPENAI_ENDPOINT.rstrip("/") + "/openai/v1/",
         api_key=get_bearer_token_provider(
@@ -202,6 +205,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     )
 
     def embed(text):
+        # Reuse this deployment for stored facts and later recall queries.
         response = openai_client.embeddings.create(input=text, model=EMBEDDING_DEPLOYMENT)
         return response.data[0].embedding
     ```
@@ -212,6 +216,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     from datetime import datetime, timezone
     from shared import conversation, USER_ID, THREAD_ID
 
+    # Item TTL is in seconds from the last modification, not from this timestamp field.
     TURN_TTL_SECONDS = 60 * 60 * 24 * 30
 
     TURNS = [
@@ -229,6 +234,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
          "Happy to help when you're ready to compare them."),
     ]
 
+    # Stable IDs make reruns replace the same turns; threadId supplies the partition key.
     for index, (question, reply) in enumerate(TURNS):
         conversation.upsert_item({
             "id": f"{THREAD_ID}-{index}",
@@ -268,6 +274,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     ORDER BY c.turnIndex DESC
     """
 
+    # TOP with descending turnIndex selects the newest turns within one thread.
     results = conversation.query_items(
         query=RECENT_TURNS,
         parameters=[
@@ -277,6 +284,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
         partition_key=THREAD_ID,
     )
 
+    # Reverse only the selected window so it displays in conversation order.
     for turn in reversed(list(results)):
         print(f"[{turn['turnIndex']}] {turn['messages'][0]['content']}")
 
@@ -322,6 +330,8 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
     Return an empty list when the conversation contains no durable fact."""
 
     def store_fact(text, category, confidence, item_id=None):
+        # Use one document per fact for independent retrieval and retirement.
+        # Supplying an ID makes upsert replace that fact; otherwise it creates a new ID.
         item_id = item_id or str(uuid.uuid4())
         memory.upsert_item({
             "id": item_id,
@@ -338,6 +348,7 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
         return item_id
 
     def main():
+        # Distill turns in chronological order from this thread's partition.
         turns = list(conversation.query_items(
             query="SELECT c.turnIndex, c.messages FROM c WHERE c.threadId = @threadId ORDER BY c.turnIndex",
             parameters=[{"name": "@threadId", "value": THREAD_ID}],
@@ -349,6 +360,8 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
             for turn in turns for message in turn["messages"]
         )
 
+        # JSON mode requests valid JSON, not a validated schema or verified facts.
+        # The returned confidence is the model's estimate, not a calibrated probability.
         response = openai_client.chat.completions.create(
             model=CHAT_DEPLOYMENT,
             messages=[
@@ -367,6 +380,7 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
 
         print(f"Facts stored: {len(facts)}")
 
+    # Importing store_fact from another script must not trigger extraction again.
     if __name__ == "__main__":
         main()
     ```
@@ -385,6 +399,7 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
     from distill import store_fact
     from shared import BUDGET_FACT_ID
 
+    # Keep this controlled fact stable so recall isn't dependent on extraction wording.
     store_fact(
         "The shopper rides a touring bike and won't spend more than 40 dollars on a headlight.",
         "requirement",
@@ -417,6 +432,7 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
 
     QUESTION = "how much is this person willing to pay for lights"
 
+    # Restrict the lexical check to the controlled fact, not variable model output.
     keyword_hits = list(memory.query_items(
         query="""
             SELECT c.content FROM c
@@ -431,6 +447,8 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
     ))
     print(f"Keyword matches: {len(keyword_hits)}")
 
+    # Search only this user's active facts. Superseded records remain stored
+    # but are excluded from recall; distance isn't the fact's confidence value.
     vector_hits = list(memory.query_items(
         query="""
             SELECT TOP 3 c.content, c.category, c.confidence,
@@ -483,6 +501,7 @@ Memory has to fit a budget. In this task, you answer the same question with and 
     def ask(with_memory):
         block = ""
         if with_memory:
+            # Retrieve a bounded set of active facts, not the full conversation.
             hits = list(memory.query_items(
                 query="""
                     SELECT TOP 4 c.content
@@ -496,6 +515,7 @@ Memory has to fit a budget. In this task, you answer the same question with and 
                 ],
                 partition_key=USER_ID,
             ))
+            # Facts are background data, separate from the system's behavioral rules.
             block = "KNOWN ABOUT THE USER\n" + "\n".join(f"- {h['content']}" for h in hits) + "\n\n"
 
         response = openai_client.chat.completions.create(
@@ -508,6 +528,7 @@ Memory has to fit a budget. In this task, you answer the same question with and 
             max_completion_tokens=250,
         )
         label = "with memory" if with_memory else "no memory"
+        # Prompt tokens exclude the embedding call, database query, and output tokens.
         print(f"--- {label} ({response.usage.prompt_tokens} prompt tokens) ---")
         print(response.choices[0].message.content)
         print()
@@ -547,6 +568,7 @@ People change their minds, and eventually they ask to be forgotten. In this task
     for fact in active:
         print(f"{fact['id']}: {fact['content']}")
 
+    # Human review catches paraphrases of the old budget; exact text matching wouldn't.
     additional_ids = input(
         "Enter comma-separated IDs of any other facts containing the old headlight budget, or press Enter: "
     )
@@ -557,6 +579,7 @@ People change their minds, and eventually they ask to be forgotten. In this task
     if not obsolete_ids or not obsolete_ids <= active_ids:
         raise ValueError("Every selected ID must identify an active fact. Check the list before retrying.")
 
+    # A stable replacement ID avoids duplicate revised-budget records on reruns.
     new_id = store_fact(
         "The shopper raised their headlight budget to 60 dollars after comparing options.",
         "requirement",
@@ -564,6 +587,8 @@ People change their minds, and eventually they ask to be forgotten. In this task
         item_id="revised-headlight-budget",
     )
 
+    # Retire old facts without deleting the history. These are separate writes,
+    # not an atomic reconciliation; recall excludes records with supersededBy set.
     for obsolete_id in obsolete_ids:
         item = memory.read_item(item=obsolete_id, partition_key=USER_ID)
         item["supersededBy"] = new_id
@@ -580,6 +605,7 @@ People change their minds, and eventually they ask to be forgotten. In this task
         parameters=[{"name": "@userId", "value": USER_ID}],
         partition_key=USER_ID,
     ))
+    # Verify retirement by querying again rather than trusting successful writes alone.
     if obsolete_ids & {fact["id"] for fact in active}:
         raise RuntimeError("A selected obsolete fact is still active.")
     print(f"Active facts after:  {len(active)}")
@@ -603,9 +629,12 @@ People change their minds, and eventually they ask to be forgotten. In this task
     ```python
     from shared import conversation, memory, USER_ID, THREAD_ID
 
+    # The containers use different partition keys. This lab has one known thread;
+    # erasing a real user's history must cover every thread belonging to that user.
     memory.delete_all_items_by_partition_key(USER_ID)
     conversation.delete_all_items_by_partition_key(THREAD_ID)
 
+    # Partition deletion runs in the background; submission isn't proof of completion.
     remaining = list(memory.query_items(
         query="SELECT VALUE COUNT(1) FROM c WHERE c.userId = @userId",
         parameters=[{"name": "@userId", "value": USER_ID}],

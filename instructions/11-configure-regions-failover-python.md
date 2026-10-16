@@ -188,6 +188,8 @@ Both regions are healthy, so this change is the planned operation: the service r
     ITEM_ID = "063F1A00-8CA1-4DB9-8298-BEAC4B8CC238"
     CATEGORY_ID = "AE48F0AA-4F65-4734-A4CF-D48B8F82267F"
 
+    # Authenticate with az login. Preferred locations guide SDK routing; they
+    # don't change the account's regions or enable multi-region writes.
     client = CosmosClient(
         ENDPOINT,
         credential=AzureCliCredential(),
@@ -196,13 +198,17 @@ Both regions are healthy, so this change is the planned operation: the service r
     )
     container = client.get_database_client("cosmicworks").get_container_client("product")
 
+    # A point read needs both the item ID and its /categoryId partition key value.
     item = container.read_item(item=ITEM_ID, partition_key=CATEGORY_ID)
     print(f"Read {item['name']}.")
 
     item["name"] = "Road-350-W Yellow, 48 (regional check)"
+    # Upsert replaces this existing item. The SDK discovers the writable region
+    # from the account topology, rather than from a region-specific endpoint.
     container.upsert_item(item)
     print("Write succeeded.")
 
+    # Reading again verifies the update, not which region served the request.
     verified = container.read_item(item=ITEM_ID, partition_key=CATEGORY_ID)
     print(f"Read back {verified['name']}.")
     ```

@@ -129,6 +129,8 @@ A value of `-1` expires only the items that set their own `ttl`.
 
     string endpoint = "<cosmos-endpoint>";
 
+    // Reuse one credential-backed client. Getting a container reference
+    // doesn't create it or confirm that it exists.
     CosmosClient client = new(endpoint, new DefaultAzureCredential());
     Container container = client.GetContainer("cosmicworks", "operations");
 
@@ -142,6 +144,7 @@ A value of `-1` expires only the items that set their own `ttl`.
 1. Add a second file named **Models.cs** with the item types:
 
     ```csharp
+    // Property names and nested tag objects match the JSON document shape.
     public record Tag(string id, string name);
 
     public record Product(
@@ -192,6 +195,7 @@ Create one item, then read it back two ways and compare the request charge.
             new Tag("6C2F05C8-1E61-4912-BE1A-C67A378429BB", "Tag-5")
         });
 
+    // Create rejects an existing ID in this partition instead of overwriting it.
     try
     {
         await container.CreateItemAsync(saddle, partitionKey);
@@ -206,6 +210,7 @@ Create one item, then read it back two ways and compare the request charge.
 1. Add the point read and print its charge:
 
     ```csharp
+    // Knowing both the item ID and partition key avoids executing a SQL query.
     ItemResponse<Product> readResponse = await container.ReadItemAsync<Product>(id, partitionKey);
     Console.WriteLine($"Point read:  {readResponse.RequestCharge:0.00} RU");
     ```
@@ -213,6 +218,7 @@ Create one item, then read it back two ways and compare the request charge.
 1. Add an equivalent query that filters on the same two values:
 
     ```csharp
+    // Bind values separately from SQL and explicitly route to one partition.
     QueryDefinition query = new QueryDefinition(
             "SELECT * FROM c WHERE c.id = @id AND c.categoryId = @categoryId")
         .WithParameter("@id", id)
@@ -223,6 +229,7 @@ Create one item, then read it back two ways and compare the request charge.
         query,
         requestOptions: new QueryRequestOptions { PartitionKey = partitionKey });
 
+    // Sum every page's charge to measure the complete query, not just one response.
     while (iterator.HasMoreResults)
     {
         FeedResponse<Product> page = await iterator.ReadNextAsync();
@@ -261,6 +268,7 @@ Replace, upsert, and delete the item, then recreate it for the tasks that follow
 
     Product saddle = await container.ReadItemAsync<Product>(id, partitionKey);
 
+    // A record's with expression copies the other fields for the full replacement.
     Product updated = saddle with { price = 32.55d };
 
     ItemResponse<Product> replaced = await container.ReplaceItemAsync(updated, id, partitionKey);
@@ -272,6 +280,7 @@ Replace, upsert, and delete the item, then recreate it for the tasks that follow
 1. Add an upsert that suppresses the response payload:
 
     ```csharp
+    // Suppress the document response body, not the write itself or its RU charge.
     ItemRequestOptions noContent = new() { EnableContentResponseOnWrite = false };
 
     ItemResponse<Product> upserted = await container.UpsertItemAsync(
@@ -312,6 +321,7 @@ Change one property without rewriting the whole document, and make that change c
     string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
     PartitionKey partitionKey = new(categoryId);
 
+    // Both patch operations apply to one item only when the predicate holds.
     PatchItemRequestOptions patchOptions = new()
     {
         FilterPredicate = "FROM c WHERE c.price < 100"
@@ -342,6 +352,7 @@ Change one property without rewriting the whole document, and make that change c
 1. Now force the condition to fail. Append the following code to the end of **Program.cs**. It uses a predicate the item no longer satisfies:
 
     ```csharp
+    // A false predicate rejects the patch without incrementing the price.
     try
     {
         await container.PatchItemAsync<Product>(
@@ -365,6 +376,7 @@ Change one property without rewriting the whole document, and make that change c
 
     ```csharp
     ItemResponse<Product> current = await container.ReadItemAsync<Product>(id, partitionKey);
+    // IfMatchEtag accepts the replacement only if this item version is still current.
     ItemRequestOptions etagOptions = new() { IfMatchEtag = current.ETag };
 
     await container.ReplaceItemAsync(
@@ -376,6 +388,7 @@ Change one property without rewriting the whole document, and make that change c
 1. Reuse the same, now stale, ETag on a second replace:
 
     ```csharp
+    // The successful replace changed the ETag; reusing the saved one must fail.
     try
     {
         await container.ReplaceItemAsync(
@@ -405,6 +418,8 @@ Write a transient item, give it a short lifetime, and watch it disappear.
     string categoryId = "26C74104-40BC-4541-8EF5-9892F7F03D72";
     PartitionKey partitionKey = new(categoryId);
 
+    // Item TTL is in seconds from the last write. Container TTL must be enabled.
+    // Upserting this item again restarts its expiration window.
     var session = new
     {
         id = "session-9f21",
@@ -435,6 +450,7 @@ Write a transient item, give it a short lifetime, and watch it disappear.
         }
     }
 
+    // Check before and after expiry, with a margin beyond the 30-second lifetime.
     await Task.Delay(TimeSpan.FromSeconds(10));
     await ReadSession("After 10s:");
 
@@ -474,6 +490,8 @@ To see how the failure reports itself, write two related items atomically, then 
         "3FE1A99E-DE14-4D11-B635-F5D39258A0B9", categoryId,
         "Components, Saddles", "SE-T924", "HL Touring Seat/Saddle", 52.64d, Array.Empty<Tag>());
 
+    // Every item body must match this one partition key. The writes commit
+    // together or roll back together, unlike independent bulk writes.
     TransactionalBatch batch = container.CreateTransactionalBatch(partitionKey)
         .UpsertItem(mountainSaddle)
         .UpsertItem(touringSaddle);
@@ -494,6 +512,7 @@ To see how the failure reports itself, write two related items atomically, then 
         "5996B5E0-6EC7-4CB7-A924-7B5A053AE980", categoryId,
         "Components, Saddles", "SE-M236", "LL Mountain Seat/Saddle", 27.12d, Array.Empty<Tag>());
 
+    // This different /categoryId deliberately invalidates the entire transaction.
     Product helmet = new(
         "47ED1C3B-C205-4507-94EE-3B69A744B261", "14A1AD5D-59EA-4B63-A189-67B077783B0E",
         "Accessories, Helmets", "HL-U509", "Sport-100 Helmet, Black", 34.99d, Array.Empty<Tag>());
@@ -523,6 +542,8 @@ This task writes to the `bulkload` container rather than `operations`, so the it
 1. In **Program.cs**, replace everything below the marker comment with the following code. It uses a second client with bulk execution enabled, because that setting can't be changed after a client is created:
 
     ```csharp
+    // Bulk execution groups independent concurrent writes for throughput;
+    // it doesn't give them transactional all-or-nothing semantics.
     CosmosClientOptions bulkOptions = new() { AllowBulkExecution = true };
     using CosmosClient bulkClient = new(endpoint, new DefaultAzureCredential(), bulkOptions);
 
@@ -531,6 +552,7 @@ This task writes to the `bulkload` container rather than `operations`, so the it
     List<Product> items = Enumerable.Range(0, 2000)
         .Select(i => new Product(
             id: Guid.NewGuid().ToString(),
+            // These values create logical partitions, not 20 physical partitions.
             categoryId: $"bulk-category-{i % 20}",
             categoryName: $"Bulk Category {i % 20}",
             sku: $"BL-{i:D5}",
@@ -558,11 +580,14 @@ This task writes to the `bulkload` container rather than `operations`, so the it
                     exception.StatusCode == HttpStatusCode.TooManyRequests ||
                     exception.StatusCode == (HttpStatusCode)449)
                 {
+                    // Return only known rejections for retry. Other exceptions surface;
+                    // a timed-out create might already have committed.
                     return item;
                 }
             })
             .ToList();
 
+        // Await every write, then retry only items returned as rejected.
         Product?[] outcomes = await Task.WhenAll(tasks);
         pending = outcomes.OfType<Product>().ToList();
 

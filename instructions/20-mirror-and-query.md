@@ -413,6 +413,8 @@ The same Delta files that back the SQL analytics endpoint are readable by Spark,
 1. In the first cell, read the table into a dataframe and display it.
 
     ```python
+    # Spark reads the mirrored Delta table through the lakehouse shortcut,
+    # not the source Cosmos DB container. LIMIT bounds the preview.
     df = spark.sql("SELECT * FROM cosmicworks_product LIMIT 1000")
     display(df)
     ```
@@ -420,6 +422,7 @@ The same Delta files that back the SQL analytics endpoint are readable by Spark,
 1. Run the same aggregate you ran in T-SQL, to confirm both engines read the same data.
 
     ```python
+    # Repeat the SQL endpoint's grouping against the same mirrored data.
     summary = spark.sql("""
         SELECT categoryName, COUNT(*) AS productCount
         FROM cosmicworks_product
@@ -434,6 +437,8 @@ The same Delta files that back the SQL analytics endpoint are readable by Spark,
 1. Confirm that nested data is a string column here too.
 
     ```python
+    # Display the full tags string to inspect its JSON representation.
+    # show() doesn't parse or expand the nested values.
     spark.sql("SELECT name, tags FROM cosmicworks_product LIMIT 5").show(truncate=False)
     ```
 

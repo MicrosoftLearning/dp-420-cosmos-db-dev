@@ -121,6 +121,7 @@ using Microsoft.Azure.Cosmos;
 
 string endpoint = "<cosmos-endpoint>";
 
+// Use a developer credential, such as az login, instead of an account key.
 CosmosClient client = new(endpoint, new DefaultAzureCredential());
 Database database = client.GetDatabase("cosmicworks");
 
@@ -128,6 +129,7 @@ foreach (string name in new[] { "productMeta", "product" })
 {
     Container container = database.GetContainer(name);
 
+    // SELECT VALUE returns a scalar count, so deserialize the result as int.
     FeedResponse<int> response = await container
         .GetItemQueryIterator<int>("SELECT VALUE COUNT(1) FROM c")
         .ReadNextAsync();
@@ -171,10 +173,13 @@ public static class Sync
         CosmosClient client = new(endpoint, new DefaultAzureCredential());
         Database database = client.GetDatabase("cosmicworks");
 
+        // Watch metadata, then update the denormalized categoryName elsewhere.
         productContainer = database.GetContainer("product");
         Container monitoredContainer = database.GetContainer("productMeta");
         Container leaseContainer = database.GetContainer("leases");
 
+        // Leases persist progress and coordinate workers. The processor name
+        // identifies the consumer, while the instance name identifies this worker.
         ChangeFeedProcessor processor = monitoredContainer
             .GetChangeFeedProcessorBuilder<MetaItem>(
                 processorName: "categoryNameSync",
@@ -196,11 +201,13 @@ public static class Sync
     {
         foreach (MetaItem item in changes)
         {
+            // productMeta mixes category and tag documents; only categories drive this sync.
             if (item.type != "category")
             {
                 continue;
             }
 
+            // The category document's id matches categoryId on the related products.
             QueryDefinition query = new QueryDefinition(
                     "SELECT p.id, p.categoryId FROM product p WHERE p.categoryId = @categoryId")
                 .WithParameter("@categoryId", item.id);
@@ -213,6 +220,8 @@ public static class Sync
             {
                 foreach (ProductRef product in await iterator.ReadNextAsync())
                 {
+                    // Delivery can repeat. Setting an absolute value is replay-safe;
+                    // the product writes aren't one cross-container transaction.
                     await productContainer.PatchItemAsync<dynamic>(
                         product.id,
                         new PartitionKey(product.categoryId),
@@ -269,8 +278,10 @@ const string categoryId = "3E4CEACD-D007-46EB-82D7-31F6141752B2";
 CosmosClient client = new(endpoint, new DefaultAzureCredential());
 Container container = client.GetContainer("cosmicworks", "productMeta");
 
+// Change the value on each run so the consumer has a new update to observe.
 string newName = $"Components, Road Frames (revised {DateTime.UtcNow:HHmmss})";
 
+// This metadata container uses /type: the partition key is "category", not the GUID.
 await container.PatchItemAsync<dynamic>(
     categoryId,
     new PartitionKey("category"),
@@ -315,6 +326,7 @@ public class ProductAudit
 
     public ProductAudit(ILogger<ProductAudit> logger) => _logger = logger;
 
+    // The binding resolves %...% from host settings and uses leases for feed progress.
     [Function("ProductAudit")]
     public void Run([CosmosDBTrigger(
         databaseName: "%COSMOS_DATABASE_NAME%",
@@ -328,6 +340,8 @@ public class ProductAudit
             return;
         }
 
+        // One invocation can contain several changed documents. This handler
+        // logs them; it doesn't copy data or update the source items.
         foreach (Product product in changes)
         {
             _logger.LogInformation(

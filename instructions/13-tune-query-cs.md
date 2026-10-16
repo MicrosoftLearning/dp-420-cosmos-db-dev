@@ -128,9 +128,11 @@ Three operations stand in for the shapes an application runs: a point read by ID
     string categoryId = "75BF1ACB-168D-469C-9AA3-1FD26BB4EA4C";
     string productId = "BD340F0A-F661-4ED8-B36F-FBA7623605D9";
 
+    // Reuse one client authenticated by az login for all measurements.
     using CosmosClient client = new(endpoint, new AzureCliCredential());
     Container product = client.GetDatabase("cosmicworks").GetContainer("product");
 
+    // An ID plus partition key permits a point read without executing SQL.
     ItemResponse<Product> read = await product.ReadItemAsync<Product>(
         productId, new PartitionKey(categoryId));
     Console.WriteLine($"{"point read",-24}: {read.RequestCharge,8:0.00} RU  ({read.Resource.name})");
@@ -146,6 +148,7 @@ Three operations stand in for the shapes an application runs: a point read by ID
     static async Task MeasureAsync(Container container, string label, string text,
         params (string Name, object Value)[] parameters)
     {
+        // Bind values separately from SQL rather than interpolating them into it.
         QueryDefinition query = new(text);
         foreach ((string name, object value) in parameters)
         {
@@ -155,6 +158,7 @@ Three operations stand in for the shapes an application runs: a point read by ID
         double charge = 0;
         int items = 0;
 
+        // Include every result page when measuring the query's total RU charge.
         FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(query);
         while (iterator.HasMoreResults)
         {
@@ -166,6 +170,7 @@ Three operations stand in for the shapes an application runs: a point read by ID
         Console.WriteLine($"{label,-24}: {charge,8:0.00} RU for {items} items");
     }
 
+    // Match the stored JSON property names when deserializing query results.
     public class Product
     {
         public string id { get; set; } = "";
@@ -205,6 +210,8 @@ The second query returns one item. Whether it's expensive depends on how many it
     charge += page.RequestCharge;
     items += page.Count;
 
+    // Compare documents loaded by the engine with documents returned.
+    // CumulativeMetrics aggregates the partition metrics for this page.
     ServerSideMetrics metrics = page.Diagnostics.GetQueryMetrics().CumulativeMetrics;
     retrieved += metrics.RetrievedDocumentCount;
     output += metrics.OutputDocumentCount;
@@ -246,6 +253,7 @@ The scan loaded all 295 products in the container to return one. The second quer
 1. In your application, change the scan query's filter to compare the property directly and pass the value in its stored casing.
 
     ```csharp
+    // Compare the indexed property directly, using the name's stored casing.
     await MeasureAsync(product, "direct name match",
         "SELECT * FROM c WHERE c.name = @name",
         ("@name", "Touring-3000 Blue, 62"));
@@ -268,6 +276,7 @@ The category and price query is already index-served, so there's no scan left to
     Add a request options object inside `MeasureAsync` and pass it to the iterator.
 
     ```csharp
+    // Index metrics describe used and potential indexes; they don't create them.
     QueryRequestOptions options = new() { PopulateIndexMetrics = true };
     FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(query, requestOptions: options);
     ```
@@ -352,10 +361,12 @@ The `product` container is partitioned on `/categoryId`. Every query so far that
 1. Add a query that filters only on price, leaving the partition key out entirely, and keep the scoped version alongside it.
 
     ```csharp
+    // Without a partition-key equality filter, the query can visit every partition.
     await MeasureAsync(product, "price only (fan-out)",
         "SELECT * FROM c WHERE c.price > @floor",
         ("@floor", 1000));
 
+    // Adding /categoryId equality restricts the query to that category's partition.
     await MeasureAsync(product, "price within category",
         "SELECT * FROM c WHERE c.categoryId = @categoryId AND c.price > @floor",
         ("@categoryId", categoryId), ("@floor", 1000));
@@ -375,6 +386,7 @@ With one physical partition, that null result is worth understanding rather than
 1. Confirm the partition count for yourself by printing the per-partition breakdown. Add this code inside the `while` loop in `MeasureAsync`.
 
     ```csharp
+    // Inspect range IDs across all pages to see which partitions the query reached.
     foreach (ServerSidePartitionedMetrics partition in page.Diagnostics.GetQueryMetrics().PartitionedMetrics)
     {
         Console.WriteLine($"    partition {partition.PartitionKeyRangeId}: {partition.RequestCharge:0.00} RU");

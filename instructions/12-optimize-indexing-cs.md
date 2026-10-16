@@ -126,6 +126,7 @@ Before changing anything, record what three representative operations cost again
     string sku = "BK-R93R-44";
     string productId = "FD48A179-6CF5-45F2-8605-9DA19B9D4409";
 
+    // Use az login for data access; GetContainer references an existing resource.
     using CosmosClient client = new(endpoint, new AzureCliCredential());
     Container product = client.GetDatabase("cosmicworks").GetContainer("product");
 
@@ -137,12 +138,15 @@ Before changing anything, record what three representative operations cost again
         "SELECT * FROM c WHERE c.categoryId = @categoryId ORDER BY c.price DESC",
         ("@categoryId", categoryId));
 
+    // Replace an unchanged item to measure write and index-maintenance cost
+    // without deliberately changing its business data.
     ItemResponse<Product> read = await product.ReadItemAsync<Product>(productId, new PartitionKey(categoryId));
     ItemResponse<Product> written = await product.ReplaceItemAsync(read.Resource, productId, new PartitionKey(categoryId));
     Console.WriteLine($"replace one product      : {written.RequestCharge,8:0.00} RU");
 
     static async Task MeasureAsync(Container container, string label, string text, params (string Name, object Value)[] parameters)
     {
+        // Bind values separately from SQL rather than interpolating them into it.
         QueryDefinition query = new(text);
         foreach ((string name, object value) in parameters)
         {
@@ -152,6 +156,8 @@ Before changing anything, record what three representative operations cost again
         double charge = 0;
         int items = 0;
 
+        // A query can return multiple pages. Add each page's charge and item
+        // count so the measurement covers the entire query.
         FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(query);
         while (iterator.HasMoreResults)
         {
@@ -163,6 +169,8 @@ Before changing anything, record what three representative operations cost again
         Console.WriteLine($"{label,-25}: {charge,8:0.00} RU for {items} items");
     }
 
+    // Preserve the catalog fields, including nested tags, when replacing an item.
+    // Property names match the JSON stored in the container.
     public class Product
     {
         public string id { get; set; } = "";
@@ -290,6 +298,8 @@ This task sorts the listing on two properties, `categoryId` and then `price`. An
 1. Adding an index path starts an index transformation, and the composite index isn't usable until that transformation finishes. Add this check immediately after the code that gets the `product` container, before any measurements.
 
     ```csharp
+    // A policy update isn't proof the new index is ready. Request the
+    // transformation-progress header and stop measurements until it reaches 100%.
     ContainerResponse indexingResponse = await product.ReadContainerAsync(
         new ContainerRequestOptions { PopulateQuotaInfo = true });
     int indexProgress = int.Parse(
@@ -435,6 +445,8 @@ The stock keeping unit lookup is the query that partitioning can't help, because
     Insert these two lines after the existing `MeasureAsync` calls and before the `ReadItemAsync` call.
 
     ```csharp
+    // The secondary container is partitioned on /sku, so the same equality
+    // filter now targets one logical partition rather than all categories.
     Container productBySku = client.GetDatabase("cosmicworks").GetContainer("productBySku");
 
     await MeasureAsync(productBySku, "sku lookup on the index",

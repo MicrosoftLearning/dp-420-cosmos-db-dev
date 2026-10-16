@@ -176,6 +176,7 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
     string deployment = "text-embedding-3-small";
     string dataUrl = "https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data/database-v4/product";
 
+    // Reuse a credential for both services; each SDK requests its own token audience.
     DefaultAzureCredential credential = new DefaultAzureCredential();
 
     EmbeddingClient embeddingClient = new AzureOpenAIClient(new Uri(openAiEndpoint), credential)
@@ -189,6 +190,8 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
 
     Console.WriteLine($"Downloaded {products.Count} products.");
 
+    // Use the same text for keyword and vector search so the comparison
+    // changes the retrieval method, not the indexed product description.
     for (int start = 0; start < products.Count; start += 50)
     {
         List<JObject> batch = products.Skip(start).Take(50).Cast<JObject>().ToList();
@@ -198,6 +201,7 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
 
         OpenAIEmbeddingCollection embeddings = await embeddingClient.GenerateEmbeddingsAsync(texts);
 
+        // Pair each vector with its source product; each upsert is a separate write.
         for (int i = 0; i < batch.Count; i++)
         {
             batch[i]["searchText"] = texts[i];
@@ -257,9 +261,11 @@ The phrase is *something to see the road at night*. Its content words are *see*,
 
     string searchText = "something to see the road at night";
 
+    // Query vectors must use the same deployment as the stored product vectors.
     OpenAIEmbedding embedding = await embeddingClient.GenerateEmbeddingAsync(searchText);
     float[] queryVector = embedding.ToFloats().ToArray();
 
+    // Keyword ranking uses explicit terms, not an embedding of the shopper phrase.
     QueryDefinition keywordQuery = new QueryDefinition(@"
         SELECT TOP 5 c.name, c.categoryName
         FROM c
@@ -268,6 +274,7 @@ The phrase is *something to see the road at night*. Its content words are *see*,
         .WithParameter("@term2", "road")
         .WithParameter("@term3", "night");
 
+    // Vector ranking uses the meaning encoded in the complete shopper phrase.
     QueryDefinition vectorQuery = new QueryDefinition(@"
         SELECT TOP 5 c.name, c.categoryName
         FROM c
@@ -282,6 +289,7 @@ The phrase is *something to see the road at night*. Its content words are *see*,
         double charge = 0;
         List<string> lines = new List<string>();
 
+        // Sum every page's charge so the three retrieval methods are comparable.
         using FeedIterator<dynamic> feed = container.GetItemQueryIterator<dynamic>(query);
         while (feed.HasMoreResults)
         {
@@ -321,6 +329,8 @@ You now have results from both retrieval methods. In this task, you run both in 
 1. Add the following query and call to the end of your application, before you rerun it. Restore `searchText` to `something to see the road at night` and the terms to `see`, `road`, and `night` first.
 
     ```csharp
+    // RRF combines rank positions from the two retrieval methods,
+    // not their raw distance and full-text score values.
     QueryDefinition hybridQuery = new QueryDefinition(@"
         SELECT TOP 5 c.name, c.categoryName
         FROM c
@@ -386,6 +396,8 @@ In this task, you apply the cheapest optimizations in order and record what each
 1. Add a partition key filter. The three lights all sit in one category, so filtering to it routes the query to a single logical partition.
 
     ```csharp
+    // A known category narrows both the partition scope and the candidate set.
+    // Don't apply it when the shopper is asking you to discover the category.
     QueryDefinition filteredQuery = new QueryDefinition(@"
         SELECT TOP 3 c.name, c.categoryName
         FROM c

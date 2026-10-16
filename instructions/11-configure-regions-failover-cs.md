@@ -187,14 +187,18 @@ Both regions are healthy, so this change is the planned operation: the service r
     string endpoint = "<cosmos-endpoint>";
     string preferredRegion = "<your-second-region>";
 
+    // Preferred regions guide SDK routing; they don't change the account's
+    // regions or enable multi-region writes.
     CosmosClientOptions options = new()
     {
         ApplicationPreferredRegions = new List<string> { preferredRegion }
     };
 
+    // Use the identity from az login instead of an account key.
     CosmosClient client = new(endpoint, new AzureCliCredential(), options);
     Container container = client.GetContainer("cosmicworks", "product");
 
+    // Together, the item ID and /categoryId value identify the product.
     PartitionKey partitionKey = new("AE48F0AA-4F65-4734-A4CF-D48B8F82267F");
 
     ItemResponse<dynamic> read = await container.ReadItemAsync<dynamic>(
@@ -205,10 +209,13 @@ Both regions are healthy, so this change is the planned operation: the service r
     dynamic item = read.Resource;
     item.name = "Road-350-W Yellow, 48 (regional check)";
 
+    // Upsert replaces this existing item. The SDK discovers the writable region
+    // from the account topology, rather than from a region-specific endpoint.
     ItemResponse<dynamic> write = await container.UpsertItemAsync(item, partitionKey);
 
     Console.WriteLine($"Write succeeded with status {(int)write.StatusCode}.");
 
+    // Reading again verifies the update, not which region served the request.
     ItemResponse<dynamic> verified = await container.ReadItemAsync<dynamic>(
         "063F1A00-8CA1-4DB9-8298-BEAC4B8CC238", partitionKey);
 

@@ -183,6 +183,8 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
     DEPLOYMENT = "text-embedding-3-small"
     DATA_URL = "https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data/database-v4/product"
 
+    # Reuse a credential for both services. Azure OpenAI receives a token
+    # scoped to Cognitive Services, while Cosmos DB handles its own audience.
     credential = DefaultAzureCredential()
 
     openai_client = AzureOpenAI(
@@ -204,12 +206,15 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
 
     print(f"Downloaded {len(products)} products.")
 
+    # Use the same text for keyword and vector search so the comparison
+    # changes the retrieval method, not the indexed product description.
     for start in range(0, len(products), 50):
         batch = products[start:start + 50]
         texts = [f"{product['name']} {product['categoryName']}" for product in batch]
 
         embeddings = openai_client.embeddings.create(input=texts, model=DEPLOYMENT)
 
+        # Pair each vector with its source product; each upsert is a separate write.
         for product, text, data in zip(batch, texts, embeddings.data):
             product["searchText"] = text
             product["embedding"] = data.embedding
@@ -274,6 +279,7 @@ The phrase is *something to see the road at night*. Its content words are *see*,
 
 
     def embed(text):
+        # Query vectors must use the same deployment as the stored product vectors.
         return openai_client.embeddings.create(input=text, model=DEPLOYMENT).data[0].embedding
 
 
@@ -281,8 +287,11 @@ The phrase is *something to see the road at night*. Its content words are *see*,
         request_charges = []
 
         def record_charge(headers, response):
+            # Capture each response's RU charge rather than only the final page's.
             request_charges.append(float(headers.get("x-ms-request-charge", 0)))
 
+        # Materialize the lazy results so every response reaches the hook
+        # before calculating the complete query charge.
         results = list(container.query_items(
             query=query,
             parameters=parameters,
@@ -295,12 +304,14 @@ The phrase is *something to see the road at night*. Its content words are *see*,
             print(f"  {item['name']}  |  {item['categoryName']}")
 
 
+    # Keyword ranking uses explicit terms; it doesn't embed the shopper's phrase.
     keyword_query = """
         SELECT TOP 5 c.name, c.categoryName
         FROM c
         ORDER BY RANK FullTextScore(c.searchText, @term1, @term2, @term3)
     """
 
+    # Vector ranking uses the meaning encoded in the complete shopper phrase.
     vector_query = """
         SELECT TOP 5 c.name, c.categoryName
         FROM c
@@ -341,6 +352,8 @@ You now have results from both retrieval methods. In this task, you run both in 
 1. Add the following query and call to the end of your application, before you rerun it. Restore `SEARCH_TEXT` to `something to see the road at night` and the terms to `see`, `road`, and `night` first.
 
     ```python
+    # RRF combines rank positions from the two retrieval methods,
+    # not their raw distance and full-text score values.
     hybrid_query = """
         SELECT TOP 5 c.name, c.categoryName
         FROM c
@@ -408,6 +421,8 @@ In this task, you apply the cheapest optimizations in order and record what each
 1. Add a partition key filter. The three lights all sit in one category, so filtering to it routes the query to a single logical partition.
 
     ```python
+    # A known category narrows both the partition scope and the candidate set.
+    # Don't apply it when the shopper is asking you to discover the category.
     filtered_query = """
         SELECT TOP 3 c.name, c.categoryName
         FROM c

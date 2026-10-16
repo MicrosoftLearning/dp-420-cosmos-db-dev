@@ -148,15 +148,19 @@ Now connect from code and compare the request charge of the same read at strong 
 
     string endpoint = "<cosmos-endpoint>";
 
+    // Use a developer credential, such as az login, rather than an account key.
+    // Without a consistency override, reads use the account default.
     CosmosClient client = new(endpoint, new DefaultAzureCredential());
     Container container = client.GetContainer("cosmicworks", "product");
 
+    // Together, the item ID and /categoryId value identify one product for a point read.
     string id = "0A7E57DA-C73F-467F-954F-17B7AFD6227E";
     PartitionKey partitionKey = new("4F34E180-384D-42FC-AC10-FEC30227577F");
 
     ItemResponse<dynamic> strongResponse =
         await container.ReadItemAsync<dynamic>(id, partitionKey);
 
+    // RequestCharge measures the service's RU cost, not elapsed time.
     Console.WriteLine($"STRONG request charge:\t{strongResponse.RequestCharge:0.00} RUs");
     ```
 
@@ -177,6 +181,8 @@ Now connect from code and compare the request charge of the same read at strong 
 1. Now relax the consistency level for this single request. Add the following code to the end of **Program.cs**:
 
     ```csharp
+    // Relax only this request; the client's and account's default remain unchanged.
+    // Read the same item so the comparison changes only consistency.
     ItemRequestOptions options = new()
     {
         ConsistencyLevel = ConsistencyLevel.Eventual
@@ -302,4 +308,3 @@ az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --
 ```
 
 You configured all three cost and performance levers: autoscale throughput sized to bursty traffic, a consistency level relaxed per request where staleness is acceptable, and time to live for automatic retention. The request-charge comparison you measured shows how consistency affects read cost; workload measurements and the billing model guide throughput sizing.
-

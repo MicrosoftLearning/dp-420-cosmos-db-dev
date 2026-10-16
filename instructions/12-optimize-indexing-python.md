@@ -130,6 +130,7 @@ Before changing anything, record what three representative operations cost again
     SKU = "BK-R93R-44"
     PRODUCT_ID = "FD48A179-6CF5-45F2-8605-9DA19B9D4409"
 
+    # Use az login for data access; these clients reference existing resources.
     client = CosmosClient(ENDPOINT, AzureCliCredential())
     product = client.get_database_client("cosmicworks").get_container_client("product")
 
@@ -137,6 +138,8 @@ Before changing anything, record what three representative operations cost again
     def measure(container, label, query, parameters):
         charge = 0.0
         items = 0
+        # Parameters keep values separate from SQL. The partition-key filter,
+        # when present, lets the service narrow the query's scope.
         pages = container.query_items(
             query=query,
             parameters=parameters,
@@ -144,6 +147,8 @@ Before changing anything, record what three representative operations cost again
         ).by_page()
 
         for page in pages:
+            # Queries are lazy: consume the page before reading its response headers.
+            # Sum every page's charge to measure the complete query.
             items += len(list(page))
             charge += float(container.client_connection.last_response_headers["x-ms-request-charge"])
 
@@ -164,6 +169,8 @@ Before changing anything, record what three representative operations cost again
         [{"name": "@categoryId", "value": CATEGORY_ID}],
     )
 
+    # Replace an unchanged item to measure write and index-maintenance cost
+    # without deliberately changing its business data.
     item = product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID)
     product.replace_item(item=PRODUCT_ID, body=item)
     write_charge = float(product.client_connection.last_response_headers["x-ms-request-charge"])
@@ -278,6 +285,8 @@ This task sorts the listing on two properties, `categoryId` and then `price`. An
 1. Adding an index path starts an index transformation, and the composite index isn't usable until that transformation finishes. Add this check immediately after the code that gets the `product` container, before any measurements.
 
     ```python
+    # A policy update isn't proof the new index is ready. Request the
+    # transformation-progress header and stop measurements until it reaches 100%.
     index_progress_headers = {}
     product.read(
         populate_quota_info=True,
@@ -425,6 +434,8 @@ The stock keeping unit lookup is the query that partitioning can't help, because
     Insert this code after the two existing `measure` calls and before the `read_item` call.
 
     ```python
+    # The secondary container is partitioned on /sku, so the same equality
+    # filter now targets one logical partition rather than all categories.
     product_by_sku = client.get_database_client("cosmicworks").get_container_client("productBySku")
 
     measure(

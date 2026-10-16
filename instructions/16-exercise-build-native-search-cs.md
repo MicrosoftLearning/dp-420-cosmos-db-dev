@@ -179,6 +179,7 @@ The searchable text matters more than it sounds. The CosmicWorks `description` p
     string deployment = "text-embedding-3-small";
     string dataUrl = "https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data/database-v4/product";
 
+    // Reuse a credential for both services; each SDK requests its own token audience.
     DefaultAzureCredential credential = new DefaultAzureCredential();
 
     EmbeddingClient embeddingClient = new AzureOpenAIClient(new Uri(openAiEndpoint), credential)
@@ -192,6 +193,8 @@ The searchable text matters more than it sounds. The CosmicWorks `description` p
 
     Console.WriteLine($"Downloaded {products.Count} products.");
 
+    // Batch embedding requests, then write the enriched products individually.
+    // This isn't a Cosmos DB transactional batch.
     for (int start = 0; start < products.Count; start += 50)
     {
         List<JObject> batch = products.Skip(start).Take(50).Cast<JObject>().ToList();
@@ -199,6 +202,7 @@ The searchable text matters more than it sounds. The CosmicWorks `description` p
 
         OpenAIEmbeddingCollection embeddings = await embeddingClient.GenerateEmbeddingsAsync(texts);
 
+        // Keep each vector with its source text and original product identity.
         for (int i = 0; i < batch.Count; i++)
         {
             batch[i]["searchText"] = texts[i];
@@ -212,9 +216,11 @@ The searchable text matters more than it sounds. The CosmicWorks `description` p
         Console.WriteLine($"Loaded {start + batch.Count} of {products.Count}.");
     }
 
+    // Both keyword search and embeddings use this same text representation.
     static string BuildSearchText(JObject product) =>
         $"{product["name"]} {product["categoryName"]}";
 
+    // Detect changes to the embedding input without comparing entire vectors.
     static string ContentHash(string text) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     ```
@@ -337,9 +343,13 @@ In this task, you run a similarity query whose search terms appear nowhere in th
 
     string searchText = "something to protect my head";
 
+    // Use the same embedding deployment as ingestion so query and stored vectors
+    // share a vector space and match the container's configured dimensions.
     OpenAIEmbedding embedding = await embeddingClient.GenerateEmbeddingAsync(searchText);
     float[] queryVector = embedding.ToFloats().ToArray();
 
+    // Although the alias says similarityScore, the projected value is a distance.
+    // ORDER BY returns the nearest vectors first; it isn't a confidence percentage.
     QueryDefinition query = new QueryDefinition(@"
         SELECT TOP 5 c.name, c.categoryName,
             VectorDistance(c.embedding, @queryVector) AS similarityScore
@@ -349,6 +359,7 @@ In this task, you run a similarity query whose search terms appear nowhere in th
 
     Console.WriteLine($"Query: \"{searchText}\"");
 
+    // Consume every page; RequestCharge below is the charge for that page.
     using FeedIterator<dynamic> feed = container.GetItemQueryIterator<dynamic>(query);
 
     while (feed.HasMoreResults)
@@ -429,6 +440,8 @@ Renaming a product doesn't update its stored `searchText` or embedding. The full
     int scanned = 0;
     int refreshed = 0;
 
+    // This one-off latest-version scan starts at the beginning without
+    // persisting a continuation token for a later run.
     FeedIterator<JObject> changeFeed = container.GetChangeFeedIterator<JObject>(
         ChangeFeedStartFrom.Beginning(), ChangeFeedMode.LatestVersion);
 
@@ -436,6 +449,7 @@ Renaming a product doesn't update its stored `searchText` or embedding. The full
     {
         FeedResponse<JObject> page = await changeFeed.ReadNextAsync();
 
+        // HTTP 304 means the reader is caught up for now, not permanently finished.
         if (page.StatusCode == HttpStatusCode.NotModified) { break; }
 
         foreach (JObject change in page)
@@ -443,10 +457,12 @@ Renaming a product doesn't update its stored `searchText` or embedding. The full
             scanned++;
             string text = BuildSearchText(change);
 
+            // Skip unchanged embedding inputs, including this refresher's own writes.
             if (ContentHash(text) == change["contentHash"]?.ToString()) { continue; }
 
             OpenAIEmbedding embedding = await embeddingClient.GenerateEmbeddingAsync(text);
 
+            // Refresh text, hash, and vector together so the search fields agree.
             change["searchText"] = text;
             change["contentHash"] = ContentHash(text);
             change["embedding"] = JArray.FromObject(embedding.ToFloats().ToArray());

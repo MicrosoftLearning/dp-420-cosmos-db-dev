@@ -190,6 +190,8 @@ The Python client allows one retry before a remaining 429 reaches your code. Thi
 
     endpoint = "<cosmos-endpoint>"
 
+    # DefaultAzureCredential can use your developer sign-in, such as az login.
+    # Reduce throttle retries for this lab so some HTTP 429 responses reach the code.
     client = CosmosClient(
         endpoint,
         credential=DefaultAzureCredential(),
@@ -198,6 +200,7 @@ The Python client allows one retry before a remaining 429 reaches your code. Thi
 
     container = client.get_database_client("cosmicworks").get_container_client("product")
 
+    # Load the catalog once so the loop measures repeated writes, not catalog reads.
     products = list(container.read_all_items())
     print(f"Read {len(products)} products.")
 
@@ -208,17 +211,23 @@ The Python client allows one retry before a remaining 429 reaches your code. Thi
     def upsert(item):
         global succeeded, throttled, last_activity_id
         try:
+            # Reuse each item's ID and categoryId so upsert replaces it instead
+            # of continually creating new products.
             container.upsert_item(item)
             succeeded += 1
         except exceptions.CosmosHttpResponseError as error:
             if error.status_code == 429:
                 throttled += 1
+                # Save an activity ID to correlate an SDK failure with diagnostic logs.
                 last_activity_id = error.headers.get("x-ms-activity-id", "")
             else:
+                # Don't hide unrelated failures as expected rate limiting.
                 raise
 
     deadline = time.time() + 60
 
+    # Overlap writes to exceed the container's 400 RU/s. This deliberate load
+    # and reduced retry policy aren't production defaults.
     with ThreadPoolExecutor(max_workers=16) as pool:
         while time.time() < deadline:
             list(pool.map(upsert, products))

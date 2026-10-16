@@ -160,6 +160,8 @@ To verify the connection, now point the SDK at that endpoint and read the accoun
     string key = "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
 
     // ==== CLIENT ==== Task 4 replaces this section. Task 6 replaces it again.
+    // The certificate bypass is local-emulator-only. Gateway mode uses
+    // the HTTP client configured here, rather than direct TCP connections.
     CosmosClientOptions options = new()
     {
         HttpClientFactory = () =>
@@ -185,6 +187,7 @@ To verify the connection, now point the SDK at that endpoint and read the accoun
 1. To verify the connection, read account properties. These lines stay in the file for the whole exercise:
 
     ```csharp
+    // Read account metadata from the service, not an item in a container.
     AccountProperties account = await client.ReadAccountAsync();
     Console.WriteLine($"Account name:     {account.Id}");
     Console.WriteLine($"Primary region:   {account.WritableRegions.FirstOrDefault()?.Name}");
@@ -223,6 +226,7 @@ Because the app only ever *references* resources, the code you write here's the 
 1. Below the account output, add the following code to reference the database and container:
 
     ```csharp
+    // These calls build references; ReadContainerAsync makes the service request.
     Database database = client.GetDatabase("cosmicworks");
     Container container = client.GetContainer("cosmicworks", "product");
 
@@ -251,6 +255,7 @@ Add logging so you can see request methods, URIs, status codes, and request-unit
             RequestMessage request, CancellationToken cancellationToken)
         {
             Console.WriteLine($"  [REQ]  {request.Method.Method} {request.RequestUri}");
+            // Forward the request through the SDK pipeline; don't replace its response.
             ResponseMessage response = await base.SendAsync(request, cancellationToken);
             Console.WriteLine($"  [RES]  {(int)response.StatusCode} {response.StatusCode}" +
                               $"  RU: {response.Headers.RequestCharge:0.00}");
@@ -263,6 +268,7 @@ Add logging so you can see request methods, URIs, status codes, and request-unit
 
     ```csharp
     // ==== CLIENT ==== Task 6 replaces this section.
+    // Keep the emulator-only transport settings while adding the logging handler.
     CosmosClient client = new CosmosClientBuilder(endpoint, key)
         .WithConnectionModeGateway()
         .WithHttpClientFactory(() =>
@@ -296,12 +302,14 @@ Attempt to read an item that doesn't exist, then inspect the resulting exception
     ```csharp
     try
     {
+        // A nonexistent ID and partition key deliberately exercise error handling.
         var response = await container.ReadItemAsync<dynamic>(
             id: "nonexistent-id",
             partitionKey: new PartitionKey("nonexistent-category"));
     }
     catch (CosmosException ex)
     {
+        // Report the failure; this block doesn't implement a retry loop.
         Console.WriteLine($"\nCaught CosmosException:");
         Console.WriteLine($"  Status code:    {(int)ex.StatusCode} ({ex.StatusCode})");
         Console.WriteLine($"  Is retryable:   " +
@@ -331,6 +339,8 @@ One detail differs, and it isn't the endpoint. The emulator accepts a key; the c
 
     ```csharp
     // ==== CLIENT ====
+    // Explicitly use az login and normal certificate validation for the cloud account.
+    // Retain the logging handler while removing the emulator's transport overrides.
     CosmosClient client = new CosmosClientBuilder(endpoint, new AzureCliCredential())
         .AddCustomHandlers(new LogHandler())
         .Build();
@@ -375,4 +385,3 @@ In this exercise you:
 - Added a logging handler to observe SDK HTTP traffic and request-unit charges.
 - Caught a `CosmosException` / `CosmosResourceNotFoundError` and distinguished a permanent 404 from transient retryable errors.
 - Pointed the same app at a cloud account by changing the endpoint and client construction and removing the emulator key. The data operations stayed unchanged, while provisioning remained separate from the data-plane application.
-

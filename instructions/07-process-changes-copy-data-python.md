@@ -121,11 +121,13 @@ from azure.identity import DefaultAzureCredential
 
 endpoint = "<cosmos-endpoint>"
 
+# Use a developer credential, such as az login, instead of an account key.
 client = CosmosClient(endpoint, credential=DefaultAzureCredential())
 database = client.get_database_client("cosmicworks")
 
 for name in ["productMeta", "product"]:
     container = database.get_container_client(name)
+    # SELECT VALUE returns a scalar count across the container, not item documents.
     count = list(
         container.query_items(
             query="SELECT VALUE COUNT(1) FROM c",
@@ -167,9 +169,11 @@ endpoint = "<cosmos-endpoint>"
 
 client = CosmosClient(endpoint, credential=DefaultAzureCredential())
 database = client.get_database_client("cosmicworks")
+# Watch metadata, then update the denormalized categoryName in a different container.
 monitored = database.get_container_client("productMeta")
 products = database.get_container_client("product")
 
+# This bookmark exists only in memory; restarting the script doesn't reload it.
 continuation = None
 print("Reading the change feed. Press Ctrl+C to stop.")
 
@@ -177,13 +181,16 @@ while True:
     if continuation:
         changes = monitored.query_items_change_feed(continuation=continuation)
     else:
+        # Start with future changes, not a replay of the existing metadata catalog.
         changes = monitored.query_items_change_feed(start_time="Now")
 
     for item in changes:
+        # productMeta mixes category and tag documents; only categories drive this sync.
         if item.get("type") != "category":
             continue
 
         updated = 0
+        # The category document's id is the product container's partition key value.
         results = products.query_items(
             query="SELECT p.id, p.categoryId FROM product p WHERE p.categoryId = @categoryId",
             parameters=[{"name": "@categoryId", "value": item["id"]}],
@@ -191,6 +198,8 @@ while True:
         )
 
         for product in results:
+            # Setting the absolute name makes replay of this update safe;
+            # the product writes aren't one cross-container transaction.
             products.patch_item(
                 item=product["id"],
                 partition_key=product["categoryId"],
@@ -235,8 +244,10 @@ client = CosmosClient(endpoint, credential=DefaultAzureCredential())
 container = client.get_database_client("cosmicworks").get_container_client("productMeta")
 
 stamp = datetime.now(timezone.utc).strftime("%H%M%S")
+# Change the value on each run so the consumer has a new update to observe.
 new_name = f"Components, Road Frames (revised {stamp})"
 
+# This metadata container uses /type: the partition key is "category", not the GUID.
 container.patch_item(
     item=category_id,
     partition_key="category",
@@ -286,6 +297,7 @@ app = func.FunctionApp()
 
 
 @app.function_name(name="ProductAudit")
+# The binding resolves %...% from host settings and uses leases for feed progress.
 @app.cosmos_db_trigger(
     arg_name="changes",
     database_name="%COSMOS_DATABASE_NAME%",
@@ -294,6 +306,8 @@ app = func.FunctionApp()
     lease_container_name="leases",
 )
 def product_audit(changes: func.DocumentList) -> None:
+    # A trigger invocation can contain several changed documents. This handler
+    # logs them; it doesn't copy data or update the source items.
     for product in changes:
         logging.info(
             "Product %s is now in category '%s'.",

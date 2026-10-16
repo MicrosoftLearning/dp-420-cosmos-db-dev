@@ -164,13 +164,17 @@ Now connect from code and compare the request charge of the same read at strong 
 
     endpoint = "<cosmos-endpoint>"
 
+    # Use a developer credential, such as az login, rather than an account key.
+    # Without a consistency override, reads use the account default.
     client = CosmosClient(url=endpoint, credential=DefaultAzureCredential())
     container = client.get_database_client("cosmicworks").get_container_client("product")
 
+    # Together, the item ID and /categoryId value identify one product for a point read.
     item_id = "0A7E57DA-C73F-467F-954F-17B7AFD6227E"
     partition_key = "4F34E180-384D-42FC-AC10-FEC30227577F"
 
     def print_charge(label):
+        # A response hook measures this request's RU charge, not elapsed time.
         def hook(headers, response):
             print(f"{label} request charge:\t{headers['x-ms-request-charge']} RUs")
         return hook
@@ -198,6 +202,8 @@ Now connect from code and compare the request charge of the same read at strong 
 1. Now relax the consistency level. The Python SDK sets consistency at the client level, so create a second client configured for eventual consistency. Add the following code to the end of **script.py**:
 
     ```python
+    # Relax reads for this second client without changing the account's policy.
+    # Read the same item so the comparison changes only consistency.
     eventual_client = CosmosClient(
         url=endpoint,
         credential=DefaultAzureCredential(),
@@ -334,4 +340,3 @@ az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --
 ```
 
 You configured all three cost and performance levers: autoscale throughput sized to bursty traffic, a consistency level relaxed per request where staleness is acceptable, and time to live for automatic retention. The request-charge comparison you measured shows how consistency affects read cost; workload measurements and the billing model guide throughput sizing.
-

@@ -135,6 +135,8 @@ The catalog holds 295 products. Each one looks like this:
 
     string endpoint = "<cosmos-endpoint>";
 
+    // Reuse one credential-backed client; GetContainer doesn't create resources
+    // or make a service request.
     CosmosClient client = new(endpoint, new DefaultAzureCredential());
 
     Container container = client.GetContainer("cosmicworks", "product");
@@ -147,6 +149,7 @@ The catalog holds 295 products. Each one looks like this:
 1. Add the item types at the bottom of the file. Top-level statements come first, so every type declaration in this exercise belongs below the executable code:
 
     ```csharp
+    // Property names and nested tag objects match the stored JSON shape.
     public record Tag(string id, string name);
 
     public record Product(
@@ -183,6 +186,8 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
     ```csharp
     const string roadFrames = "3E4CEACD-D007-46EB-82D7-31F6141752B2";
 
+    // Project only the card fields. scannerData is a new nested result object,
+    // and STARTSWITH's third argument enables case-insensitive matching.
     string sql = """
         SELECT
             p.name,
@@ -194,6 +199,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
           AND STARTSWITH(p.name, @prefix, true)
         """;
 
+    // Bind values separately from SQL instead of interpolating user input.
     QueryDefinition query = new QueryDefinition(sql)
         .WithParameter("@category", roadFrames)
         .WithParameter("@max", 400)
@@ -207,6 +213,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
     ```csharp
     async Task<(int Count, double Charge)> RunAsync(QueryDefinition q, PartitionKey? key)
     {
+        // Keep SQL and parameters identical; only request scoping changes.
         QueryRequestOptions options = new();
         if (key.HasValue) options.PartitionKey = key.Value;
 
@@ -216,6 +223,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
         using FeedIterator<ProductCard> iterator =
             container.GetItemQueryIterator<ProductCard>(q, requestOptions: options);
 
+        // Count results and RU charges across every response page.
         while (iterator.HasMoreResults)
         {
             FeedResponse<ProductCard> page = await iterator.ReadNextAsync();
@@ -236,6 +244,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
 1. Add the result types to the record declarations at the bottom of the file:
 
     ```csharp
+    // These types describe the query's projection, not the full stored Product.
     public record ScannerData(double price);
 
     public record ProductCard(string name, string category, ScannerData scannerData);
@@ -262,6 +271,8 @@ CosmicWorks tags are merchandising-assigned identifiers rather than descriptive 
 1. Append the following code. `EXISTS` filters items by the contents of the array, and the `ARRAY` expression projects the tag names alongside each match:
 
     ```csharp
+    // EXISTS decides which products match. ARRAY shapes the tags returned for
+    // each match, without producing a separate result row for every tag.
     QueryDefinition subquery = new QueryDefinition("""
             SELECT
                 p.id,
@@ -336,6 +347,8 @@ Ask a different question of the same data. A `JOIN` returns one result per array
 1. Append the following code. It expands every tag in the category and counts both the rows returned and the distinct products behind them:
 
     ```csharp
+    // This JOIN expands one product into one row per tag; an empty tags array
+    // produces no rows. It isn't a relational join between two containers.
     QueryDefinition crossProduct = new QueryDefinition("""
             SELECT p.name, t.name AS tag
             FROM product p
@@ -344,6 +357,7 @@ Ask a different question of the same data. A `JOIN` returns one result per array
             """)
         .WithParameter("@category", roadFrames);
 
+    // Count distinct product names separately from product/tag pairs.
     HashSet<string> namesInJoin = new();
     int pairs = 0;
     double joinCharge = 0;
@@ -385,6 +399,7 @@ Now watch the same effect against three products elsewhere in the catalog that c
     ```csharp
     string[] untagged = { "Road Tire Tube", "Classic Vest, S", "ML Mountain Pedal" };
 
+    // SELECT VALUE returns scalar strings, so the iterator below uses string.
     QueryDefinition direct = new QueryDefinition(
             "SELECT VALUE p.name FROM product p WHERE ARRAY_CONTAINS(@names, p.name)")
         .WithParameter("@names", untagged);
@@ -436,12 +451,16 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
                 "SELECT p.id, p.name, p.price FROM product p WHERE p.categoryId = @category")
             .WithParameter("@category", roadFrames);
 
+        // MaxItemCount requests a page size; fewer items can arrive even when
+        // a continuation token still indicates more results.
         QueryRequestOptions options = new()
         {
             PartitionKey = new PartitionKey(roadFrames),
             MaxItemCount = 10
         };
 
+        // Treat the token as opaque and reuse it with the same query, parameters,
+        // and partition scope. Fetch only one page in this stateless helper.
         using FeedIterator<PagedProduct> iterator =
             container.GetItemQueryIterator<PagedProduct>(paged, continuationToken, options);
 
@@ -471,6 +490,7 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
 
         Console.WriteLine($"Page {pageNumber}: {result.Count} items, {result.Charge:0.00} RU, token: {(token is null ? "none" : "present")}");
     }
+    // Stop on token exhaustion, not on a short or empty page.
     while (token is not null);
     ```
 

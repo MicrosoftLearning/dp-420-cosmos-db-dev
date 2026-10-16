@@ -129,11 +129,14 @@ Three operations stand in for the shapes an application runs: a point read by ID
     CATEGORY_ID = "75BF1ACB-168D-469C-9AA3-1FD26BB4EA4C"
     PRODUCT_ID = "BD340F0A-F661-4ED8-B36F-FBA7623605D9"
 
+    # Reuse one client authenticated by az login for all measurements.
     client = CosmosClient(ENDPOINT, AzureCliCredential())
     product = client.get_database_client("cosmicworks").get_container_client("product")
 
 
     def charge_of_last_request():
+        # Read immediately after the operation being measured; another request
+        # on this container can replace the last-response headers.
         return float(product.client_connection.last_response_headers["x-ms-request-charge"])
 
 
@@ -146,12 +149,15 @@ Three operations stand in for the shapes an application runs: a point read by ID
             parameters=parameters,
             enable_cross_partition_query=True,
         ).by_page():
+            # Fetch the lazy page before reading its charge, and include every page.
             count += len(list(page))
             total += charge_of_last_request()
 
         print(f"{label:<24}: {total:>8.2f} RU for {count} items")
 
 
+    # This point read uses an ID and partition key, providing a baseline
+    # that doesn't require executing a SQL query.
     item = product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID)
     print(f"{'point read':<24}: {charge_of_last_request():>8.2f} RU  ({item['name']})")
 
@@ -199,6 +205,7 @@ The second query returns one item. Whether it's expensive depends on how many it
         retrieved = 0
         output = 0
 
+        # Ask the service for execution metrics as well as query results.
         pages = product.query_items(
             query=query,
             parameters=parameters,
@@ -207,12 +214,15 @@ The second query returns one item. Whether it's expensive depends on how many it
         ).by_page()
 
         for page in pages:
+            # Consume the page before inspecting the headers for that request.
             list(page)
             total += charge_of_last_request()
 
             raw = product.client_connection.last_response_headers[
                 "x-ms-documentdb-query-metrics"
             ]
+            # Compare documents loaded by the engine with documents returned.
+            # A small result alone doesn't prove the query did little work.
             metrics = dict(pair.split("=", 1) for pair in raw.split(";"))
             retrieved += int(metrics["retrievedDocumentCount"])
             output += int(metrics["outputDocumentCount"])
@@ -242,6 +252,7 @@ The scan loaded all 295 products in the container to return one. The second quer
 1. In your application, change the scan query's filter to compare the property directly and pass the value in its stored casing.
 
     ```python
+    # Compare the indexed property directly, using the name's stored casing.
     measure(
         "direct name match",
         "SELECT * FROM c WHERE c.name = @name",
@@ -266,6 +277,7 @@ The category and price query is already index-served, so there's no scan left to
     Add `populate_index_metrics=True` to the `query_items` call in `measure`, then print the parsed utilization dictionary inside the page loop. Single-index entries carry an `IndexSpec` string. Composite entries carry an `IndexSpecs` list, so the code reads whichever one is present.
 
     ```python
+    # Index utilization describes used and potential indexes; it doesn't create them.
     utilization = product.client_connection.last_response_headers[
         "x-ms-cosmos-index-utilization"
     ]
@@ -350,12 +362,14 @@ The `product` container is partitioned on `/categoryId`. Every query so far that
 1. Add a query that filters only on price, leaving the partition key out entirely, and keep the scoped version alongside it.
 
     ```python
+    # Without a partition-key equality filter, the query can visit every partition.
     measure(
         "price only (fan-out)",
         "SELECT * FROM c WHERE c.price > @floor",
         [{"name": "@floor", "value": 1000}],
     )
 
+    # Adding /categoryId equality restricts the query to that category's partition.
     measure(
         "price within category",
         "SELECT * FROM c WHERE c.categoryId = @categoryId AND c.price > @floor",

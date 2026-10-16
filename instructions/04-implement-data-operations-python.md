@@ -141,6 +141,8 @@ A value of `-1` expires only the items that set their own `ttl`.
 
     endpoint = "<cosmos-endpoint>"
 
+    # Reuse one credential-backed client. Getting a container reference
+    # doesn't create it or confirm that it exists.
     client = CosmosClient(url=endpoint, credential=DefaultAzureCredential())
     container = client.get_database_client("cosmicworks").get_container_client("operations")
 
@@ -184,6 +186,7 @@ Create one item, then read it back two ways and compare the request charge.
         ],
     }
 
+    # Create rejects an existing ID in this partition instead of overwriting it.
     try:
         container.create_item(body=saddle)
         print("Create:      item created")
@@ -194,6 +197,7 @@ Create one item, then read it back two ways and compare the request charge.
 1. Add the point read and print its charge:
 
     ```python
+    # Knowing both the item ID and partition key avoids executing a SQL query.
     read_item = container.read_item(item=item_id, partition_key=category_id)
     print(f"Point read:  {read_item.get_response_headers()['x-ms-request-charge']} RU")
     ```
@@ -205,8 +209,11 @@ Create one item, then read it back two ways and compare the request charge.
 
     def capture_charge(headers, results):
         global query_charge
+        # Sum each response so the comparison covers the whole query.
         query_charge += float(headers["x-ms-request-charge"])
 
+    # Bind values separately from SQL and explicitly route to one partition.
+    # list() consumes the lazy results before the final charge is printed.
     results = list(container.query_items(
         query="SELECT * FROM c WHERE c.id = @id AND c.categoryId = @categoryId",
         parameters=[
@@ -246,6 +253,7 @@ Replace, upsert, and delete the item, then recreate it for the tasks that follow
     item_id = "027D0B9A-F9D9-4C96-8213-C8546C4AAE71"
     category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
 
+    # Read the full document so replacing it preserves fields not being changed.
     saddle = container.read_item(item=item_id, partition_key=category_id)
 
     saddle["price"] = 32.55
@@ -261,6 +269,8 @@ Replace, upsert, and delete the item, then recreate it for the tasks that follow
     ```python
     saddle["price"] = 30.00
 
+    # Upsert creates or replaces. Suppressing its response body saves bandwidth,
+    # not the RU cost of the write; response headers remain available.
     upserted = container.upsert_item(body=saddle, no_response=True)
     charge = upserted.get_response_headers()["x-ms-request-charge"]
     print(f"Upsert:      {charge} RU (no payload returned)")
@@ -272,6 +282,7 @@ Replace, upsert, and delete the item, then recreate it for the tasks that follow
 
     ```python
     container.delete_item(item=item_id, partition_key=category_id)
+    # Read this charge before the following create replaces the last-response headers.
     charge = container.client_connection.last_response_headers["x-ms-request-charge"]
     print(f"Delete:      {charge} RU")
 
@@ -302,6 +313,7 @@ Change one property without rewriting the whole document, and make that change c
     category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
 
     try:
+        # Both patch operations apply to one item only when the predicate holds.
         patched = container.patch_item(
             item=item_id,
             partition_key=category_id,
@@ -321,6 +333,7 @@ Change one property without rewriting the whole document, and make that change c
 1. Now force the condition to fail. Append the following code, which uses a predicate the item no longer satisfies:
 
     ```python
+    # A false predicate rejects the patch without incrementing the price.
     try:
         container.patch_item(
             item=item_id,
@@ -337,6 +350,7 @@ Change one property without rewriting the whole document, and make that change c
 
     ```python
     current = container.read_item(item=item_id, partition_key=category_id)
+    # IfNotModified accepts the replacement only if this item version is still current.
     etag = current["_etag"]
 
     current["price"] = 45.00
@@ -353,6 +367,7 @@ Change one property without rewriting the whole document, and make that change c
 1. Reuse the same, now stale, ETag on a second replace:
 
     ```python
+    # The successful replace changed the ETag; reusing the saved one must fail.
     try:
         current["price"] = 50.00
         container.replace_item(
@@ -381,6 +396,8 @@ Write a transient item, give it a short lifetime, and watch it disappear.
     ```python
     category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
 
+    # Item TTL is in seconds from the last write. Container TTL must be enabled.
+    # Upserting this item again restarts its expiration window.
     container.upsert_item(body={
         "id": "session-9f21",
         "categoryId": category_id,
@@ -402,6 +419,7 @@ Write a transient item, give it a short lifetime, and watch it disappear.
         except exceptions.CosmosResourceNotFoundError:
             print(f"{label} session expired")
 
+    # Check before and after expiry, with a margin beyond the 30-second lifetime.
     time.sleep(10)
     read_session("After 10s:")
 
@@ -432,6 +450,8 @@ To see how the failure reports itself, write two related items atomically, then 
     ```python
     category_id = "26C74104-40BC-4541-8EF5-9892F7F03D72"
 
+    # Each tuple contains an operation name and its positional arguments.
+    # All item bodies must match the batch's one partition key value.
     batch_operations = [
         ("upsert", ({"id": "201D0D79-81AD-43D2-AD6E-F09EEE6AC2D7", "categoryId": category_id,
                      "categoryName": "Components, Saddles", "sku": "SE-M798",
@@ -441,6 +461,7 @@ To see how the failure reports itself, write two related items atomically, then 
                      "name": "HL Touring Seat/Saddle", "price": 52.64, "tags": []},)),
     ]
 
+    # These writes commit together or roll back together, unlike independent bulk writes.
     batch_response = container.execute_item_batch(
         batch_operations=batch_operations,
         partition_key=category_id,
@@ -457,6 +478,8 @@ To see how the failure reports itself, write two related items atomically, then 
 1. Now build a batch that mixes partition key values. Append the following code:
 
     ```python
+    # The second body deliberately uses a different /categoryId, invalidating
+    # the entire transaction, including the otherwise valid first create.
     bad_operations = [
         ("create", ({"id": "5996B5E0-6EC7-4CB7-A924-7B5A053AE980", "categoryId": category_id,
                      "categoryName": "Components, Saddles", "sku": "SE-M236",
@@ -516,10 +539,12 @@ This task writes to the `bulkload` container rather than `operations`, so the it
             for i in range(2000)
         ]
 
+        # Async context managers close credential and connection resources.
         async with DefaultAzureCredential() as credential:
             async with CosmosClient(endpoint, credential) as client:
                 container = client.get_database_client("cosmicworks").get_container_client("bulkload")
 
+                # Bound concurrent independent writes; this isn't an atomic batch.
                 semaphore = asyncio.Semaphore(100)
 
                 async def create(item):
@@ -532,9 +557,12 @@ This task writes to the `bulkload` container rather than `operations`, so the it
                 first_pass_failures = 0
 
                 for attempt in range(3):
+                    # Preserve each outcome in input order so failed items can be identified.
                     results = await asyncio.gather(
                         *(create(item) for item in pending), return_exceptions=True)
 
+                    # Retry only known rejections. Don't blindly replay timeouts:
+                    # the original create might already have committed.
                     for result in results:
                         if isinstance(result, BaseException) and (
                             not isinstance(result, exceptions.CosmosHttpResponseError)
@@ -542,6 +570,7 @@ This task writes to the `bulkload` container rather than `operations`, so the it
                         ):
                             raise result
 
+                    # Only rejected items enter the next pass; successes aren't resent.
                     pending = [item for item, result in zip(pending, results)
                                if isinstance(result, Exception)]
 
