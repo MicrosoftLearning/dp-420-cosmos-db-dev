@@ -86,12 +86,12 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
 
     ```powershell
     $account = "<your-account-name>"
-    $groupName = "security-client"
+    $containerGroupName = "security-client"
     $endpoint = az cosmosdb show --resource-group $resourceGroup --name $account `
         --query documentEndpoint --output tsv
     ```
 
-1. Confirm the security baseline. Expect local authentication disabled and public network access enabled.
+1. Confirm the security baseline. Expect **LocalAuthDisabled** to be **True** and **PublicAccess** to be **Enabled**. These values mean local authentication is disabled and public network access is enabled.
 
     ```azurecli
     az cosmosdb show --resource-group $resourceGroup --name $account `
@@ -116,15 +116,15 @@ Prepare source locally before creating ACI. The client downloads 295 CosmicWorks
 
 The `seed` mode upserts the dataset. The `read` mode performs a point read. The `check` mode reads, then attempts replacement with the original downloaded values. Only a replacement 403 after read success counts as expected denial. Unexpected write success returns failure without changing business values, although server-maintained metadata can change.
 
-1. Create a local working folder in **local PowerShell**. Keep this directory separate from the container's working directory.
+1. In **local PowerShell**, create a `dp420-security` subfolder under the current **Allfiles/Labs/Shared** folder and change to it. This local folder is separate from the container's working directory.
 
     ```powershell
-    $workFolder = Join-Path $HOME 'dp420-security'
+    $workFolder = Join-Path $PWD.Path 'dp420-security'
     New-Item -ItemType Directory -Path $workFolder -Force | Out-Null
     Set-Location $workFolder
     ```
 
-1. Create `Program.cs` in Visual Studio Code with the following complete program. Output contains statuses, not tokens, products, or full exception messages. Gateway mode deliberately uses HTTPS for this controlled comparison. The .NET SDK otherwise defaults to Direct mode, with different outbound port requirements.
+1. In the **dp420-security** folder, create `Program.cs` in Visual Studio Code with the following complete program. Output contains statuses, not tokens, products, or full exception messages. Gateway mode deliberately uses HTTPS for this controlled comparison. The .NET SDK otherwise defaults to Direct mode, with different outbound port requirements.
 
     ```csharp
     using System;
@@ -136,6 +136,13 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
     using Microsoft.Azure.Cosmos;
     using Newtonsoft.Json.Linq;
 
+    // Run one stage per process:
+    // seed loads products, read tests connectivity and read permission,
+    // and check verifies that reading succeeds but writing is denied.
+    // Exit codes: 0 = expected result, 1 = unexpected result,
+    // 2 = invalid arguments or configuration, 3 = seed or read denied.
+    // Returning an integer from this top-level program sets the process exit
+    // code, which you inspect in Bash with echo $? after running the program.
     if (args.Length != 1 || args[0] is not ("seed" or "read" or "check"))
     {
         Console.WriteLine("Usage: seed | read | check");
@@ -145,6 +152,8 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
     string mode = args[0];
     try
     {
+        // ACI receives the account URL through an environment variable.
+        // The URL identifies the account; it isn't an account key or token.
         string? endpoint = Environment.GetEnvironmentVariable("COSMOS_ENDPOINT");
         if (string.IsNullOrWhiteSpace(endpoint))
         {
@@ -152,14 +161,21 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
             return 2;
         }
 
+        // Download the public sample dataset once into the container's
+        // current directory. Later runs reuse it, including during the
+        // Cosmos DB network test, so they don't need another download.
         const string sourceUrl = "https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data/database-v4/product";
         const string cacheFile = "products.json";
         if (!File.Exists(cacheFile))
         {
+            // using disposes the downloader when this block finishes.
             using HttpClient downloader = new HttpClient();
             await File.WriteAllTextAsync(cacheFile, await downloader.GetStringAsync(sourceUrl));
         }
 
+        // Parse the JSON array and reject an unexpected dataset before
+        // accessing Cosmos DB. JObject retains each complete product document
+        // for seeding and replacement without a separate C# model class.
         JArray products = JArray.Parse(await File.ReadAllTextAsync(cacheFile));
         if (products.Count != 295 || products.Any(product =>
             product is not JObject ||
@@ -169,18 +185,35 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
             throw new InvalidDataException();
         }
 
+        // A point read needs both the item ID and partition key value.
+        // Reuse the first cached product so every test targets the same
+        // item in the container, whose partition key path is /categoryId.
+        // Validation above establishes these types; ! suppresses nullable
+        // warnings and doesn't perform an additional runtime check.
         JObject firstProduct = (JObject)products[0]!;
         string productId = firstProduct.Value<string>("id")!;
         string categoryId = firstProduct.Value<string>("categoryId")!;
+        // Inside ACI, request tokens for the host's system-assigned managed
+        // identity, not your local Azure CLI identity. No account key is used.
+        // The identity still needs a Cosmos DB data-plane role assignment.
         var credential = new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned);
+        // Force Gateway mode (HTTPS) for the controlled network test rather
+        // than the SDK's default Direct mode. using disposes the client when
+        // execution leaves this try block, including on return or exception.
         using CosmosClient client = new CosmosClient(endpoint, credential,
             new CosmosClientOptions { ConnectionMode = ConnectionMode.Gateway });
+        // This reference targets resources already created by setup;
+        // it doesn't create a database or container.
         Container container = client.GetContainer("cosmicworks", "product");
 
         if (mode == "seed")
         {
+            // Temporary Data Contributor permission allows loading.
+            // Upsert creates a missing item or replaces an existing one,
+            // so retrying doesn't create duplicate copies of the items.
             foreach (JObject product in products.Cast<JObject>())
             {
+                // Route each write using that product's partition key value.
                 await container.UpsertItemAsync(product,
                     new PartitionKey(product.Value<string>("categoryId")!));
             }
@@ -188,6 +221,8 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
             return 0;
         }
 
+        // Both read and check must first prove this identity can read.
+        // A failed read skips the write attempt and reaches a handler.
         await container.ReadItemAsync<JObject>(productId, new PartitionKey(categoryId));
         Console.WriteLine("Read succeeded.");
         if (mode == "read")
@@ -197,28 +232,41 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
 
         try
         {
+            // Only check reaches here. Data Reader should allow the
+            // preceding read but reject this replacement with HTTP 403.
+            // Use the original values to avoid intentional business-data
+            // changes if writing succeeds, but metadata can still change.
             await container.ReplaceItemAsync(firstProduct, productId, new PartitionKey(categoryId));
             Console.WriteLine("UNEXPECTED: Write succeeded.");
             return 1;
         }
         catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.Forbidden)
         {
+            // The filter accepts only a forbidden replacement as expected
+            // denial. Other exceptions reach the outer error handlers.
             Console.WriteLine("Write denied (403). Expected.");
             return 0;
         }
     }
     catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.Forbidden)
     {
+        // A 403 during initialization, seeding, or reading is different
+        // from the expected write denial. Exit 3 is expected only for
+        // the read test while the lab has public network access disabled.
         Console.WriteLine(mode == "seed" ? "Seed denied (403)." : "Read denied (403).");
         return 3;
     }
     catch (CosmosException exception)
     {
+        // A different HTTP status is an unexpected failure, not proof that
+        // the intended permission or network restriction worked.
         Console.WriteLine($"Unexpected Cosmos status ({(int)exception.StatusCode}).");
         return 1;
     }
     catch (Exception exception)
     {
+        // Report the failure type without exposing full exception details,
+        // which can include request information unsuitable for lab output.
         Console.WriteLine($"Unexpected failure ({exception.GetType().Name}).");
         return 1;
     }
@@ -246,7 +294,7 @@ ACI supplies the Linux process with a managed identity endpoint. Temporary Data 
 1. Create ACI with a system-assigned identity and an idle process for repeated sessions. Omit identity `--scope` and `--role`: no Azure management grant is needed. Public IP, DNS label, and port options remain unset.
 
     ```azurecli
-    az container create --resource-group $resourceGroup --name $groupName `
+    az container create --resource-group $resourceGroup --name $containerGroupName `
         --location $location --image $image --os-type Linux --cpu 2 --memory 4 `
         --assign-identity --restart-policy Never --command-line 'tail -f /dev/null' `
         --environment-variables "COSMOS_ENDPOINT=$endpoint" "SOURCE_BASE64=$sourceBase64"
@@ -255,9 +303,9 @@ ACI supplies the Linux process with a managed identity endpoint. Temporary Data 
 1. Check for `Running` and capture the principal object ID. Continue only with a nonempty ID. Investigate provisioning or capacity errors otherwise.
 
     ```powershell
-    az container show --resource-group $resourceGroup --name $groupName `
+    az container show --resource-group $resourceGroup --name $containerGroupName `
         --query 'containers[0].instanceView.currentState.state' --output tsv
-    $principalId = az container show --resource-group $resourceGroup --name $groupName `
+    $principalId = az container show --resource-group $resourceGroup --name $containerGroupName `
         --query identity.principalId --output tsv
     $principalId
     ```
@@ -278,7 +326,7 @@ ACI supplies the Linux process with a managed identity endpoint. Temporary Data 
 1. Enter **container Bash** from **local PowerShell**. ACI exec starts one shell command; enter subsequent commands at the Bash prompt.
 
     ```azurecli
-    az container exec --resource-group $resourceGroup --name $groupName --exec-command /bin/bash
+    az container exec --resource-group $resourceGroup --name $containerGroupName --exec-command /bin/bash
     ```
 
 1. Initialize the project in **container Bash**. Decode the source and install unpinned supported packages. Continue only after installation completes successfully.
@@ -292,7 +340,7 @@ ACI supplies the Linux process with a managed identity endpoint. Temporary Data 
     dotnet add package Newtonsoft.Json
     ```
 
-1. Load the products in **container Bash**. Expect `Seed succeeded: 295 items.` and exit code `0`. For a 403, check the recorded principal and scope locally, allow propagation, and retry. Don't broaden the grant. A retry uses the cache and upserts the same products.
+1. Load the products in **container Bash**. Expect `Seed succeeded: 295 items.` and exit code `0`. For a 403, check the recorded principal and scope locally, allow propagation, and retry. Don't broaden the grant. A retry uses the cache and upserts the same products. If the pasted commands haven't started running, press **Enter**.
 
     ```bash
     dotnet run -- seed
@@ -338,7 +386,7 @@ Adding Reader doesn't cancel Contributor. Remove the temporary grant, then test 
 1. To test the hosted identity, not your CLI identity, reenter **container Bash** from **local PowerShell**.
 
     ```azurecli
-    az container exec --resource-group $resourceGroup --name $groupName --exec-command /bin/bash
+    az container exec --resource-group $resourceGroup --name $containerGroupName --exec-command /bin/bash
     ```
 
 1. Run the check in **container Bash**. Each invocation starts a new process whose read and replacement share one client and identity.
@@ -377,6 +425,8 @@ Change only public-network access. Keep the role, principal, container, cache, a
     az cosmosdb update --resource-group $resourceGroup --name $account --public-network-access DISABLED
     ```
 
+    > **Note:** This command can take **5 minutes or more** to complete and might not display progress while Azure applies the change. Wait for the PowerShell prompt to return before continuing.
+
 1. Inspect the setting in **local PowerShell**. Expect `Disabled`. This management-plane request still works and doesn't demonstrate data access.
 
     ```azurecli
@@ -386,7 +436,7 @@ Change only public-network access. Keep the role, principal, container, cache, a
 1. To reuse the same network source and managed identity, enter **container Bash** from **local PowerShell**.
 
     ```azurecli
-    az container exec --resource-group $resourceGroup --name $groupName --exec-command /bin/bash
+    az container exec --resource-group $resourceGroup --name $containerGroupName --exec-command /bin/bash
     ```
 
 1. Run the point read in **container Bash**. Expect `Read denied (403).` and intentional exit code `3`. Allow up to 15 minutes for network propagation. Don't accept successful reads as isolation: check the setting and retry. Other errors are inconclusive.
@@ -412,10 +462,12 @@ Change only public-network access. Keep the role, principal, container, cache, a
     az cosmosdb show --resource-group $resourceGroup --name $account --query publicNetworkAccess --output tsv
     ```
 
+    > **Note:** The update command can take **5 minutes or more** to complete and might not display progress while Azure applies the change. Wait for the PowerShell prompt to return before continuing.
+
 1. Reenter **container Bash** from **local PowerShell** for the final comparison.
 
     ```azurecli
-    az container exec --resource-group $resourceGroup --name $groupName --exec-command /bin/bash
+    az container exec --resource-group $resourceGroup --name $containerGroupName --exec-command /bin/bash
     ```
 
 1. Repeat the read and authorization check in **container Bash**. Expect read success, then the earlier read-success and write-denial pair, each with exit code `0`. Retry after propagation as needed. Don't accept unexpected results or change roles to make reads succeed.
@@ -472,7 +524,7 @@ If your lab provided the resource group, or the group holds other resources, del
 
 ```azurecli
 az cosmosdb delete --name $account --resource-group $resourceGroup --yes
-az container delete --name $groupName --resource-group $resourceGroup --yes
+az container delete --name $containerGroupName --resource-group $resourceGroup --yes
 ```
 
 This exercise demonstrates three distinct boundaries: hosted identity, scoped data permissions, and network access. The paired positive and negative tests provide evidence for those operations without claiming production-wide security.
