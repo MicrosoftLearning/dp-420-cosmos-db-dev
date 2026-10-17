@@ -177,25 +177,35 @@ Before changing anything, record what three representative operations cost again
     print(f"{'replace one product':<25}: {write_charge:>8.2f} RU")
     ```
 
-1. Run the application.
+1. Run the application and record the default-policy charges.
 
     ```powershell
+    Write-Host "Task 1 - Default policy"
     python measure.py
     ```
 
-    The output reports one charge per operation. Charges depend on the data, query shape, indexing policy, and consistency level. Record your measurements rather than the sample values.
+    Sample output follows. Record your measured charges under **Task 1 - Default policy**; your values can differ.
 
     ```output
-    sku lookup               :     3.03 RU for 1 items
-    category sorted by price :    14.75 RU for 43 items
+    sku lookup               :     2.82 RU for 1 items
+    category sorted by price :     4.59 RU for 43 items
     replace one product      :    10.29 RU
     ```
+
+    Copy this table into your notes. Record RU charges for each run without overwriting earlier results.
+
+    | Measurement | `sku lookup` | `category sorted by price` | `replace one product` | `sku lookup on the index` |
+    | :--- | :--- | :--- | :--- | :--- |
+    | Task 1 - Default policy | Record | Record | Record | Not created |
+    | Task 2 - Trimmed policy | Record | Record | Record | Not created |
+    | Task 3 - Before GSI | Record | Record | Record | Not created |
+    | Task 4 - After GSI | Record | Record | Record | Record |
 
 The sorted query runs today because the range index that the default policy provides already serves an `ORDER BY` on a single property. Sorting on two properties is different: that clause always needs a composite index and fails without one. You make that change in Task 3.
 
 ## Task 2: Trim the indexing policy
 
-The catalog's `description` and `tags` properties are read constantly and never filtered. Excluding them from the index cuts the cost of every write without affecting any query the storefront runs.
+The catalog's `description` and `tags` properties are read constantly and never filtered. Excluding them from the index can reduce write charges without affecting the queries in this exercise.
 
 1. Create a file named **index-policy.json** in your project folder with the following content.
 
@@ -236,13 +246,14 @@ The catalog's `description` and `tags` properties are read constantly and never 
         --query "resource.indexingPolicy.excludedPaths"
     ```
 
-1. Run the application again and compare the replace charge with the baseline. Removing index paths takes effect immediately, so the write is cheaper on this run.
+1. Run the application and record all three charges under **Task 2 - Trimmed policy**.
 
     ```powershell
+    Write-Host "Task 2 - Trimmed policy"
     python measure.py
     ```
 
-The two query charges stay close to their baselines, because neither query filters on the paths you excluded. That contrast is the result to take away: you paid less for writes and gave up nothing on reads.
+1. Compare **Task 2 with Task 1**: check `replace one product` for write savings and both queries for unchanged read cost. Equal charges are valid.
 
 ## Task 3: Add a composite index
 
@@ -282,9 +293,18 @@ This task sorts the listing on two properties, `categoryId` and then `price`. An
         --idx @index-policy.json
     ```
 
-1. Adding an index path starts an index transformation, and the composite index isn't usable until that transformation finishes. Add this check immediately after the code that gets the `product` container, before any measurements.
+1. Adding an index path starts an index transformation, and the composite index isn't usable until that transformation finishes.
+
+    In **measure.py**, find this line near the top of the file:
 
     ```python
+    product = client.get_database_client("cosmicworks").get_container_client("product")
+    ```
+
+    Add this block immediately after the line that gets the `product` container.
+
+    ```python
+
     # A policy update isn't proof the new index is ready. Request the
     # transformation-progress header and stop measurements until it reaches 100%.
     index_progress_headers = {}
@@ -300,7 +320,14 @@ This task sorts the listing on two properties, `categoryId` and then `price`. An
         raise SystemExit("Index transformation is still running. Run the application again later.")
     ```
 
-1. Run the application. Repeat until the progress reports **100%**. The check stops the application while the transformation is incomplete.
+1. Run the application until index progress is **100%**.
+
+    ```powershell
+    Write-Host "Index readiness check"
+    python measure.py
+    ```
+
+    Don't record these charges; update the query next.
 
 1. Confirm the requested composite index definition. This command shows the policy, not the index transformation progress.
 
@@ -317,13 +344,22 @@ This task sorts the listing on two properties, `categoryId` and then `price`. An
 
     In **measure.py**, replace the `ORDER BY c.price DESC` clause in the second `measure` call with `ORDER BY c.categoryId, c.price DESC`.
 
-1. Run the application again and compare the charge for the sorted query. Record the replace charge from this run as the baseline for Task 4.
+1. After changing the query, run the application. Confirm **100%** progress and record all three charges under **Task 3 - Before GSI**.
 
-With only 295 items, the charge difference can be small. Without the composite index, that two-property `ORDER BY` returns an error instead of results, so the index is what makes the query possible at all. Composite indexes can reduce query charges on larger datasets, particularly when the sorted property has many distinct values. Use your measurements to assess the saving.
+    ```powershell
+    Write-Host "Task 3 - Before GSI"
+    python measure.py
+    ```
+
+    **Save this pre-GSI replace charge for the write-cost comparison in Task 4.**
+
+The composite index enables the two-property sort. Tasks 2 and 3 use different sorted queries, so their charge difference doesn't isolate index savings.
 
 ## Task 4: Create a global secondary index
 
 The stock keeping unit lookup is the query that partitioning can't help, because `sku` isn't the partition key. Give it a global secondary index partitioned on `/sku`.
+
+Keep the source indexing policy and queries unchanged so Task 3 remains the pre-GSI baseline.
 
 ### Enable the feature on the account
 
@@ -348,18 +384,28 @@ The stock keeping unit lookup is the query that partitioning can't help, because
         --body "@capabilities.json"
     ```
 
-1. Confirm the feature is enabled.
+1. Wait for the account update to finish, then confirm the feature is enabled. The update can take a few minutes, so `enabled` can initially be `false` even after the PATCH command returns.
+
+    Run the following command in the same terminal. If the update is still in progress or `enabled` is `false`, wait 30 seconds and run this GET command again; don't repeat the PATCH command.
 
     ```azurecli
     az rest `
         --method GET `
         --uri "https://management.azure.com$accountId/?api-version=2022-11-15-preview" `
-        --query "properties.enableMaterializedViews"
+        --query "{state:properties.provisioningState, enabled:properties.enableMaterializedViews, backup:properties.backupPolicy.type}"
     ```
 
+    Continue to **Create the index container** only when the output shows all three values below:
+
     ```output
-    true
+    {
+      "backup": "Continuous",
+      "enabled": true,
+      "state": "Succeeded"
+    }
     ```
+
+    If the update reports `Failed`, or `enabled` remains `false` after several minutes, stop and check the PATCH response and the account's **Activity log** in the Azure portal for errors. Don't create the index container while the feature is disabled.
 
 ### Create the index container
 
@@ -399,16 +445,7 @@ The stock keeping unit lookup is the query that partitioning can't help, because
         --headers content-type=application/json
     ```
 
-1. Check the container creation status. This management response doesn't confirm that the initial data synchronization is complete. An empty status isn't a readiness signal.
-
-    ```azurecli
-    az rest `
-        --method GET `
-        --uri "https://management.azure.com$accountId/sqlDatabases/cosmicworks/containers/productBySku/?api-version=2022-11-15-preview" `
-        --query "{status: properties.Status}"
-    ```
-
-1. Confirm the index container exists.
+1. Confirm the index container exists. This check verifies creation, not whether the initial data synchronization is complete.
 
     ```azurecli
     az cosmosdb sql container show `
@@ -419,13 +456,29 @@ The stock keeping unit lookup is the query that partitioning can't help, because
         --query "resource.id"
     ```
 
-1. In the Azure portal, open **Metrics** for the account and select **Global Secondary Index Propagation Latency in Seconds**. Filter **GlobalSecondaryIndexName** to `productBySku`, then apply splitting by **GlobalSecondaryIndexStatus**. Wait for the index to report **Active**, rather than only **InitialBuildAfterCreate**. Missing metric data doesn't confirm readiness.
+    The expected output is:
 
-1. In **Data Explorer**, run this query in both `product` and `productBySku`. Continue only when both return **295**.
+    ```output
+    "productBySku"
+    ```
+
+### Verify the index data
+
+1. In the account's **Data Explorer**, expand **cosmicworks**, select **product** > **Items**, and open **New SQL Query**. Run the following query, then repeat it under **productBySku** > **Items**. Both containers must return **295**.
 
     ```sql
     SELECT VALUE COUNT(1) FROM c
     ```
+
+1. Run the following query in both containers to check the product used by the lookup measurement. Each query must return one item with the same values for all five projected properties.
+
+    ```sql
+    SELECT c.id, c.sku, c.name, c.price, c.categoryId
+    FROM c
+    WHERE c.sku = "BK-R93R-44"
+    ```
+
+    Wait and repeat until both counts and SKU results match. These checks verify the lab data, not future replication latency.
 
 ### Compare the lookup
 
@@ -446,11 +499,16 @@ The stock keeping unit lookup is the query that partitioning can't help, because
     )
     ```
 
-1. Run the application one more time and compare the two stock keeping unit lookups.
+1. Run the application and record all four charges under **Task 4 - After GSI**.
 
-    The query against `product` visits every physical partition. The query against `productBySku` filters on that container's partition key, so it targets one partition. At this dataset size, both containers can fit on one physical partition, so a lower charge isn't guaranteed. The index avoids the added fan-out cost as the source gains physical partitions, but total query cost still depends on the data and results. Its smaller projection can also affect the comparison.
+    ```powershell
+    Write-Host "Task 4 - After GSI"
+    python measure.py
+    ```
 
-1. Compare the replace charge with the value you recorded at the end of Task 3, after the composite index finished building. Using that baseline keeps the source indexing policy the same for the comparison. A source container with a global secondary index incurs an extra replace charge because it persists both versions of the item so the change can propagate. That surcharge is part of the cost of avoiding cross-partition lookups.
+1. Compare **`sku lookup` and `sku lookup on the index` in this run** for GSI read savings. Equal charges mean no measured saving; both containers can fit in one physical partition at this dataset size.
+
+1. Compare **`replace one product` with the charge saved at the end of Task 3**. Subtract **before GSI** from **after GSI** to measure added write cost.
 
 ## Clean up resources
 
@@ -462,4 +520,4 @@ az group delete --name $resourceGroup --yes --no-wait
 
 If your lab provided `ResourceGroup1`, or the group holds other resources, keep the group. In the Azure portal, delete only the Azure Cosmos DB account you created for this exercise.
 
-The three numbers to keep from this exercise are the write charge before and after you trimmed the policy, the two stock keeping unit lookups, and the write charge after the index existed. Together they describe the whole trade: indexing costs writes and saves reads, and a global secondary index moves that trade to a different partition key rather than escaping it.
+Keep your completed results table.
