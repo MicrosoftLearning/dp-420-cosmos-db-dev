@@ -24,7 +24,7 @@ Use these guides to prepare for the DP-420 exercises. Follow your exercise's set
 | Secure an Azure Cosmos DB account | `security` | Disposable account, own resource group. Also needs Azure Container Instances quota |
 | Configure backup and restore | `backup` | Disposable account, own resource group. Continuous backup at `Continuous7Days` |
 | Design multi-region availability and failover | `multiregion` | Disposable account, own resource group. Two regions |
-| Design and optimize an indexing strategy | `indexing` | Disposable account, own resource group. Continuous backup at `Continuous7Days` |
+| Design and optimize an indexing strategy | `indexing` | Disposable account. Continuous7Days, seeded `product` and `productMeta`, empty `indexingLab` sandbox |
 | Analyze and tune query performance | `core` | Needs the seeded `product` container |
 | Monitor and troubleshoot Azure Cosmos DB | `monitoring` | Disposable account, own resource group. `product` at 400 RU/s manual |
 | Manage Azure Cosmos DB at scale with fleets | `fleet` | **Two** disposable accounts, own resource group. Identical single-region configuration |

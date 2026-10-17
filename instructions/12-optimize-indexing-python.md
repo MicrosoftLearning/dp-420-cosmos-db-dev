@@ -2,8 +2,8 @@
 lab:
   title: Optimize an indexing strategy in Python
   module: Module 12 - Design and Optimize an Indexing Strategy in Azure Cosmos DB
-  description: Measure a baseline, trim an indexing policy, add a composite index, and create a global secondary index, comparing the request charge after each change.
-  duration: 45 minutes
+  description: Measure index-maintenance cost, enable composite and computed-property queries, query a spatial index, and verify a global secondary index.
+  duration: 75 minutes
   level: 300
   islab: true
   primarytopics:
@@ -14,9 +14,7 @@ lab:
 
 # Optimize an indexing strategy in Python
 
-In this exercise, you tune the indexing on a product catalog and measure what each change costs. You start by recording a baseline for three operations, then trim the indexing policy, add a composite index, and finally create a global secondary index that turns a cross-partition lookup into a single-partition one.
-
-Every task ends with a request charge you can compare against the one before it. Those numbers are the point of the exercise, so record them as you go.
+In this exercise, you optimize indexing on a CosmicWorks product catalog. You measure index-maintenance cost, add composite and computed-property indexes, query a spatial index, and verify a global secondary index (GSI).
 
 This exercise takes approximately **45** minutes to complete.
 
@@ -48,7 +46,7 @@ Global secondary indexes require continuous backup on the account, and moving an
 
 1. Open the context menu for the folder and select **Open in Integrated Terminal**. If the terminal isn't PowerShell, select the dropdown beside the **+** in the terminal toolbar and choose **PowerShell**.
 
-1. Sign in to the Azure CLI. A browser window opens so you can sign in to Azure.
+1. Sign in to the Azure CLI and follow the sign-in prompts for your environment.
 
     ```azurecli
     az login
@@ -64,7 +62,7 @@ Global secondary indexes require continuous backup on the account, and moving an
 1. Run the setup script.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab12 -LabProfile indexing
+    .\setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab12 -LabProfile indexing
     ```
 
     Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab12a7f3k9`.
@@ -78,144 +76,162 @@ The script creates the following resources:
 | Resource | Configuration |
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, continuous backup at the `Continuous7Days` tier, with key-based authentication disabled |
-| `cosmicworks` database | Holds the container this exercise uses |
-| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, loaded with 295 CosmicWorks products |
+| `cosmicworks` database | Holds the containers this exercise uses |
+| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, loaded with 295 CosmicWorks database-v4 products |
+| `productMeta` container | Partitioned on `/type`, autoscale up to 1,000 RU/s, loaded with 237 database-v4 category and tag documents |
+| `indexingLab` container | Partitioned on `/categoryId`, autoscale up to 1,000 RU/s, left empty for the lab fixtures |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
+
+Task 6 adds a fourth container for the GSI. Throughput and storage charges apply.
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> &#9888; Use only the account this script creates for this exercise. Later steps change the account's indexing configuration. Never point this exercise at a shared training or production account.
+> &#9888; Use only the account this script creates for this exercise, not an account from an earlier indexing run. Existing policies or a GSI invalidate the before-and-after tests.
 
 > &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
-1. Set variables for the account name and your subscription so the Azure CLI commands in this exercise can use them.
+1. Set variables for the account name and endpoint, then verify the resources:
 
     ```powershell
     $accountName = "<your-account-name>"
-    $subscriptionId = (az account show --query id --output tsv)
+    $env:COSMOS_ENDPOINT = "<your-account-endpoint>"
+    .\verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile indexing
     ```
 
-## Task 1: Measure the baseline
+## Task 1: Create a write-cost experiment
 
-Before changing anything, record what three representative operations cost against the default indexing policy: a lookup by stock keeping unit, a sorted listing within one category, and a single item replace.
-
-1. In the terminal, create a project folder and a virtual environment.
+1. In the same terminal, create your application folder and install the SDKs:
 
     ```powershell
     mkdir indexing-lab
-    cd indexing-lab
+    Set-Location indexing-lab
     python -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    python -m pip install azure-cosmos==4.17.1 azure-identity==1.26.0
     ```
 
-1. Activate the environment. On Windows PowerShell, activate the environment with `.venv\Scripts\Activate.ps1`.
-
-    ```powershell
-    .venv\Scripts\activate
-    ```
-
-1. Install the two packages the application needs.
-
-    ```powershell
-    pip install azure-cosmos azure-identity
-    ```
-
-1. Create a file named **measure.py** and add the following code. Replace `<cosmos-endpoint>` with the account endpoint you recorded.
+1. Create **measure.py** with the following code. The probe attaches the 200 real catalog tags to a sandbox copy, making unused index entries measurable without changing the original product.
 
     ```python
-    from azure.cosmos import CosmosClient, PartitionKey
+    import json
+    import os
+    import time
+    from azure.cosmos import CosmosClient
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
     from azure.identity import AzureCliCredential
 
-    ENDPOINT = "<cosmos-endpoint>"
     CATEGORY_ID = "AE48F0AA-4F65-4734-A4CF-D48B8F82267F"
-    SKU = "BK-R93R-44"
     PRODUCT_ID = "FD48A179-6CF5-45F2-8605-9DA19B9D4409"
+    SKU = "BK-R93R-44"
+    # Use the identity from az login; these clients reference existing resources.
+    client = CosmosClient(os.environ["COSMOS_ENDPOINT"], AzureCliCredential())
+    database = client.get_database_client("cosmicworks")
+    product = database.get_container_client("product")
+    sandbox = database.get_container_client("indexingLab")
+    metadata = database.get_container_client("productMeta")
 
-    # Use az login for data access; these clients reference existing resources.
-    client = CosmosClient(ENDPOINT, AzureCliCredential())
-    product = client.get_database_client("cosmicworks").get_container_client("product")
+
+    def business_item(item):
+        # Keep business fields, but don't send server-managed metadata back.
+        return {key: value for key, value in item.items() if not key.startswith("_")}
 
 
-    def measure(container, label, query, parameters):
-        charge = 0.0
-        items = 0
-        # Parameters keep values separate from SQL. The partition-key filter,
-        # when present, lets the service narrow the query's scope.
-        pages = container.query_items(
-            query=query,
-            parameters=parameters,
-            enable_cross_partition_query=True,
-        ).by_page()
-
+    def measure(container, text, parameters=None, partition_key=None):
+        # Supplying a key scopes the request to one logical partition.
+        options = {"enable_cross_partition_query": partition_key is None}
+        if partition_key is not None:
+            options["partition_key"] = partition_key
+        rows, charge = [], 0.0
+        pages = container.query_items(query=text, parameters=parameters or [], **options).by_page()
         for page in pages:
-            # Queries are lazy: consume the page before reading its response headers.
-            # Sum every page's charge to measure the complete query.
-            items += len(list(page))
+            # Queries are lazy: consume each page before reading its request charge.
+            rows.extend(list(page))
             charge += float(container.client_connection.last_response_headers["x-ms-request-charge"])
+        return rows, charge
 
-        print(f"{label:<25}: {charge:>8.2f} RU for {items} items")
+
+    def replace_charge(container, item):
+        charge = 0.0
+        # Average three identical replacements; setup writes aren't included.
+        for _ in range(3):
+            headers = {}
+            container.replace_item(
+                item=item["id"], body=item,
+                response_hook=lambda response_headers, body: headers.update(response_headers),
+            )
+            charge += float(headers["x-ms-request-charge"])
+        return charge / 3
 
 
-    measure(
-        product,
-        "sku lookup",
-        "SELECT * FROM c WHERE c.sku = @sku",
-        [{"name": "@sku", "value": SKU}],
+    def index_ready(container):
+        headers = {}
+        # A policy update can finish before its new indexes are ready for queries.
+        container.read(
+            populate_quota_info=True,
+            response_hook=lambda response_headers, body: headers.update(response_headers),
+        )
+        progress = int(headers["x-ms-documentdb-collection-index-transformation-progress"])
+        print(f"Index transformation: {progress}%")
+        return progress == 100
+
+
+    def wait_for_rows(container, text, parameters, expected, partition_key=None):
+        # GSI propagation is asynchronous; poll actual data with a bounded wait.
+        deadline = time.monotonic() + 900
+        while True:
+            try:
+                rows, _ = measure(container, text, parameters, partition_key)
+                if rows == expected:
+                    return
+            except CosmosResourceNotFoundError:
+                # The data endpoint can become available after the ARM resource exists.
+                pass
+            if time.monotonic() >= deadline:
+                raise TimeoutError("Expected GSI data didn't arrive within 15 minutes.")
+            time.sleep(5)
+
+
+    # TASK CODE
+    source = business_item(product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID))
+    tags, _ = measure(
+        metadata, "SELECT c.id, c.name FROM c WHERE c.type = @type",
+        [{"name": "@type", "value": "tag"}], partition_key="tag",
     )
-
-    measure(
-        product,
-        "category sorted by price",
-        "SELECT * FROM c WHERE c.categoryId = @categoryId ORDER BY c.price DESC",
-        [{"name": "@categoryId", "value": CATEGORY_ID}],
+    if len(tags) != 200:
+        raise ValueError("Expected 200 tags. Check the indexing profile's productMeta data.")
+    # Stable ordering keeps the before/after replacement bodies identical.
+    tags.sort(key=lambda tag: tag["id"])
+    # Expand tags only in the sandbox to expose unused index-maintenance work.
+    probe = {**source, "id": "indexing-write-probe", "labPurpose": "write-probe", "tags": tags}
+    # Prepare the probe first; its upsert charge isn't part of the replace average.
+    sandbox.upsert_item(probe)
+    rows, charge = measure(
+        sandbox, "SELECT c.sku, c.name, c.price FROM c WHERE c.id = @id AND c.sku = @sku",
+        [{"name": "@id", "value": probe["id"]}, {"name": "@sku", "value": SKU}],
+        partition_key=CATEGORY_ID,
     )
-
-    # Replace an unchanged item to measure write and index-maintenance cost
-    # without deliberately changing its business data.
-    item = product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID)
-    product.replace_item(item=PRODUCT_ID, body=item)
-    write_charge = float(product.client_connection.last_response_headers["x-ms-request-charge"])
-    print(f"{'replace one product':<25}: {write_charge:>8.2f} RU")
+    print(f"Probe: {len(probe['tags'])} tags, {len(json.dumps(probe).encode())} bytes")
+    print(f"SKU lookup: {charge:.2f} RU for {len(rows)} items")
+    print(f"Probe replace: {replace_charge(sandbox, probe):.2f} RU")
     ```
 
-1. Run the application and record the default-policy charges.
+1. Run the application:
 
     ```powershell
-    Write-Host "Task 1 - Default policy"
     python measure.py
     ```
 
-    Sample output follows. Record your measured charges under **Task 1 - Default policy**; your values can differ.
+    Record **Probe replace** as **before trimming**. The SKU lookup should return one item.
 
-    ```output
-    sku lookup               :     2.82 RU for 1 items
-    category sorted by price :     4.59 RU for 43 items
-    replace one product      :    10.29 RU
-    ```
+## Task 2: Exclude unused index paths
 
-    Copy this table into your notes. Record RU charges for each run without overwriting earlier results.
-
-    | Measurement | `sku lookup` | `category sorted by price` | `replace one product` | `sku lookup on the index` |
-    | :--- | :--- | :--- | :--- | :--- |
-    | Task 1 - Default policy | Record | Record | Record | Not created |
-    | Task 2 - Trimmed policy | Record | Record | Record | Not created |
-    | Task 3 - Before GSI | Record | Record | Record | Not created |
-    | Task 4 - After GSI | Record | Record | Record | Record |
-
-The sorted query runs today because the range index that the default policy provides already serves an `ORDER BY` on a single property. Sorting on two properties is different: that clause always needs a composite index and fails without one. You make that change in Task 3.
-
-## Task 2: Trim the indexing policy
-
-The catalog's `description` and `tags` properties are read constantly and never filtered. Excluding them from the index can reduce write charges without affecting the queries in this exercise.
-
-1. Create a file named **index-policy.json** in your project folder with the following content.
+1. Create **index-policy.json** in your application folder. Include the root and exclude the unused description and tag paths:
 
     ```json
     {
       "indexingMode": "consistent",
       "automatic": true,
-      "includedPaths": [
-        { "path": "/*" }
-      ],
+      "includedPaths": [{ "path": "/*" }],
       "excludedPaths": [
         { "path": "/description/?" },
         { "path": "/tags/*" },
@@ -224,300 +240,314 @@ The catalog's `description` and `tags` properties are read constantly and never 
     }
     ```
 
-1. Apply the policy to the `product` container.
-
-    ```azurecli
-    az cosmosdb sql container update `
-        --resource-group $resourceGroup `
-        --account-name $accountName `
-        --database-name cosmicworks `
-        --name product `
-        --idx @index-policy.json
-    ```
-
-1. Confirm the container now reports the excluded paths.
-
-    ```azurecli
-    az cosmosdb sql container show `
-        --resource-group $resourceGroup `
-        --account-name $accountName `
-        --database-name cosmicworks `
-        --name product `
-        --query "resource.indexingPolicy.excludedPaths"
-    ```
-
-1. Run the application and record all three charges under **Task 2 - Trimmed policy**.
+1. Apply the policy to the sandbox, then run the **unchanged** program:
 
     ```powershell
-    Write-Host "Task 2 - Trimmed policy"
+    az cosmosdb sql container update `
+        --resource-group $resourceGroup --account-name $accountName `
+        --database-name cosmicworks --name indexingLab --idx "@index-policy.json"
     python measure.py
     ```
 
-1. Compare **Task 2 with Task 1**: check `replace one product` for write savings and both queries for unchanged read cost. Equal charges are valid.
+    **Compare:** Probe replace should cost less than **before trimming**, while the lookup still returns the same product. Don't change the probe or query between these measurements.
 
 ## Task 3: Add a composite index
 
-This task sorts the listing on two properties, `categoryId` and then `price`. An `ORDER BY` clause on two properties needs a composite index, so you define the index first and then point the application at the wider clause.
+1. In **measure.py**, replace everything from `# TASK CODE` to the end of the file with this block. Keep the imports, clients, constants, and functions above it unchanged. Use this same replacement rule for later Python blocks.
 
-1. Edit **index-policy.json** to add a composite index on `categoryId` ascending and `price` descending, matching the `ORDER BY` clause you're about to write.
+    ```python
+    # TASK CODE
+    if not index_ready(product):
+        raise SystemExit("Wait, then run measure.py again.")
+    # Both ORDER BY paths must match a composite index, in this sequence.
+    rows, charge = measure(
+        product,
+        "SELECT c.id, c.sku, c.price FROM c WHERE c.categoryId = @categoryId "
+        "ORDER BY c.categoryId, c.price DESC",
+        [{"name": "@categoryId", "value": CATEGORY_ID}], partition_key=CATEGORY_ID,
+    )
+    print(f"{len(rows)} products; {charge:.2f} RU")
+    print(json.dumps(rows[:3], indent=2))
+    ```
+
+1. Run `python measure.py`. Expect HTTP **400** stating that the two-property `ORDER BY` needs a composite index. Other errors aren't the expected result.
+
+1. Create **product-policy.json**. Keep the catalog's range indexes and add the composite in query order:
 
     ```json
     {
       "indexingMode": "consistent",
       "automatic": true,
-      "includedPaths": [
-        { "path": "/*" }
-      ],
-      "excludedPaths": [
-        { "path": "/description/?" },
-        { "path": "/tags/*" },
-        { "path": "/\"_etag\"/?" }
-      ],
-      "compositeIndexes": [
-        [
-          { "path": "/categoryId", "order": "ascending" },
-          { "path": "/price", "order": "descending" }
-        ]
-      ]
+      "includedPaths": [{ "path": "/*" }],
+      "excludedPaths": [{ "path": "/\"_etag\"/?" }],
+      "compositeIndexes": [[
+        { "path": "/categoryId", "order": "ascending" },
+        { "path": "/price", "order": "descending" }
+      ]]
     }
     ```
 
-1. Apply the updated policy.
+1. Apply it and run the **same query**, unchanged:
 
-    ```azurecli
+    ```powershell
     az cosmosdb sql container update `
-        --resource-group $resourceGroup `
-        --account-name $accountName `
-        --database-name cosmicworks `
-        --name product `
-        --idx @index-policy.json
-    ```
-
-1. Adding an index path starts an index transformation, and the composite index isn't usable until that transformation finishes.
-
-    In **measure.py**, find this line near the top of the file:
-
-    ```python
-    product = client.get_database_client("cosmicworks").get_container_client("product")
-    ```
-
-    Add this block immediately after the line that gets the `product` container.
-
-    ```python
-
-    # A policy update isn't proof the new index is ready. Request the
-    # transformation-progress header and stop measurements until it reaches 100%.
-    index_progress_headers = {}
-    product.read(
-        populate_quota_info=True,
-        response_hook=lambda headers, properties: index_progress_headers.update(headers),
-    )
-    index_progress = int(
-        index_progress_headers["x-ms-documentdb-collection-index-transformation-progress"]
-    )
-    print(f"Index transformation: {index_progress}%")
-    if index_progress < 100:
-        raise SystemExit("Index transformation is still running. Run the application again later.")
-    ```
-
-1. Run the application until index progress is **100%**.
-
-    ```powershell
-    Write-Host "Index readiness check"
+        --resource-group $resourceGroup --account-name $accountName `
+        --database-name cosmicworks --name product --idx "@product-policy.json"
     python measure.py
     ```
 
-    Don't record these charges; update the query next.
+    If progress is below **100%**, wait and rerun the program. **Check:** 43 products return, sorted by descending price.
 
-1. Confirm the requested composite index definition. This command shows the policy, not the index transformation progress.
+## Task 4: Define and index a computed property
 
-    ```azurecli
-    az cosmosdb sql container show `
-        --resource-group $resourceGroup `
-        --account-name $accountName `
-        --database-name cosmicworks `
-        --name product `
-        --query "resource.indexingPolicy.compositeIndexes"
-    ```
-
-1. To sort on both properties, change the query in the application so that it matches the composite index you defined.
-
-    In **measure.py**, replace the `ORDER BY c.price DESC` clause in the second `measure` call with `ORDER BY c.categoryId, c.price DESC`.
-
-1. After changing the query, run the application. Confirm **100%** progress and record all three charges under **Task 3 - Before GSI**.
+1. In the terminal, create the computed-property object and container definition. Load your existing product policy so the composite index is retained.
 
     ```powershell
-    Write-Host "Task 3 - Before GSI"
-    python measure.py
-    ```
-
-    **Save this pre-GSI replace charge for the write-cost comparison in Task 4.**
-
-The composite index enables the two-property sort. Tasks 2 and 3 use different sorted queries, so their charge difference doesn't isolate index savings.
-
-## Task 4: Create a global secondary index
-
-The stock keeping unit lookup is the query that partitioning can't help, because `sku` isn't the partition key. Give it a global secondary index partitioned on `/sku`.
-
-Keep the source indexing policy and queries unchanged so Task 3 remains the pre-GSI baseline.
-
-### Enable the feature on the account
-
-1. Create a file named **capabilities.json** with the following content. The property carries the feature's former name, and setting it enables global secondary indexes.
-
-    ```json
-    {
-      "properties": {
-        "enableMaterializedViews": true
-      }
-    }
-    ```
-
-1. Build the account's resource ID and enable the feature.
-
-    ```azurecli
+    $subscriptionId = (az account show --query id --output tsv)
     $accountId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.DocumentDB/databaseAccounts/$accountName"
-
-    az rest `
-        --method PATCH `
-        --uri "https://management.azure.com$accountId/?api-version=2022-11-15-preview" `
-        --body "@capabilities.json"
-    ```
-
-1. Wait for the account update to finish, then confirm the feature is enabled. The update can take a few minutes, so `enabled` can initially be `false` even after the PATCH command returns.
-
-    Run the following command in the same terminal. If the update is still in progress or `enabled` is `false`, wait 30 seconds and run this GET command again; don't repeat the PATCH command.
-
-    ```azurecli
-    az rest `
-        --method GET `
-        --uri "https://management.azure.com$accountId/?api-version=2022-11-15-preview" `
-        --query "{state:properties.provisioningState, enabled:properties.enableMaterializedViews, backup:properties.backupPolicy.type}"
-    ```
-
-    Continue to **Create the index container** only when the output shows all three values below:
-
-    ```output
-    {
-      "backup": "Continuous",
-      "enabled": true,
-      "state": "Succeeded"
+    $containerId = "$accountId/sqlDatabases/cosmicworks/containers/product"
+    # Derive the category without adding a stored product field.
+    $computedProperty = @{
+        name = "cp_primaryCategory"
+        query = "SELECT VALUE SUBSTRING(c.categoryName, 0, INDEX_OF(c.categoryName, ',')) FROM c"
     }
+    $containerDefinition = @{
+        location = $location
+        properties = @{
+            resource = @{
+                id = "product"
+                partitionKey = @{ paths = @("/categoryId"); kind = "Hash"; version = 2 }
+                # Retain the composite index when replacing the container definition.
+                indexingPolicy = (Get-Content -Raw .\product-policy.json | ConvertFrom-Json)
+                computedProperties = @($computedProperty)
+            }
+        }
+    }
+    $containerDefinition | ConvertTo-Json -Depth 30 | Set-Content .\product-definition.json -Encoding utf8
+    # Use ARM for container changes; the application keeps keyless SDK data access.
+    az rest --method PUT --uri "https://management.azure.com${containerId}?api-version=2025-04-15" --body "@product-definition.json"
+    az resource wait --ids $containerId --api-version 2025-04-15 `
+        --custom "properties.resource.computedProperties[0].name == 'cp_primaryCategory'" --interval 5 --timeout 900
     ```
 
-    If the update reports `Failed`, or `enabled` remains `false` after several minutes, stop and check the PATCH response and the account's **Activity log** in the Azure portal for errors. Don't create the index container while the feature is disabled.
+    Container changes use the management API because keyless authentication doesn't authorize SDK container replacement.
 
-### Create the index container
+1. Replace the Python task-code block with:
 
-1. Create a file named **gsi-definition.json** with the following content. Change `West US 2` if you used a different region.
+    ```python
+    # TASK CODE
+    if not index_ready(product):
+        raise SystemExit("Wait, then run measure.py again.")
+    # Select the derived value explicitly; SELECT * omits computed properties.
+    # ORDER BY also needs the explicit /cp_primaryCategory/? index path.
+    rows, charge = measure(
+        product, "SELECT c.sku, c.cp_primaryCategory FROM c ORDER BY c.cp_primaryCategory",
+    )
+    print(f"{len(rows)} products; {charge:.2f} RU")
+    print(sorted({row["cp_primaryCategory"] for row in rows}))
+    ```
+
+1. Run `python measure.py`. Expect HTTP **400** for the missing order-by index. The root wildcard doesn't index computed properties.
+
+1. In **product-policy.json**, replace only the `includedPaths` array value with the following. Keep its following comma and the other properties unchanged:
+
+    ```json
+    [
+      { "path": "/*" },
+      { "path": "/cp_primaryCategory/?" }
+    ]
+    ```
+
+1. Update the definition with the edited policy and submit it:
+
+    ```powershell
+    # Update only the policy, preserving the computed definition in the ARM object.
+    $containerDefinition.properties.resource.indexingPolicy = Get-Content -Raw .\product-policy.json | ConvertFrom-Json
+    $containerDefinition | ConvertTo-Json -Depth 30 | Set-Content .\product-definition.json -Encoding utf8
+    az rest --method PUT --uri "https://management.azure.com${containerId}?api-version=2025-04-15" --body "@product-definition.json"
+    az resource wait --ids $containerId --api-version 2025-04-15 `
+        --custom "properties.resource.indexingPolicy.includedPaths[?path=='/cp_primaryCategory/?']" --interval 5 --timeout 900
+    python measure.py
+    ```
+
+    Rerun after progress reaches **100%**. **Check:** 295 products sort into Accessories, Bikes, Clothing, and Components.
+
+## Task 5: Create GeoJSON objects and a spatial index
+
+1. In the sandbox's **index-policy.json**, add this property after `excludedPaths`, inserting the separating comma:
+
+    ```json
+    "spatialIndexes": [
+      { "path": "/location/*", "types": ["Point"] }
+    ]
+    ```
+
+1. Apply the edited policy:
+
+    ```powershell
+    az cosmosdb sql container update `
+        --resource-group $resourceGroup --account-name $accountName `
+        --database-name cosmicworks --name indexingLab --idx "@index-policy.json"
+    ```
+
+1. Replace the Python task-code block with the following. These are sandbox copies with **lab-only coordinates**, not geocoded CosmicWorks addresses:
+
+    ```python
+    # TASK CODE
+    if not index_ready(sandbox):
+        raise SystemExit("Wait, then run measure.py again.")
+    source = business_item(product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID))
+    # GeoJSON Point coordinates are longitude first, then latitude.
+    locations = [
+        ("Seattle", [-122.33, 47.60]),
+        ("Bellevue", [-122.2015, 47.6101]),
+        ("Boston", [-71.06, 42.36]),
+    ]
+    for city, coordinates in locations:
+        item = {
+            **source,
+            "id": f"spatial-{city.lower()}",
+            "labPurpose": "spatial",
+            "fulfillmentCity": city,
+            "location": {"type": "Point", "coordinates": coordinates},
+        }
+        # Keep these test locations in the sandbox, not the original catalog.
+        sandbox.upsert_item(item)
+    # ST_DISTANCE uses meters: 25,000 meters is a 25-km search radius.
+    rows, charge = measure(
+        sandbox,
+        'SELECT c.fulfillmentCity FROM c WHERE c.labPurpose = "spatial" '
+        'AND ST_DISTANCE(c.location, {"type":"Point","coordinates":[-122.33,47.60]}) < 25000',
+        partition_key=CATEGORY_ID,
+    )
+    print(f"Within 25 km: {sorted(row['fulfillmentCity'] for row in rows)}; {charge:.2f} RU")
+    ```
+
+1. Run `python measure.py`, repeating if progress is below **100%**. **Check:** Seattle and Bellevue match; Boston doesn't. GeoJSON coordinates use longitude, then latitude.
+
+## Task 6: Create and query a global secondary index
+
+1. Replace the Python task-code block and run `python measure.py`:
+
+    ```python
+    # TASK CODE
+    # Capture the source-write baseline before the GSI adds synchronization work.
+    source = business_item(product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID))
+    print(f"Source replace before GSI: {replace_charge(product, source):.2f} RU")
+    ```
+
+    Record **Source replace before GSI**. Use this value, not the sandbox measurement from Task 1.
+
+1. Create **capabilities.json**:
+
+    ```json
+    { "properties": { "enableMaterializedViews": true } }
+    ```
+
+1. Enable the feature and wait for the account update:
+
+    ```powershell
+    # The account API still calls the GSI feature enableMaterializedViews.
+    az rest --method PATCH --uri "https://management.azure.com${accountId}?api-version=2022-11-15-preview" --body "@capabilities.json"
+    az resource wait --ids $accountId --api-version 2022-11-15-preview `
+        --custom "properties.enableMaterializedViews && properties.provisioningState == 'Succeeded'" --interval 10 --timeout 900
+    ```
+
+1. Create **gsi-definition.json**, using the region you selected during setup for `location`:
 
     ```json
     {
-      "location": "West US 2",
-      "tags": {},
+      "location": "westus2",
       "properties": {
         "resource": {
           "id": "productBySku",
-          "partitionKey": {
-            "paths": [ "/sku" ]
-          },
+          "partitionKey": { "paths": ["/sku"], "kind": "Hash", "version": 2 },
           "materializedViewDefinition": {
             "sourceCollectionId": "product",
             "definition": "SELECT c.id, c.sku, c.name, c.price, c.categoryId FROM c"
           }
         },
-        "options": {
-          "autoscaleSettings": {
-            "maxThroughput": 1000
-          }
-        }
+        "options": { "autoscaleSettings": { "maxThroughput": 1000 } }
       }
     }
     ```
 
-1. Create the index container.
-
-    ```azurecli
-    az rest `
-        --method PUT `
-        --uri "https://management.azure.com$accountId/sqlDatabases/cosmicworks/containers/productBySku/?api-version=2022-11-15-preview" `
-        --body "@gsi-definition.json" `
-        --headers content-type=application/json
-    ```
-
-1. Confirm the index container exists. This check verifies creation, not whether the initial data synchronization is complete.
-
-    ```azurecli
-    az cosmosdb sql container show `
-        --resource-group $resourceGroup `
-        --account-name $accountName `
-        --database-name cosmicworks `
-        --name productBySku `
-        --query "resource.id"
-    ```
-
-    The expected output is:
-
-    ```output
-    "productBySku"
-    ```
-
-### Verify the index data
-
-1. In the account's **Data Explorer**, expand **cosmicworks**, select **product** > **Items**, and open **New SQL Query**. Run the following query, then repeat it under **productBySku** > **Items**. Both containers must return **295**.
-
-    ```sql
-    SELECT VALUE COUNT(1) FROM c
-    ```
-
-1. Run the following query in both containers to check the product used by the lookup measurement. Each query must return one item with the same values for all five projected properties.
-
-    ```sql
-    SELECT c.id, c.sku, c.name, c.price, c.categoryId
-    FROM c
-    WHERE c.sku = "BK-R93R-44"
-    ```
-
-    Wait and repeat until both counts and SKU results match. These checks verify the lab data, not future replication latency.
-
-### Compare the lookup
-
-1. Add the following code so the application runs the same stock keeping unit query against the index container.
-
-    Insert this code after the two existing `measure` calls and before the `read_item` call.
-
-    ```python
-    # The secondary container is partitioned on /sku, so the same equality
-    # filter now targets one logical partition rather than all categories.
-    product_by_sku = client.get_database_client("cosmicworks").get_container_client("productBySku")
-
-    measure(
-        product_by_sku,
-        "sku lookup on the index",
-        "SELECT * FROM c WHERE c.sku = @sku",
-        [{"name": "@sku", "value": SKU}],
-    )
-    ```
-
-1. Run the application and record all four charges under **Task 4 - After GSI**.
+1. Create the index container:
 
     ```powershell
-    Write-Host "Task 4 - After GSI"
-    python measure.py
+    $gsiId = "$accountId/sqlDatabases/cosmicworks/containers/productBySku"
+    az rest --method PUT --uri "https://management.azure.com${gsiId}?api-version=2022-11-15-preview" --body "@gsi-definition.json"
+    az resource wait --exists --ids $gsiId --api-version 2022-11-15-preview --interval 5 --timeout 900
     ```
 
-1. Compare **`sku lookup` and `sku lookup on the index` in this run** for GSI read savings. Equal charges mean no measured saving; both containers can fit in one physical partition at this dataset size.
+1. Replace the Python task-code block. Notice the explicit SKU partition key and the source-ID mapping:
 
-1. Compare **`replace one product` with the charge saved at the end of Task 3**. Subtract **before GSI** from **after GSI** to measure added write cost.
+    ```python
+    # TASK CODE
+    product_by_sku = database.get_container_client("productBySku")
+    # ARM container creation doesn't prove that initial data copying has finished.
+    wait_for_rows(product_by_sku, "SELECT VALUE COUNT(1) FROM c", [], [295])
+    parameters = [{"name": "@sku", "value": SKU}]
+    # SKU isn't the source partition key, so this lookup isn't partition-scoped.
+    source_query = (
+        "SELECT c.id AS sourceId, c.sku, c.name, c.price, c.categoryId FROM c WHERE c.sku = @sku"
+    )
+    # The GSI generates id; _id preserves the source id for result comparison.
+    index_query = (
+        "SELECT c._id AS sourceId, c.sku, c.name, c.price, c.categoryId FROM c WHERE c.sku = @sku"
+    )
+    source_rows, source_charge = measure(product, source_query, parameters)
+    if len(source_rows) != 1:
+        raise ValueError("Expected one source product for this SKU.")
+    # The explicit SKU key routes these requests to one GSI logical partition.
+    wait_for_rows(product_by_sku, index_query, parameters, source_rows, partition_key=SKU)
+    index_rows, index_charge = measure(product_by_sku, index_query, parameters, partition_key=SKU)
+    if index_rows != source_rows:
+        raise ValueError("Source and GSI results differ.")
+    # Keep the item and policy unchanged to isolate the GSI's added write charge.
+    source = business_item(product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID))
+    print(f"Source lookup: {source_charge:.2f} RU; targeted GSI lookup: {index_charge:.2f} RU")
+    print(f"Source replace after GSI: {replace_charge(product, source):.2f} RU")
+    ```
 
-## Clean up resources
+1. Run `python measure.py`. The program waits for data, not a Metrics label.
 
-Delete the resource group only if you created it for this exercise and it contains only this exercise's resources:
+    **Compare:** the two lookup charges are from this run. Compare source replace with **before GSI** from this task; the policy and item are unchanged. Equal lookup charges are valid for this small catalog. The GSI's generated `id` differs; the source ID is in `_id`.
 
-```azurecli
-az group delete --name $resourceGroup --yes --no-wait
+1. Replace the task-code block once more to test source-only writes and automatic propagation:
+
+    ```python
+    # TASK CODE
+    product_by_sku = database.get_container_client("productBySku")
+    source = business_item(product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID))
+    original_price = source["price"]
+    parameters = [{"name": "@sku", "value": SKU}]
+    index_query = "SELECT c._id, c.price FROM c WHERE c.sku = @sku"
+    try:
+        # Write only to the source; Azure Cosmos DB updates the read-only GSI.
+        source["price"] = round(original_price + 1, 2)
+        product.replace_item(item=PRODUCT_ID, body=source)
+        expected = [{"_id": PRODUCT_ID, "price": source["price"]}]
+        wait_for_rows(product_by_sku, index_query, parameters, expected, partition_key=SKU)
+        print("The source-only price change appeared in the GSI.")
+    finally:
+        # Restore the original data even if the propagation check fails.
+        source["price"] = original_price
+        product.replace_item(item=PRODUCT_ID, body=source)
+        expected = [{"_id": PRODUCT_ID, "price": original_price}]
+        # Verify that the restoration reaches the GSI as well as the source.
+        wait_for_rows(product_by_sku, index_query, parameters, expected, partition_key=SKU)
+        print("Original price restored in both containers.")
+    ```
+
+1. Run `python measure.py`. **Check:** both propagation and restoration complete. The application never writes to the GSI.
+
+## Clean up
+
+Delete only the account created for this exercise:
+
+```powershell
+az cosmosdb delete --resource-group $resourceGroup --name $accountName --yes
 ```
 
-If your lab provided `ResourceGroup1`, or the group holds other resources, keep the group. In the Azure portal, delete only the Azure Cosmos DB account you created for this exercise.
-
-Keep your completed results table.
+Keep a lab-provided or shared resource group.

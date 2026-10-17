@@ -211,6 +211,8 @@ $Expectations = @{
         SeededProduct = $true
         Containers    = @(
             @{ Database = 'cosmicworks'; Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; MinItems = 295 }
+            @{ Database = 'cosmicworks'; Name = 'productMeta'; PartitionKey = '/type'; MaxThroughput = 1000; MinItems = 237 }
+            @{ Database = 'cosmicworks'; Name = 'indexingLab'; PartitionKey = '/categoryId'; MaxThroughput = 1000 }
         )
     }
     monitoring  = @{

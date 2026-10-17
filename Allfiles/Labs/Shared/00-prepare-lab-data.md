@@ -139,9 +139,19 @@ Serves the indexing strategy exercise. This profile creates a dedicated account 
 ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab12 -LabProfile indexing
 ```
 
-It creates an account with a backup policy of `Continuous` at the `Continuous7Days` tier, holding a `cosmicworks` database with one `product` container partitioned on `/categoryId` at an autoscale maximum of 1000 RU/s, seeded with the 295 CosmicWorks products.
+It creates a keyless account with `Continuous7Days` backup and three containers in `cosmicworks`, each on autoscale up to 1,000 RU/s:
 
-The exercise enables the global secondary index feature on the account itself, because doing so is part of what the exercise teaches.
+| Container | Partition key | Contents |
+| :--- | :--- | :--- |
+| `product` | `/categoryId` | 295 unmodified CosmicWorks database-v4 products |
+| `productMeta` | `/type` | 237 database-v4 category and tag documents |
+| `indexingLab` | `/categoryId` | Empty sandbox for the write probe and GeoJSON fixtures |
+
+The lab copies one product into the sandbox and attaches the 200 real tag records to make index-maintenance work measurable. Separate sandbox copies add explicitly fictional fulfillment coordinates for spatial queries. These fixtures don't change the original catalog. Use a fresh account for the exercise; setup preserves policies and data on an existing account.
+
+The profile pins a [CosmicWorks database-v4 snapshot](https://github.com/AzureCosmosDB/CosmicWorks/tree/841101fb777762fb2da1419e8058aee40b0de66b/data/database-v4) so the expected counts and reference products stay reproducible.
+
+The exercise enables global secondary indexes and creates a fourth container, `productBySku`. Learners create their own SDK program, indexing policies, and container definitions in the exercise; no prebuilt application or policy bundle is required.
 
 ## The monitoring profile
 

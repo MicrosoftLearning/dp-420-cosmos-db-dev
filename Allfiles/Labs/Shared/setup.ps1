@@ -31,8 +31,8 @@
                region offline, so use a resource group of its own.
     indexing - A disposable account for the indexing strategy exercise, created with
                continuous backup because global secondary indexes require it, and a
-               seeded cosmicworks/product container on autoscale. Use a resource group
-               of its own.
+               seeded cosmicworks/product and productMeta catalog plus an empty
+               indexingLab sandbox on autoscale. Use a resource group of its own.
     monitoring - A disposable account for the monitoring and troubleshooting exercise,
                with a seeded cosmicworks/product container on 400 RU/s manual
                throughput so the exercise can drive it into rate limiting. That
@@ -201,6 +201,7 @@ $ProgressPreference = 'SilentlyContinue'
 #region Configuration
 
 $DataRoot = 'https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data'
+$IndexingDataRoot = 'https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/841101fb777762fb2da1419e8058aee40b0de66b/data/database-v4'
 
 # The template lives beside this script, so a learner can run the script from anywhere.
 $script:ScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
@@ -358,8 +359,7 @@ $Profiles = @{
     }
     indexing = @{
         # Global secondary indexes require continuous backup on the account, and
-        # continuous backup can only be chosen at account creation, so this exercise
-        # gets an account and a resource group of its own.
+        # the lab must not change a shared account's backup configuration.
         Account   = @{
             BackupPolicy   = 'Continuous'
             ContinuousTier = 'Continuous7Days'
@@ -368,7 +368,9 @@ $Profiles = @{
             @{
                 Name       = 'cosmicworks'
                 Containers = @(
-                    @{ Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$DataRoot/database-v4/product" }
+                    @{ Name = 'product'; PartitionKey = '/categoryId'; MaxThroughput = 1000; Seed = "$IndexingDataRoot/product" }
+                    @{ Name = 'productMeta'; PartitionKey = '/type'; MaxThroughput = 1000; Seed = "$IndexingDataRoot/productMeta" }
+                    @{ Name = 'indexingLab'; PartitionKey = '/categoryId'; MaxThroughput = 1000 }
                 )
             }
         )
@@ -1851,4 +1853,3 @@ Write-Host ''
 Write-Host 'Every exercise in this course asks for the account endpoint.'
 
 #endregion
-
