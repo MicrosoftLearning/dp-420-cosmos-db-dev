@@ -14,7 +14,7 @@ lab:
 
 # Configure Regions and Failover in Python
 
-In this exercise, you configure an Azure Cosmos DB for NoSQL account that spans two regions, move its write region while both regions are healthy, enable writes in both regions, and finally take a region offline the way you would during a real outage. Each step is verified against the account's own region topology rather than against an assumption about it.
+In this exercise, you configure an Azure Cosmos DB for NoSQL account that spans two regions, move its write region while both regions are healthy, enable writes in both regions, and finally take a region offline the way you would during a real outage. You verify each change using the account's region configuration or the regional status shown in the Azure portal.
 
 The account this exercise creates is disposable, which matters more here than in any other exercise in this learning path. The last task takes a region offline, and **a region that goes offline stays offline until Microsoft brings it back**, which can take days and needs a support request after a drill. Running that against an account you care about would be a genuine outage.
 
@@ -52,30 +52,30 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     az login
     ```
 
-1. Set variables for the resource group and the account's first region. Use `ResourceGroup1`, or the group supplied by your lab if its name differs.
+1. Set variables for the resource group and both account regions. Use `ResourceGroup1`, or the group supplied by your lab if its name differs. The example uses `westus2` and `westcentralus`; you can choose two different regions that support Azure Cosmos DB.
 
     ```powershell
     $resourceGroup = "ResourceGroup1"
     $location = "westus2"
+    $secondRegion = "westcentralus"
     ```
 
-1. Run the setup script.
+1. Run the setup script, passing your second region with `-SecondaryLocation`.
 
     ```powershell
-    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab11 -LabProfile multiregion
+    ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -SecondaryLocation $secondRegion -NamePrefix dp420lab11 -LabProfile multiregion
     ```
 
     Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab11a7f3k9`.
 
 1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
 
-1. Record the **Account name**, **Account endpoint**, and **Second region** values the script prints. You need all three later in this exercise, and the endpoint looks like `https://<your-account-name>.documents.azure.com:443/`.
+1. Record the **Account name** and **Account endpoint** values the script prints. You need both later in this exercise, and the endpoint looks like `https://<your-account-name>.documents.azure.com:443/`. Confirm that **Second region** matches the value you set in `$secondRegion`.
 
-1. Set variables for the account name and the second region so the Azure CLI commands in this exercise can use them.
+1. Set a variable for the account name so the Azure CLI commands in this exercise can use it. Keep the `$location` and `$secondRegion` values you set before setup.
 
     ```powershell
     $accountName = "<your-account-name>"
-    $secondRegion = "<your-second-region>"
     ```
 
 The script creates the following resources:
@@ -95,7 +95,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Read the account's region topology
 
-Every operation in this exercise changes the account's region topology, so you need a way to read it before you change anything. The account's `writeLocations` and `readLocations` properties are that source of truth.
+Before changing the account, read which regions are configured for writes and reads using its `writeLocations` and `readLocations` properties. These lists don't by themselves confirm whether a region is online. Task 4 checks that status separately in the Azure portal.
 
 1. Show which region currently accepts writes, and the failover priority of every region.
 
@@ -176,7 +176,9 @@ Both regions are healthy, so this change is the planned operation: the service r
     pip install azure-cosmos azure-identity
     ```
 
-1. Replace the contents of the program file with the following code, then set the endpoint and the preferred region to the values you recorded.
+1. In **Visual Studio Code**, create a file named `main.py` in the `region-check` folder. Add the following code, then set `ENDPOINT` to the account endpoint you recorded.
+
+    For `PREFERRED_REGION`, use the same region identifier you assigned to `$secondRegion` during setup, such as `"westcentralus"`.
 
     ```python
     from azure.cosmos import CosmosClient
@@ -213,6 +215,8 @@ Both regions are healthy, so this change is the planned operation: the service r
     print(f"Read back {verified['name']}.")
     ```
 
+1. Save `main.py`, then run it in the terminal from the `region-check` folder with the virtual environment activated.
+
     ```powershell
     python main.py
     ```
@@ -248,7 +252,21 @@ A single-write-region account concentrates every write in one place. Enabling mu
     }
     ```
 
-1. Change the preferred region in your program to the region you passed as `-Location`, so the client writes to the region it isn't currently pointed at, and run it again. The write succeeds against that region rather than being forwarded, which is the change multi-region writes makes.
+1. In `main.py`, change `PREFERRED_REGION` from the second region to the account's original first region. If you used `$location = "westus2"` during setup, replace the `PREFERRED_REGION` line with:
+
+    ```python
+    PREFERRED_REGION = "westus2"
+    ```
+
+    If you chose a different first region, use the value you assigned to `$location` during setup. Change only `PREFERRED_REGION`; keep `ENDPOINT` unchanged.
+
+1. Save `main.py`, then run it again from the `region-check` terminal with the virtual environment activated.
+
+    ```powershell
+    python main.py
+    ```
+
+    Confirm that the output includes `Write succeeded.` and the updated item name. With multi-region writes enabled, the first region can now accept writes directly. The console output verifies successful reads and writes, but doesn't identify which region served them.
 
 1. Read the container's conflict resolution policy, which is the policy that now decides the outcome when both regions change the same item.
 
@@ -288,27 +306,24 @@ This is the outage operation. Every step so far is reversible in minutes; this t
         --region $location
     ```
 
-1. Confirm the account is now serving from one region.
+1. Open the account in the [Azure portal](https://portal.azure.com) and select **Replicate data globally**. Select **Refresh** to update the region status.
 
-    ```azurecli
-    az cosmosdb show `
-        --name $accountName `
-        --resource-group $resourceGroup `
-        --query "{write:writeLocations[].locationName, read:readLocations[].locationName}"
+    Before continuing, confirm the following in the **Status** column:
+
+    - The first region, specified by `$location`, is **Offline**.
+    - The second region, specified by `$secondRegion`, is **Online**.
+
+    For the default setup, these are **West US 2** and **West Central US**, respectively. If the first region isn't marked **Offline** yet, wait and refresh again.
+
+    The `writeLocations` and `readLocations` lists returned by `az cosmosdb show` can still include the offline region. Use the portal's **Status** column to verify the outage, not whether the region appears in those lists.
+
+1. Without changing `main.py`, run it again from the `region-check` terminal with the virtual environment activated.
+
+    ```powershell
+    python main.py
     ```
 
-    ```output
-    {
-      "read": [ "<your-second-region>" ],
-      "write": [ "<your-second-region>" ]
-    }
-    ```
-
-1. Leave the program's preferred region set to the first region from Task 3, and run it again without changing the code. The SDK discovers the remaining healthy region and routes reads and writes there.
-
-    Had the offline region been the only write region and the account been configured with a single write region, this command would have promoted the read region with the highest failover priority to write region instead. Either way, the application recovers without a code change.
-
-1. Open the account in the [Azure portal](https://portal.azure.com), select **Replicate data globally**, and confirm the offline region is shown as offline. The **Replicate data globally** pane is also where the **Offline region**, **Change write region**, and **Configure failover policy** operations live in the portal.
+    Confirm that the output includes `Write succeeded.` and the updated item name. The SDK uses the remaining healthy region for reads and writes, even though `PREFERRED_REGION` still names the offline region. A preferred region guides routing; it doesn't restrict the client to that region.
 
 You've now run all three account-level responses to a regional problem: a planned write region change, a topology change that removes the need for one, and an outage response.
 
