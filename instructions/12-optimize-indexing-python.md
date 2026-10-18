@@ -117,7 +117,6 @@ Because key-based authentication is disabled, no key or connection string appear
     import os
     import time
     from azure.cosmos import CosmosClient
-    from azure.cosmos.exceptions import CosmosResourceNotFoundError
     from azure.identity import AzureCliCredential
 
     CATEGORY_ID = "AE48F0AA-4F65-4734-A4CF-D48B8F82267F"
@@ -179,13 +178,9 @@ Because key-based authentication is disabled, no key or connection string appear
         # GSI propagation is asynchronous; poll actual data with a bounded wait.
         deadline = time.monotonic() + 900
         while True:
-            try:
-                rows, _ = measure(container, text, parameters, partition_key)
-                if rows == expected:
-                    return
-            except CosmosResourceNotFoundError:
-                # The data endpoint can become available after the ARM resource exists.
-                pass
+            rows, _ = measure(container, text, parameters, partition_key)
+            if rows == expected:
+                return
             if time.monotonic() >= deadline:
                 raise TimeoutError("Expected GSI data didn't arrive within 15 minutes.")
             time.sleep(5)
@@ -296,7 +291,9 @@ Because key-based authentication is disabled, no key or connection string appear
     python measure.py
     ```
 
-    If progress is below **100%**, wait and rerun the program. **Check:** 43 products return, sorted by descending price.
+    If progress is below **100%**, wait and rerun the program.
+
+    Confirm **43** products in descending price order. The matching composite index lets the catalog run this category-and-price sort without changing the query.
 
 ## Task 4: Define and index a computed property
 
@@ -449,8 +446,10 @@ Because key-based authentication is disabled, no key or connection string appear
     ```powershell
     # The account API still calls the GSI feature enableMaterializedViews.
     az rest --method PATCH --uri "https://management.azure.com${accountId}?api-version=2022-11-15-preview" --body "@capabilities.json"
+    if ($LASTEXITCODE -ne 0) { throw "The feature update failed. Check the error above." }
     az resource wait --ids $accountId --api-version 2022-11-15-preview `
         --custom "properties.enableMaterializedViews && properties.provisioningState == 'Succeeded'" --interval 10 --timeout 900
+    if ($LASTEXITCODE -ne 0) { throw "The feature check failed. Stop here." }
     ```
 
 1. Create **gsi-definition.json**, using the region you selected during setup for `location`:
@@ -477,14 +476,27 @@ Because key-based authentication is disabled, no key or connection string appear
     ```powershell
     $gsiId = "$accountId/sqlDatabases/cosmicworks/containers/productBySku"
     az rest --method PUT --uri "https://management.azure.com${gsiId}?api-version=2022-11-15-preview" --body "@gsi-definition.json"
+    if ($LASTEXITCODE -ne 0) { throw "Couldn't create productBySku. Check the error above." }
     az resource wait --exists --ids $gsiId --api-version 2022-11-15-preview --interval 5 --timeout 900
+    if ($LASTEXITCODE -ne 0) { throw "Could not confirm productBySku exists. Stop here." }
+    $createdIndex = az cosmosdb sql container show `
+        --resource-group $resourceGroup --account-name $accountName `
+        --database-name cosmicworks --name productBySku --query "resource.id" --output tsv
+    if ($LASTEXITCODE -ne 0 -or $createdIndex -cne "productBySku") {
+        throw "Couldn't find productBySku in this account. Stop here."
+    }
+    Write-Host "Created productBySku."
     ```
+
+    Confirm **Created productBySku.** appears before continuing. The application waits for data only after the container exists.
 
 1. Replace the Python task-code block. Notice the explicit SKU partition key and the source-ID mapping:
 
     ```python
     # TASK CODE
     product_by_sku = database.get_container_client("productBySku")
+    # A client reference doesn't create the container; this read checks it exists.
+    product_by_sku.read()
     # ARM container creation doesn't prove that initial data copying has finished.
     wait_for_rows(product_by_sku, "SELECT VALUE COUNT(1) FROM c", [], [295])
     parameters = [{"name": "@sku", "value": SKU}]
@@ -519,6 +531,8 @@ Because key-based authentication is disabled, no key or connection string appear
     ```python
     # TASK CODE
     product_by_sku = database.get_container_client("productBySku")
+    # Check that the GSI exists before changing the source price.
+    product_by_sku.read()
     source = business_item(product.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID))
     original_price = source["price"]
     parameters = [{"name": "@sku", "value": SKU}]

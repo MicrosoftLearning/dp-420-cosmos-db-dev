@@ -115,7 +115,6 @@ Because key-based authentication is disabled, no key or connection string appear
 
     ```csharp
     using System.Globalization;
-    using System.Net;
     using System.Text;
     using Azure.Identity;
     using Microsoft.Azure.Cosmos;
@@ -352,7 +351,8 @@ Because key-based authentication is disabled, no key or connection string appear
     ```
 
     Repeat `dotnet run` until transformation reaches **100%**; while incomplete, the program prints only progress and exits before querying.
-    Confirm **43** descending-price results after the identical query succeeds; this demonstrates the composite requirement, not an RU comparison between different queries.
+
+    Confirm **43** products in descending price order. The matching composite index lets the catalog run this category-and-price sort without changing the query.
 
 ## Task 4: Create and index a computed property
 
@@ -569,13 +569,13 @@ Because key-based authentication is disabled, no key or connection string appear
         $"{await MeanReplaceAsync(product, source.Resource, categoryId):F2} RU");
     ```
 
-1. Run and record **Before GSI**; this is the baseline with the **current composite/computed source policy**, not a charge from Task 3:
+1. Run the program. Write down the RU number next to **Before GSI, source replace average of 3**:
 
     ```powershell
     dotnet run
     ```
 
-    Don't change the source policy or business body during the following comparison.
+    You'll type this number later when the program asks for it. Don't change the product or its indexing policy between these runs.
 
 1. Create **capabilities.json** with this account-update object:
 
@@ -595,9 +595,11 @@ Because key-based authentication is disabled, no key or connection string appear
     az rest --method PATCH `
         --uri "https://management.azure.com${accountId}?api-version=2022-11-15-preview" `
         --body "@capabilities.json"
+    if ($LASTEXITCODE -ne 0) { throw "The feature update failed. Check the error above." }
     az resource wait --ids $accountId --api-version 2022-11-15-preview `
         --custom "properties.enableMaterializedViews && properties.provisioningState == 'Succeeded'" `
         --interval 10 --timeout 900
+    if ($LASTEXITCODE -ne 0) { throw "The feature check failed. Stop here." }
     ```
 
 1. Construct your GSI definition object and write **gsi-definition.json** using the actual `$location`:
@@ -625,11 +627,20 @@ Because key-based authentication is disabled, no key or connection string appear
     az rest --method PUT `
         --uri "https://management.azure.com${gsiId}?api-version=2022-11-15-preview" `
         --body "@gsi-definition.json"
+    if ($LASTEXITCODE -ne 0) { throw "Couldn't create productBySku. Check the error above." }
     az resource wait --exists --ids $gsiId --api-version 2022-11-15-preview `
         --interval 5 --timeout 900
+    if ($LASTEXITCODE -ne 0) { throw "Could not confirm productBySku exists. Stop here." }
+    $createdIndex = az cosmosdb sql container show `
+        --resource-group $resourceGroup --account-name $accountName `
+        --database-name cosmicworks --name productBySku --query "resource.id" --output tsv
+    if ($LASTEXITCODE -ne 0 -or $createdIndex -cne "productBySku") {
+        throw "Couldn't find productBySku in this account. Stop here."
+    }
+    Write-Host "Created productBySku."
     ```
 
-    Container existence isn't data readiness; next, query the replicated data.
+    Confirm **Created productBySku.** appears before continuing. The container must exist before the application can wait for its data.
 
 1. In **Program.cs**, insert this **generic polling helper immediately before `// TASK CODE`**, after the existing helpers:
 
@@ -654,10 +665,11 @@ Because key-based authentication is disabled, no key or connection string appear
     }
     ```
 
-1. Now **replace everything from `// TASK CODE` to EOF** with this complete task block; retain the polling helper above the marker:
+1. Now **replace everything from `// TASK CODE` to EOF** with this block, keeping the polling helper above it. It compares request charges and checks that a source-only update reaches the GSI.
 
     ```csharp
     // TASK CODE
+    // Connect to the GSI created in step 5; this doesn't create a container.
     Container productBySku = database.GetContainer("productBySku");
     // SKU isn't the source partition key, so this lookup isn't partition-scoped.
     QueryDefinition sourceQuery = new QueryDefinition(
@@ -672,39 +684,40 @@ Because key-based authentication is disabled, no key or connection string appear
         sourceLookup.Items[0].Value<string>("sourceId") != productId)
         throw new InvalidOperationException("Expected one source SKU match.");
     (List<JObject> Items, double RU)? gsiLookup = null;
-    Console.WriteLine("Waiting for 295 GSI items and the matching SKU projection...");
+    int lastCopied = -1;
+    Console.WriteLine("Waiting for the GSI copy...");
     // ARM container creation doesn't prove that initial data copying has finished.
-    await WaitAsync("GSI hydration", async token =>
+    await WaitAsync("productBySku", async token =>
     {
-        try
+        var count = await QueryAsync<JToken>(productBySku,
+            new QueryDefinition("SELECT VALUE COUNT(1) FROM c"),
+            cancellationToken: token);
+        int copied = count.Items.Single().Value<int>();
+        if (copied != lastCopied)
         {
-            var count = await QueryAsync<JToken>(productBySku,
-                new QueryDefinition("SELECT VALUE COUNT(1) FROM c"),
-                cancellationToken: token);
-            // The explicit SKU key routes this request to one GSI logical partition.
-            var routed = await QueryAsync<JObject>(productBySku, gsiQuery,
-                new PartitionKey(sku), token);
-            if (count.Items.Single().Value<int>() != 295 ||
-                routed.Items.Count != 1 ||
-                !JToken.DeepEquals(sourceLookup.Items[0], routed.Items[0]))
-                return false;
-            gsiLookup = routed;
-            return true;
+            Console.WriteLine($"Products copied: {copied}/295");
+            lastCopied = copied;
         }
-        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
-        {
-            // The data endpoint can become available after the ARM resource exists.
+        if (copied != 295)
             return false;
-        }
+        // The explicit SKU key routes this request to one GSI logical partition.
+        var routed = await QueryAsync<JObject>(productBySku, gsiQuery,
+            new PartitionKey(sku), token);
+        if (routed.Items.Count != 1 ||
+            !JToken.DeepEquals(sourceLookup.Items[0], routed.Items[0]))
+            return false;
+        gsiLookup = routed;
+        return true;
     });
     Console.WriteLine($"Source cross-partition SKU lookup: {sourceLookup.RU:F2} RU");
     Console.WriteLine($"GSI /sku-targeted lookup: {gsiLookup!.Value.RU:F2} RU");
     Console.WriteLine(gsiLookup.Value.Items.Single().ToString(Formatting.None));
 
-    Console.Write("Enter your recorded Before GSI charge (decimal point): ");
+    Console.Write("Before GSI source replace charge (number only, with a decimal point): ");
     if (!double.TryParse(Console.ReadLine(), NumberStyles.Float,
-            CultureInfo.InvariantCulture, out double beforeGsi) || beforeGsi <= 0)
-        throw new InvalidOperationException("Enter the positive Before GSI value from this task.");
+            CultureInfo.InvariantCulture, out double beforeGsi) ||
+        !double.IsFinite(beforeGsi) || beforeGsi <= 0)
+        throw new InvalidOperationException("Type the RU number saved at the start of Task 6, without the letters RU.");
     var measured = await product.ReadItemAsync<JObject>(productId, new PartitionKey(categoryId));
     // Keep the item and policy unchanged to isolate the GSI's added write charge.
     double afterGsi = await MeanReplaceAsync(product, measured.Resource, categoryId);
@@ -760,11 +773,13 @@ Because key-based authentication is disabled, no key or connection string appear
     }
     ```
 
-1. Run and enter your **Before GSI** charge when prompted:
+1. Run the program. When it asks for the charge, type the **number you saved at the start of Task 6**, without `RU`, and press **Enter**:
 
     ```powershell
     dotnet run
     ```
+
+    The copy check has a **15-minute limit** and prints the product count.
 
     A GSI generates its own `id` and exposes the source `id` as **`_id`**; compare the matching `sourceId` projections, not the two containers' raw IDs.
     Equal read charges are legitimate for this small, single-physical-partition dataset; source replacements incur extra GSI maintenance cost.
