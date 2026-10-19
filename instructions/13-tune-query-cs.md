@@ -2,7 +2,7 @@
 lab:
   title: Tune a high-cost query in C#
   module: Module 13 - Analyze and Tune Query and Operation Performance in Azure Cosmos DB
-  description: Baseline three operations against a product catalog, prove a scan with query metrics, rewrite the filter so the index serves it, add a composite index, and compare fan-out with single-partition routing.
+  description: Baseline three operations against a product catalog, inspect query metrics for scan evidence, compare a direct property filter, add a composite index, and compare fan-out with single-partition routing.
   duration: 45 minutes
   level: 300
   islab: true
@@ -14,7 +14,7 @@ lab:
 
 # Tune a high-cost query in C#
 
-In this exercise, you diagnose an expensive query the way the metrics ask you to: measure first, read the evidence, then change one thing at a time. You start by recording a baseline for three operations against a product catalog, then use the server-side query metrics to prove that one of them scans the container, rewrite it so the index serves the filter, add a composite index for a two-property filter, and finish by comparing a query that fans out with the same query scoped to a single partition.
+In this exercise, you diagnose query cost by measuring first, reading the evidence, and then changing one thing at a time. You start by recording a baseline for three operations against a product catalog, then use the server-side query metrics to check how many documents each query loads. Next, you compare a function-based filter with a direct property filter, add a composite index for a two-property filter, and finish by comparing a query that fans out with the same query scoped to a single partition.
 
 Every task produces a number you can compare against the one before it. Those comparisons are the point of the exercise, so write your numbers down as you go. Request charges depend on your data and query configuration, so treat the sample values in this exercise as illustrations of shape rather than targets to match.
 
@@ -137,7 +137,7 @@ Three operations stand in for the shapes an application runs: a point read by ID
         productId, new PartitionKey(categoryId));
     Console.WriteLine($"{"point read",-24}: {read.RequestCharge,8:0.00} RU  ({read.Resource.name})");
 
-    await MeasureAsync(product, "scan on UPPER(name)",
+    await MeasureAsync(product, "UPPER(name) lookup",
         "SELECT * FROM c WHERE UPPER(c.name) = @name",
         ("@name", "TOURING-3000 BLUE, 62"));
 
@@ -193,42 +193,55 @@ Three operations stand in for the shapes an application runs: a point read by ID
 
     ```output
     point read              :     1.00 RU  (Touring-3000 Blue, 62)
-    scan on UPPER(name)     :    12.86 RU for 1 items
+    UPPER(name) lookup      :    12.86 RU for 1 items
     category and price      :     3.29 RU for 12 items
     ```
 
 The point read is your reference for the same item and consistency level. A point read of a 1 KB item costs 1 request unit (RU) with session, consistent prefix, or eventual consistency. Strong and bounded staleness reads cost twice as much. Record the consistency level and all three charges before continuing.
 
-## Task 2: Prove the scan with query metrics
+## Task 2: Inspect the same queries with query metrics
 
-The second query returns one item. Whether it's expensive depends on how many items the engine had to load to find that item, and only the server-side metrics reveal that count.
+The `UPPER(c.name)` query returns one item. The server-side metrics reveal how many documents the engine loaded to produce that result.
 
-1. In **Program.cs**, replace the body of the `while` loop inside `MeasureAsync` with the following code, which reads the query metrics from each page.
+**Don't change either SQL query or its parameters in this task.** Task 1 already executes `SELECT * FROM c WHERE UPPER(c.name) = @name`. Task 2 adds measurement to the same queries; it doesn't introduce a scan or optimize the filter. Similar RU charges in Tasks 1 and 2 are expected. The SQL changes in Task 3.
 
-    ```csharp
-    FeedResponse<Product> page = await iterator.ReadNextAsync();
-    charge += page.RequestCharge;
-    items += page.Count;
-
-    // Compare documents loaded by the engine with documents returned.
-    // CumulativeMetrics aggregates the partition metrics for this page.
-    ServerSideMetrics metrics = page.Diagnostics.GetQueryMetrics().CumulativeMetrics;
-    retrieved += metrics.RetrievedDocumentCount;
-    output += metrics.OutputDocumentCount;
-    ```
-
-1. Declare the two counters beside the existing ones, above the `FeedIterator<Product>` line.
+1. In **Program.cs**, replace the entire `MeasureAsync` method with the following version. Leave the point read, both `MeasureAsync(...)` calls above the method, and the `Product` class unchanged.
 
     ```csharp
-    long retrieved = 0;
-    long output = 0;
-    ```
+    static async Task MeasureAsync(Container container, string label, string text,
+        params (string Name, object Value)[] parameters)
+    {
+        QueryDefinition query = new(text);
+        foreach ((string name, object value) in parameters)
+        {
+            query = query.WithParameter(name, value);
+        }
 
-1. Replace the `Console.WriteLine` at the end of `MeasureAsync` with a line that reports both counts.
+        double charge = 0;
+        long retrieved = 0;
+        long output = 0;
 
-    ```csharp
-    Console.WriteLine(
-        $"{label,-24}: {charge,8:0.00} RU  retrieved {retrieved,4}  output {output,4}");
+        FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(query);
+        while (iterator.HasMoreResults)
+        {
+            FeedResponse<Product> page = await iterator.ReadNextAsync();
+            charge += page.RequestCharge;
+
+            // CumulativeMetrics aggregates the partition metrics for this page.
+            var queryMetrics = page.Diagnostics.GetQueryMetrics();
+            if (queryMetrics is null)
+            {
+                throw new InvalidOperationException("Query metrics weren't returned for this page.");
+            }
+
+            ServerSideMetrics metrics = queryMetrics.CumulativeMetrics;
+            retrieved += metrics.RetrievedDocumentCount;
+            output += metrics.OutputDocumentCount;
+        }
+
+        Console.WriteLine(
+            $"{label,-24}: {charge,8:0.00} RU  retrieved {retrieved,4}  output {output,4}");
+    }
     ```
 
 1. Run the application again.
@@ -237,20 +250,27 @@ The second query returns one item. Whether it's expensive depends on how many it
     dotnet run
     ```
 
-The two queries now separate clearly.
+The following example illustrates a run where the name query loaded every product. These are sample measurements, not required results.
 
 ```output
-scan on UPPER(name)     :    12.86 RU  retrieved  295  output    1
+UPPER(name) lookup      :    12.86 RU  retrieved  295  output    1
 category and price      :     3.29 RU  retrieved   12  output   12
 ```
 
-The scan loaded all 295 products in the container to return one. The second query loaded exactly what it returned. Those queries match the two categories from earlier in this module, and they call for different fixes.
+1. Interpret your measurements, not the sample values:
+
+    - **Retrieved** counts documents loaded by the engine; **output** counts documents returned. Retrieved greater than output is evidence of document loading that didn't contribute to the result.
+    - If the name query reports retrieved **295** and output **1** on the verified 295-item container, it demonstrates the full-container document scan described by the example.
+    - If it reports retrieved **1** and output **1**, your measurements don't demonstrate that scan. Record that result rather than treating it as a failed step. Confirm the container count with `SELECT VALUE COUNT(1) FROM c` in Data Explorer, then run `SELECT * FROM c WHERE UPPER(c.name) = "TOURING-3000 BLUE, 62"` there and compare **Query Stats** with the application's totals. A discrepancy between the two measurements needs investigation; it isn't a reason to reseed the container or change its indexing policy.
+    - The category and price query should still return **12** items on the canonical dataset. Record its retrieved count and charge too.
+
+Keep these measurements for Task 3, including a one-to-one result if that's what you observe.
 
 ## Task 3: Rewrite the filter so the index serves it
 
-`UPPER` isn't served from the index, so the engine has no choice but to load every document and evaluate the function against each one. For this lookup, you know the exact stored product name, so you can compare it directly without converting its casing.
+The [UPPER function documentation](https://learn.microsoft.com/en-us/cosmos-db/query/upper) states that the function doesn't utilize the index. Direct property equality is an index-friendly alternative. For this lookup, you know the exact stored product name, so you can compare it directly without converting its casing. Use your measurements to determine the effect of the rewrite; don't infer a full-container scan from the function name alone.
 
-1. In your application, change the scan query's filter to compare the property directly and pass the value in its stored casing.
+1. In **Program.cs**, replace only the `MeasureAsync(...)` call labeled `UPPER(name) lookup` with the following call. This is the first SQL change in the exercise. Leave the measurement method and the category and price query unchanged.
 
     ```csharp
     // Compare the indexed property directly, using the name's stored casing.
@@ -259,17 +279,17 @@ The scan loaded all 295 products in the container to return one. The second quer
         ("@name", "Touring-3000 Blue, 62"));
     ```
 
-1. Run the application again and compare the retrieved count with the value you recorded in Task 2.
+1. Run `dotnet run` again. Confirm that the rewritten query still returns the same product, then compare its charge and retrieved count with your Task 2 measurements. Example output:
 
     ```output
     direct name match       :     2.87 RU  retrieved    1  output    1
     ```
 
-The retrieved count drops from 295 to 1. The query still returns the same product, and the request charge falls with the work. Nothing about the indexing policy changed; the default policy already indexed `/name/?`, and the original query wrote a filter the index couldn't be asked about.
+In the scan example, the retrieved count drops from 295 to 1 and the request charge falls. If your Task 2 query already reported retrieved 1 and output 1, the retrieved count might not fall, and any RU difference might be small. Record the actual comparison; don't claim a scan was removed unless your baseline demonstrated one. Nothing about the indexing policy changed; the default policy already indexed `/name/?`.
 
 ## Task 4: Add a composite index for the two-property filter
 
-The category and price query is already index-served, so there's no scan left to remove. A composite index can still help, because a query combining an equality filter with a range filter can be answered from a single composite index rather than by intersecting two range indexes.
+For the category and price query, retrieved 12 and output 12 indicate that the engine loaded only the documents it returned. A composite index can still help, because a query combining an equality filter with a range filter can be answered from a single composite index rather than by intersecting two range indexes.
 
 1. Turn on index metrics for that query and look at what the engine reports.
 
@@ -281,7 +301,7 @@ The category and price query is already index-served, so there's no scan left to
     FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(query, requestOptions: options);
     ```
 
-    Then print the metrics from the first page by adding this line inside the `while` loop.
+    Then print the metrics from each page by adding this line inside the `while` loop.
 
     ```csharp
     Console.WriteLine(page.IndexMetrics);
@@ -413,4 +433,4 @@ az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --
 
 The composite index you added in Task 4 stays on the `product` container until you remove it. Adding it preserves query results but can change query and write charges, including baselines in later exercises. Record the policy change before comparing costs in another exercise.
 
-Look back at the numbers you recorded. The largest single improvement came from deleting one function call from a `WHERE` clause, and the metrics named that function before you changed anything. That sequence, measure and then read the evidence, is what separates tuning from guessing.
+Look back at the numbers you recorded. Identify which change reduced work or RU charge in your run, and which changes made little or no measurable difference. The sequence of measuring, reading the evidence, and comparing one change at a time is what separates tuning from guessing.

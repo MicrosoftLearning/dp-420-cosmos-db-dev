@@ -2,7 +2,7 @@
 lab:
   title: Tune a high-cost query in Python
   module: Module 13 - Analyze and Tune Query and Operation Performance in Azure Cosmos DB
-  description: Baseline three operations against a product catalog, prove a scan with query metrics, rewrite the filter so the index serves it, add a composite index, and compare fan-out with single-partition routing.
+  description: Baseline three operations against a product catalog, inspect query metrics for scan evidence, compare a direct property filter, add a composite index, and compare fan-out with single-partition routing.
   duration: 45 minutes
   level: 300
   islab: true
@@ -14,7 +14,7 @@ lab:
 
 # Tune a high-cost query in Python
 
-In this exercise, you diagnose an expensive query the way the metrics ask you to: measure first, read the evidence, then change one thing at a time. You start by recording a baseline for three operations against a product catalog, then use the server-side query metrics to prove that one of them scans the container, rewrite it so the index serves the filter, add a composite index for a two-property filter, and finish by comparing a query that fans out with the same query scoped to a single partition.
+In this exercise, you diagnose query cost by measuring first, reading the evidence, and then changing one thing at a time. You start by recording a baseline for three operations against a product catalog, then use the server-side query metrics to check how many documents each query loads. Next, you compare a function-based filter with a direct property filter, add a composite index for a two-property filter, and finish by comparing a query that fans out with the same query scoped to a single partition.
 
 Every task produces a number you can compare against the one before it. Those comparisons are the point of the exercise, so write your numbers down as you go. Request charges depend on your data and query configuration, so treat the sample values in this exercise as illustrations of shape rather than targets to match.
 
@@ -135,8 +135,8 @@ Three operations stand in for the shapes an application runs: a point read by ID
 
 
     def charge_of_last_request():
-        # Read immediately after the operation being measured; another request
-        # on this container can replace the last-response headers.
+        # Use only for the point read, immediately after that single request.
+        # Queries can combine several service responses into one visible page.
         return float(product.client_connection.last_response_headers["x-ms-request-charge"])
 
 
@@ -144,14 +144,18 @@ Three operations stand in for the shapes an application runs: a point read by ID
         total = 0.0
         count = 0
 
+        def record_response(headers, _):
+            nonlocal total
+            total += float(headers["x-ms-request-charge"])
+
         for page in product.query_items(
             query=query,
             parameters=parameters,
             enable_cross_partition_query=True,
+            response_hook=record_response,
         ).by_page():
-            # Fetch the lazy page before reading its charge, and include every page.
+            # Consume all results so the hook captures every service response.
             count += len(list(page))
-            total += charge_of_last_request()
 
         print(f"{label:<24}: {total:>8.2f} RU for {count} items")
 
@@ -162,7 +166,7 @@ Three operations stand in for the shapes an application runs: a point read by ID
     print(f"{'point read':<24}: {charge_of_last_request():>8.2f} RU  ({item['name']})")
 
     measure(
-        "scan on UPPER(name)",
+        "UPPER(name) lookup",
         "SELECT * FROM c WHERE UPPER(c.name) = @name",
         [{"name": "@name", "value": "TOURING-3000 BLUE, 62"}],
     )
@@ -187,17 +191,21 @@ Three operations stand in for the shapes an application runs: a point read by ID
 
     ```output
     point read              :     1.00 RU  (Touring-3000 Blue, 62)
-    scan on UPPER(name)     :    12.86 RU for 1 items
+    UPPER(name) lookup      :    12.86 RU for 1 items
     category and price      :     3.29 RU for 12 items
     ```
 
 The point read is your reference for the same item and consistency level. A point read of a 1 KB item costs 1 request unit (RU) with session, consistent prefix, or eventual consistency. Strong and bounded staleness reads cost twice as much. Record the consistency level and all three charges before continuing.
 
-## Task 2: Prove the scan with query metrics
+## Task 2: Inspect the same queries with query metrics
 
-The second query returns one item. Whether it's expensive depends on how many items the engine had to load to find that item, and only the server-side metrics reveal that count.
+The `UPPER(c.name)` query returns one item. The server-side metrics reveal how many documents the engine loaded to produce that result.
 
-1. In **measure.py**, replace the `measure` function with the following version, which requests query metrics and parses the header they arrive in.
+**Don't change either SQL query or its parameters in this task.** Task 1 already executes `SELECT * FROM c WHERE UPPER(c.name) = @name`. Task 2 adds measurement to the same queries; it doesn't introduce a scan or optimize the filter. Similar RU charges in Tasks 1 and 2 are expected. The SQL changes in Task 3.
+
+1. In **measure.py**, replace the entire `measure` function with the following version. Leave the point read and both `measure(...)` calls below it unchanged.
+
+    The response hook records each service response, including empty responses and responses the SDK combines into a single visible page. Reading only `last_response_headers` once per visible page can undercount both charges and query metrics.
 
     ```python
     def measure(label, query, parameters):
@@ -205,27 +213,22 @@ The second query returns one item. Whether it's expensive depends on how many it
         retrieved = 0
         output = 0
 
-        # Ask the service for execution metrics as well as query results.
-        pages = product.query_items(
+        def record_response(headers, _):
+            nonlocal total, retrieved, output
+            total += float(headers["x-ms-request-charge"])
+            raw = headers["x-ms-documentdb-query-metrics"]
+            metrics = dict(pair.split("=", 1) for pair in raw.split(";") if pair)
+            retrieved += int(metrics["retrievedDocumentCount"])
+            output += int(metrics["outputDocumentCount"])
+
+        for page in product.query_items(
             query=query,
             parameters=parameters,
             enable_cross_partition_query=True,
             populate_query_metrics=True,
-        ).by_page()
-
-        for page in pages:
-            # Consume the page before inspecting the headers for that request.
+            response_hook=record_response,
+        ).by_page():
             list(page)
-            total += charge_of_last_request()
-
-            raw = product.client_connection.last_response_headers[
-                "x-ms-documentdb-query-metrics"
-            ]
-            # Compare documents loaded by the engine with documents returned.
-            # A small result alone doesn't prove the query did little work.
-            metrics = dict(pair.split("=", 1) for pair in raw.split(";"))
-            retrieved += int(metrics["retrievedDocumentCount"])
-            output += int(metrics["outputDocumentCount"])
 
         print(f"{label:<24}: {total:>8.2f} RU  retrieved {retrieved:>4}  output {output:>4}")
     ```
@@ -236,20 +239,27 @@ The second query returns one item. Whether it's expensive depends on how many it
     python measure.py
     ```
 
-The two queries now separate clearly.
+The following example illustrates a run where the name query loaded every product. These are sample measurements, not required results.
 
 ```output
-scan on UPPER(name)     :    12.86 RU  retrieved  295  output    1
+UPPER(name) lookup      :    12.86 RU  retrieved  295  output    1
 category and price      :     3.29 RU  retrieved   12  output   12
 ```
 
-The scan loaded all 295 products in the container to return one. The second query loaded exactly what it returned. Those queries match the two categories from earlier in this module, and they call for different fixes.
+1. Interpret your measurements, not the sample values:
+
+    - **Retrieved** counts documents loaded by the engine; **output** counts documents returned. Retrieved greater than output is evidence of document loading that didn't contribute to the result.
+    - If the name query reports retrieved **295** and output **1** on the verified 295-item container, it demonstrates the full-container document scan described by the example.
+    - If it reports retrieved **1** and output **1**, your measurements don't demonstrate that scan. Record that result rather than treating it as a failed step. Confirm the container count with `SELECT VALUE COUNT(1) FROM c` in Data Explorer, then run `SELECT * FROM c WHERE UPPER(c.name) = "TOURING-3000 BLUE, 62"` there and compare **Query Stats** with the application's totals. A discrepancy between the two measurements needs investigation; it isn't a reason to reseed the container or change its indexing policy.
+    - The category and price query should still return **12** items on the canonical dataset. Record its retrieved count and charge too.
+
+Keep these measurements for Task 3, including a one-to-one result if that's what you observe.
 
 ## Task 3: Rewrite the filter so the index serves it
 
-`UPPER` isn't served from the index, so the engine has no choice but to load every document and evaluate the function against each one. For this lookup, you know the exact stored product name, so you can compare it directly without converting its casing.
+The [UPPER function documentation](https://learn.microsoft.com/en-us/cosmos-db/query/upper) states that the function doesn't utilize the index. Direct property equality is an index-friendly alternative. For this lookup, you know the exact stored product name, so you can compare it directly without converting its casing. Use your measurements to determine the effect of the rewrite; don't infer a full-container scan from the function name alone.
 
-1. In your application, change the scan query's filter to compare the property directly and pass the value in its stored casing.
+1. In **measure.py**, replace only the `measure(...)` call labeled `UPPER(name) lookup` with the following call. This is the first SQL change in the exercise. Leave the measurement function and the category and price query unchanged.
 
     ```python
     # Compare the indexed property directly, using the name's stored casing.
@@ -260,27 +270,29 @@ The scan loaded all 295 products in the container to return one. The second quer
     )
     ```
 
-1. Run the application again and compare the retrieved count with the value you recorded in Task 2.
+1. Run `python measure.py` again. Confirm that the rewritten query still returns the same product, then compare its charge and retrieved count with your Task 2 measurements. Example output:
 
     ```output
     direct name match       :     2.87 RU  retrieved    1  output    1
     ```
 
-The retrieved count drops from 295 to 1. The query still returns the same product, and the request charge falls with the work. Nothing about the indexing policy changed; the default policy already indexed `/name/?`, and the original query wrote a filter the index couldn't be asked about.
+In the scan example, the retrieved count drops from 295 to 1 and the request charge falls. If your Task 2 query already reported retrieved 1 and output 1, the retrieved count might not fall, and any RU difference might be small. Record the actual comparison; don't claim a scan was removed unless your baseline demonstrated one. Nothing about the indexing policy changed; the default policy already indexed `/name/?`.
 
 ## Task 4: Add a composite index for the two-property filter
 
-The category and price query is already index-served, so there's no scan left to remove. A composite index can still help, because a query combining an equality filter with a range filter can be answered from a single composite index rather than by intersecting two range indexes.
+For the category and price query, retrieved 12 and output 12 indicate that the engine loaded only the documents it returned. A composite index can still help, because a query combining an equality filter with a range filter can be answered from a single composite index rather than by intersecting two range indexes.
 
 1. Turn on index metrics for that query and look at what the engine reports.
 
-    Add `populate_index_metrics=True` to the `query_items` call in `measure`, then print the parsed utilization dictionary inside the page loop. Single-index entries carry an `IndexSpec` string. Composite entries carry an `IndexSpecs` list, so the code reads whichever one is present.
+    Add `import base64` and `import json` at the top of **measure.py**, and add `populate_index_metrics=True` to the `query_items` call in `measure`. Then add the following code at the end of the nested `record_response` function, after updating `output`.
+
+    The hook can receive index utilization as a parsed dictionary or a Base64-encoded JSON string. Single-index entries carry an `IndexSpec` string. Composite entries carry an `IndexSpecs` list, so the code reads whichever one is present.
 
     ```python
     # Index utilization describes used and potential indexes; it doesn't create them.
-    utilization = product.client_connection.last_response_headers[
-        "x-ms-cosmos-index-utilization"
-    ]
+    utilization = headers["x-ms-cosmos-index-utilization"]
+    if isinstance(utilization, str):
+        utilization = json.loads(base64.b64decode(utilization))
 
     for section, entries in utilization.items():
         for entry in entries:
@@ -411,4 +423,4 @@ az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --
 
 The composite index you added in Task 4 stays on the `product` container until you remove it. Adding it preserves query results but can change query and write charges, including baselines in later exercises. Record the policy change before comparing costs in another exercise.
 
-Look back at the numbers you recorded. The largest single improvement came from deleting one function call from a `WHERE` clause, and the metrics named that function before you changed anything. That sequence, measure and then read the evidence, is what separates tuning from guessing.
+Look back at the numbers you recorded. Identify which change reduced work or RU charge in your run, and which changes made little or no measurable difference. The sequence of measuring, reading the evidence, and comparing one change at a time is what separates tuning from guessing.

@@ -569,7 +569,7 @@ Because key-based authentication is disabled, no key or connection string appear
         $"{await MeanReplaceAsync(product, source.Resource, categoryId):F2} RU");
     ```
 
-1. Run the program. Write down the RU number next to **Before GSI, source replace average of 3**:
+1. Run the program **before creating the GSI**. Write down the RU number next to **Before GSI, source replace average of 3**:
 
     ```powershell
     dotnet run

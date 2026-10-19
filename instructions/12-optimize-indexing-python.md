@@ -424,7 +424,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 6: Create and query a global secondary index
 
-1. Replace the Python task-code block and run `python measure.py`:
+1. Replace the Python task-code block with:
 
     ```python
     # TASK CODE
@@ -433,7 +433,13 @@ Because key-based authentication is disabled, no key or connection string appear
     print(f"Source replace before GSI: {replace_charge(product, source):.2f} RU")
     ```
 
-    Record **Source replace before GSI**. Use this value, not the sandbox measurement from Task 1.
+1. Run the baseline **now, before creating the GSI**:
+
+    ```powershell
+    python measure.py
+    ```
+
+    Write down the RU number after **Source replace before GSI**. You'll compare it with **Source replace after GSI** later in this task.
 
 1. Create **capabilities.json**:
 
