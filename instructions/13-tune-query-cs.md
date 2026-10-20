@@ -294,14 +294,27 @@ For the category and price query, retrieved 12 and output 12 indicate that the e
     using System.Text.Json;
     ```
 
-    Replace the iterator declaration in `MeasureAsync` with the following to turn on index metrics:
+1. In **Program.cs**, locate the `MeasureAsync` method you added in Task 2. Find the following line immediately before `while (iterator.HasMoreResults)`:
+
+    ```csharp
+    FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(query);
+    ```
+
+    Replace that line with these two lines to turn on index metrics:
 
     ```csharp
     QueryRequestOptions options = new() { PopulateIndexMetrics = true };
     FeedIterator<Product> iterator = container.GetItemQueryIterator<Product>(query, requestOptions: options);
     ```
 
-1. Inside the `while` loop in `MeasureAsync`, add the following code after updating `output` to print each page's index metrics:
+
+1. In the same `MeasureAsync` method, find the following line inside the `while` loop:
+
+    ```csharp
+    output += metrics.OutputDocumentCount;
+    ```
+
+    Insert the following code after that line, before the closing brace of the `while` loop, to print each page's index metrics. 
 
     ```csharp
     if (!string.IsNullOrEmpty(page.IndexMetrics))
@@ -399,7 +412,7 @@ The container remains available for reads and writes during index transformation
 
 The `product` container is partitioned on `/categoryId`. Every query so far that filtered on `categoryId` routed to one partition. This task runs the same price filter with and without that routing.
 
-1. Replace the existing `MeasureAsync(...)` call labeled `category and price` with the following two calls. Keep the point read and the `direct name match` call unchanged.
+1. Replace the existing `MeasureAsync(...)` call filtering on `category and price` with the following two calls. Keep the point read and the `direct name match` call unchanged.
 
     ```csharp
     // Without a partition-key equality filter, the query can visit every partition.
