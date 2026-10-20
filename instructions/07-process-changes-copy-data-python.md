@@ -2,7 +2,7 @@
 lab:
   title: Process changes and copy data in Python
   module: Module 7 - Process the Azure Cosmos DB for NoSQL Change Feed
-  description: Run a change feed consumer against a lease container, react to changes with an Azure Functions trigger, and copy a container onto a new partition key with a copy job.
+  description: Synchronize product category names with the change feed, log updates with an Azure Functions trigger, and copy a container to a new partition key.
   duration: 45 minutes
   level: 300
   islab: true
@@ -14,9 +14,9 @@ lab:
 
 # Process changes and copy data in Python
 
-In this exercise, you build the pipeline described throughout this module. You load the CosmicWorks catalog and run a consumer. The consumer keeps the denormalized category name current. You then run the same logic in an Azure Function. Finally, you copy the data to a container that uses a different partition key.
+In this exercise, you use the change feed to keep product category names in sync, log product updates with an Azure Function, and copy products to a container with a different partition key.
 
-The category name that products carry is a copy. Renaming a category in one container leaves that copy stale everywhere else until something reconciles it, and the change feed is what makes the reconciliation possible without polling.
+Products store a copy of the category name from `productMeta`. A category rename updates the metadata document; the consumer updates the corresponding products.
 
 ## Before you start
 
@@ -101,9 +101,9 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Set up the project and confirm the catalog
 
-The setup script created the `product`, `productMeta`, and `leases` containers, granted your identity data-plane access, and loaded the catalog. This task builds the project the rest of the exercise uses and confirms the data arrived.
+Use the account endpoint recorded during setup wherever the code contains `<cosmos-endpoint>`.
 
-Create a project and add the packages (remember to replace `<your-account-name>` and `<cosmos-endpoint>` with your actual values):
+Create a project and install the required packages:
 
 ```powershell
 mkdir change-feed-lab
@@ -149,7 +149,7 @@ productMeta: 237 items
 product: 295 items
 ```
 
-`productMeta` holds two kinds of document discriminated by a `type` property: category documents and tag documents. That detail matters in the next task.
+The `type` property distinguishes category documents from tag documents in `productMeta`.
 
 ## Task 2: Sync a denormalized property from the change feed
 
@@ -225,7 +225,7 @@ python sync.py
 Reading the change feed. Press Ctrl+C to stop.
 ```
 
-Leave this terminal open and the consumer running. The loop checks the feed every five seconds until you stop it, and the next step depends on it still running.
+Leave this terminal open with the consumer running while you perform the next steps.
 
 With the consumer running, rename a category from a second terminal. Category `3E4CEACD-D007-46EB-82D7-31F6141752B2` is *Components, Road Frames*, and its partition key value is `category`.
 
@@ -268,16 +268,16 @@ Keep the consumer running in its original terminal.
 
 Switch back to the consumer's terminal. It reports the new category name and the number of products it patched. Run the rename a second time to watch the consumer pick up another change.
 
-Two behaviors are worth noticing:
+Review the consumer's behavior:
 
-- **The `type` filter is doing real work.** `productMeta` holds 200 tag documents alongside the categories. Without the filter, a tag rename would write a tag's name into `categoryName` on unrelated products.
-- **The consumer starts from now.** Changes made before it first ran are invisible to it, because the start position applies only until a lease or continuation token exists.
+- **Metadata filtering:** The feed contains category and tag documents. Only category changes require updates to the products.
+- **Start position:** On its first run, the consumer starts with future changes.
 
-> &#10071; This pull-mode sample keeps its continuation token only in memory. If you stop it, rename the category, and restart it, it starts from `Now` and doesn't replay the intervening change. Rename again while it is running to confirm processing. A production pull consumer must persist its token after successful processing and reload it on restart; this sample doesn't provide durable checkpoints.
+> &#10071; This Python consumer keeps its continuation token in memory. Restarting it starts from `Now`, so changes made while it was stopped aren't processed. A production consumer must persist its token after successful processing and reload it on restart.
 
 ## Task 3: React to changes with an Azure Function
 
-The consumer in Task 2 is a process you have to host or an application. In this task you run the equivalent logic on an Azure Functions instead, watching the `product` container so that the changes performed in Task 2 become this task's input.
+Use an Azure Functions trigger to log changes to `product`. The Task 2 consumer's product updates trigger the function.
 
 Open a new integrated terminal in the Shared folder.
 
@@ -306,8 +306,7 @@ app = func.FunctionApp()
     lease_container_name="leases",
 )
 def product_audit(changes: func.DocumentList) -> None:
-    # A trigger invocation can contain several changed documents. This handler
-    # logs them; it doesn't copy data or update the source items.
+    # Log each product in the change feed batch.
     for product in changes:
         logging.info(
             "Product %s is now in category '%s'.",
@@ -331,7 +330,7 @@ Set `local.settings.json`:
 }
 ```
 
-Azurite emulates Azure Storage on your own machine. The Functions host keeps its internal bookkeeping in a storage account, which is what `AzureWebJobsStorage` points at, and `UseDevelopmentStorage=true` sends that to Azurite. None of your data goes there: the catalog stays in Cosmos DB, and the change feed's checkpoints stay in the `leases` container.
+Azurite provides local storage for the Functions host. The catalog remains in Azure Cosmos DB, and the function's change feed checkpoints are stored in `leases`.
 
 Start Azurite in this terminal (this application can take a few moments to initialize):
 
@@ -348,31 +347,27 @@ func start
 > &#128221; Select **Allow** if the function requests network access.
 
 
-The connection setting names an endpoint but no credential, so `DefaultAzureCredential` falls back to your `az login` session. Note what's absent from the trigger configuration: `CreateLeaseContainerIfNotExists` stays at its default, because creating a container is a control-plane operation that a data-plane role assignment doesn't permit. The `leases` container from Task 1 is already there.
+The function uses your Azure CLI sign-in and the existing `leases` container.
 
-Now watch the whole pipeline run:
+Test the pipeline:
 
 1. Go to the terminal you used for the rename program and run it again.
 
 1. Watch the Task 2 consumer. It reports the category it synced and how many products it patched.
 
-1. Watch the `func start` terminal. Each patched product arrives as a separate execution, and the message is the one your own function logs:
+1. Watch the `func start` terminal for product update messages:
 
     ```output
     Product 0AE1D2B4-... is now in category 'Components, Road Frames (revised 051233)'.
     ```
 
-Two consumers are now reading two different feeds from the same account, and one feeds the other. The Task 2 consumer watches `productMeta` and writes to `product`. The function watches `product`, so the consumer's writes are what trigger it.
-
-> &#128221; Both consumers share the `leases` container without colliding, because they monitor different containers and use different processor identities. Two consumers on the *same* monitored container would compete for the same leases, and one of them would sit idle. That case needs a distinct lease container prefix.
-
 ## Task 4: Copy a container onto a new partition key
 
-Moving a container to a different partition key means copying its data into a container created with the new key. This task runs that copy yourself, with the CLI.
+Create a destination container with the new partition key and copy the source data into it.
 
 > &#128221; Container copy jobs are in preview. The jobs run on a best-effort basis with no service-level agreement.
 
-Stop everything still running from the previous tasks, then close those terminals. An offline copy job requires writes on the source to be stopped, and the Task 2 consumer is the process writing to `product`. Updates made after the job starts might not be captured.
+Stop the consumer, function, and Azurite, then close their terminals. Don't write to the source container while the offline copy job runs.
 
 The rest of this task runs in the Azure CLI. In the **Explorer** pane, open the context menu for the **Allfiles/Labs/Shared** folder and select **Open in Integrated Terminal**, then sign in:
 
@@ -380,7 +375,7 @@ The rest of this task runs in the Azure CLI. In the **Explorer** pane, open the 
 az login
 ```
 
-Set the variables again, replacing `ResourceGroup1` if your lab environment provides a different resource group name. The ones you set during setup belonged to a terminal you just closed, and every command below uses them:
+Set the variables in this new terminal. Use your lab's resource group name and the account name recorded during setup:
 
 ```powershell
 $resourceGroup = "ResourceGroup1"
@@ -399,7 +394,7 @@ az cosmosdb sql container create `
     --throughput 800
 ```
 
-The copy commands currently ship in a preview extension. Install it:
+Install the preview extension for the copy commands:
 
 ```azurecli
 az extension add --name cosmosdb-preview
@@ -417,9 +412,7 @@ az cosmosdb copy create `
     --dest-nosql database=cosmicworks container=productArchive
 ```
 
-The command returns as soon as the job is registered, before any data moves, so the response reports `"status": "Pending"` with `"totalCount": 0` and `"processedCount": 0`.
-
-Monitor it, give it a few moments, and you need to run the `az cosmosdb copy show` command repeatedly until the `status` reads `Completed`:
+The command creates an asynchronous copy job. Monitor its progress with the following command until `status` is `Completed`:
 
 ```azurecli
 az cosmosdb copy show `
@@ -435,15 +428,13 @@ az cosmosdb copy show `
 "totalCount": 295,
 ```
 
-Read `status` to decide whether the job is finished. Don't rely on the two counts matching: they both sit at zero while the job is still pending, so they match before any work happens. Run the command again until `status` reads `Completed`. A job that fails reports `Faulted` and puts the reason in the `error` property.
-
-The job reads the source container's change feed, which is the same mechanism the previous two tasks used. `totalCount` is what the job found to copy and `processedCount` is what it wrote, so a completed job shows the same number twice.
+The copy job reads the source container's change feed. A completed job should report 295 for both `totalCount` and `processedCount`.
 
 Confirm the copy in the Azure portal: open **Data Explorer**, select the `productArchive` container, and run `SELECT VALUE COUNT(1) FROM c`. It returns 295, the same count `product` holds.
 
-The items themselves are unchanged, and each one keeps its original `id`. What changed is the container around them: `product` partitions on `/categoryId`, while `productArchive` partitions on `/id`.
+The copied items retain their original `id` values. The destination container partitions on `/id` instead of `/categoryId`.
 
-The same job shape moves a container onto a hierarchical partition key, which is one of the documented reasons to run a copy. Before running that migration on your own container, confirm that the combination of `id` and the new partition key value stays unique across the container, because uniqueness is enforced on that pair and a collision fails the job.
+For other migrations, make sure the combination of `id` and the new partition key value remains unique within the container.
 
 ## Clean up resources
 

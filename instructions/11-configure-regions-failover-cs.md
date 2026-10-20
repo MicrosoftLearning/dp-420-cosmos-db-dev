@@ -14,9 +14,7 @@ lab:
 
 # Configure Regions and Failover in C#
 
-In this exercise, you configure an Azure Cosmos DB for NoSQL account that spans two regions, move its write region while both regions are healthy, enable writes in both regions, and finally take a region offline the way you would during a real outage. You verify each change using the account's region configuration or the regional status shown in the Azure portal.
-
-The account this exercise creates is disposable, which matters more here than in any other exercise in this learning path. The last task takes a region offline, and **a region that goes offline stays offline until Microsoft brings it back**, which can take days and needs a support request after a drill. Running that against an account you care about would be a genuine outage.
+In this exercise, you configure a two-region Azure Cosmos DB for NoSQL account, change its write region, enable multi-region writes, and test availability by taking one region offline.
 
 This exercise takes approximately **45** minutes to complete.
 
@@ -95,7 +93,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Read the account's region topology
 
-Before changing the account, read which regions are configured for writes and reads using its `writeLocations` and `readLocations` properties. These lists don't by themselves confirm whether a region is online. Task 4 checks that status separately in the Azure portal.
+Before changing the account, view its configured write and read regions using the `writeLocations` and `readLocations` properties.
 
 1. Show which region currently accepts writes, and the failover priority of every region.
 
@@ -134,11 +132,11 @@ Before changing the account, read which regions are configured for writes and re
     }
     ```
 
-The account replicates to two regions and accepts writes in one of them. That's the single-write-region topology, and the next task moves the write region within it.
+The account replicates data to both regions but accepts writes in only one.
 
 ## Task 2: Change the write region
 
-Both regions are healthy, so this change is the planned operation: the service replicates outstanding changes before promoting the new region, and no data is lost. In the Azure CLI, moving failover priority `0` to another region performs the change.
+Both regions are healthy, so you can change the write region without data loss. The region with failover priority `0` accepts writes.
 
 1. Promote the second region to write region by giving it priority `0`.
 
@@ -149,7 +147,7 @@ Both regions are healthy, so this change is the planned operation: the service r
         --failover-policies "$secondRegion=0" "$location=1"
     ```
 
-    The command lists every region on the account, assigns a unique priority to each, and gives exactly one of them `0`. Leaving a region out fails.
+    List every account region with a unique failover priority, starting at `0`.
 
 1. Confirm the promotion took effect.
 
@@ -176,8 +174,6 @@ Both regions are healthy, so this change is the planned operation: the service r
     dotnet add package Newtonsoft.Json
     ```
 
-    `Microsoft.Azure.Cosmos` needs an explicit `Newtonsoft.Json` reference. Without it, the project doesn't build.
-
 1. In **Visual Studio Code**, open `Program.cs` in the `region-check` folder. Replace its contents with the following code, then set `endpoint` to the account endpoint you recorded.
 
     For `preferredRegion`, use the second region's display name from Task 1, such as `"West Central US"`. The .NET SDK also provides region constants, such as `Regions.WestCentralUS`, for these names.
@@ -189,8 +185,7 @@ Both regions are healthy, so this change is the planned operation: the service r
     string endpoint = "<cosmos-endpoint>";
     string preferredRegion = "<your-second-region>";
 
-    // Preferred regions guide SDK routing; they don't change the account's
-    // regions or enable multi-region writes.
+    // Preferred regions control client routing, not account configuration.
     CosmosClientOptions options = new()
     {
         ApplicationPreferredRegions = new List<string> { preferredRegion }
@@ -211,13 +206,11 @@ Both regions are healthy, so this change is the planned operation: the service r
     dynamic item = read.Resource;
     item.name = "Road-350-W Yellow, 48 (regional check)";
 
-    // Upsert replaces this existing item. The SDK discovers the writable region
-    // from the account topology, rather than from a region-specific endpoint.
+    // The SDK routes the write using the account's region configuration.
     ItemResponse<dynamic> write = await container.UpsertItemAsync<dynamic>(item, partitionKey);
 
     Console.WriteLine($"Write succeeded with status {(int)write.StatusCode}.");
 
-    // Reading again verifies the update, not which region served the request.
     ItemResponse<dynamic> verified = await container.ReadItemAsync<dynamic>(
         "063F1A00-8CA1-4DB9-8298-BEAC4B8CC238", partitionKey);
 
@@ -230,11 +223,11 @@ Both regions are healthy, so this change is the planned operation: the service r
     dotnet run
     ```
 
-    Both operations succeed. The client never named a write region: it read the account configuration, found the current write region, and routed the write there.
+    Confirm that the write succeeds and the read returns the updated item name. The SDK discovers the current write region from the account configuration.
 
 ## Task 3: Enable writes in both regions
 
-A single-write-region account concentrates every write in one place. Enabling multi-region writes makes both regions writable and removes the account-level failover requirement for writes entirely.
+Multi-region writes let applications write to either region.
 
 1. Enable multi-region writes on the account. Every read region becomes a read and write region.
 
@@ -275,7 +268,7 @@ A single-write-region account concentrates every write in one place. Enabling mu
     dotnet run
     ```
 
-    Confirm that the output includes `Write succeeded with status 200.` and the updated item name. With multi-region writes enabled, the first region can now accept writes directly. The console output verifies successful reads and writes, but doesn't identify which region served them.
+    Confirm that the output includes `Write succeeded with status 200.` and the updated item name. Both regions are now writable, and the client prefers the first region.
 
 1. Read the container's conflict resolution policy, which is the policy that now decides the outcome when both regions change the same item.
 
@@ -296,15 +289,11 @@ A single-write-region account concentrates every write in one place. Enabling mu
     }
     ```
 
-    The container was created without a conflict resolution policy, so it carries the default: last writer wins on the system timestamp. Changing that requires creating a new container, because the policy is fixed at creation.
-
-> &#128221; This exercise doesn't produce an actual write conflict. A conflict needs two regions to change the same item inside the replication window, which isn't reliably reproducible from a single machine. What you can verify is the policy that would resolve one, which is the configuration a production account depends on.
+    The default policy resolves conflicts using the `_ts` system timestamp. Conflict resolution policies are set when the container is created.
 
 ## Task 4: Take a region offline
 
-This is the outage operation. Every step so far is reversible in minutes; this task isn't. Read the whole task before running the first command.
-
-> &#9888; A region taken offline stays offline until Microsoft brings it back, which can take several days, and a region taken offline for a drill needs a support request to restore. Only run this against the disposable account this exercise created, which you delete in the next section.
+> &#9888; A region taken offline for a drill can remain offline for several days and requires a Microsoft support request to restore. Use only the disposable account created for this exercise.
 
 1. Take the account's first region offline, simulating a regional outage.
 
@@ -324,17 +313,13 @@ This is the outage operation. Every step so far is reversible in minutes; this t
 
     For the default setup, these are **West US 2** and **West Central US**, respectively. If the first region isn't marked **Offline** yet, wait and refresh again.
 
-    The `writeLocations` and `readLocations` lists returned by `az cosmosdb show` can still include the offline region. Use the portal's **Status** column to verify the outage, not whether the region appears in those lists.
-
 1. Without changing `Program.cs`, run it again from the `region-check` terminal.
 
     ```powershell
     dotnet run
     ```
 
-    Confirm that the output includes `Write succeeded with status 200.` and the updated item name. The SDK uses the remaining healthy region for reads and writes, even though `preferredRegion` still names the offline region. A preferred region guides routing; it doesn't restrict the client to that region.
-
-You've now run all three account-level responses to a regional problem: a planned write region change, a topology change that removes the need for one, and an outage response.
+    Confirm that the output includes `Write succeeded with status 200.` and the updated item name. The SDK routes requests to the healthy region even though `preferredRegion` still names the offline region.
 
 ## Clean up resources
 
@@ -346,4 +331,4 @@ az group delete --name $resourceGroup --yes --no-wait
 
 If your lab provided `ResourceGroup1`, or the group holds other resources, keep the group. In the Azure portal, delete only the Azure Cosmos DB account you created for this exercise.
 
-Deleting the account is what stops the two-region charge. A two-region account bills throughput and storage in both regions, and multi-region writes cost more per unit of throughput than a single write region. An account left running after this exercise costs more than twice what a single-region account does.
+Delete the account to stop ongoing charges. Throughput and storage are billed in both regions.

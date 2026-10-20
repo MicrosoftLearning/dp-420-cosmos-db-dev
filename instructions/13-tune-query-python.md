@@ -14,9 +14,9 @@ lab:
 
 # Tune a high-cost query in Python
 
-In this exercise, you diagnose query cost by measuring first, reading the evidence, and then changing one thing at a time. You start by recording a baseline for three operations against a product catalog, then use the server-side query metrics to check how many documents each query loads. Next, you compare a function-based filter with a direct property filter, add a composite index for a two-property filter, and finish by comparing a query that fans out with the same query scoped to a single partition.
+In this exercise, you measure request charges and query metrics for a product catalog. You then rewrite a filter, add a composite index, and compare queries with and without a partition-key filter.
 
-Every task produces a number you can compare against the one before it. Those comparisons are the point of the exercise, so write your numbers down as you go. Request charges depend on your data and query configuration, so treat the sample values in this exercise as illustrations of shape rather than targets to match.
+Record your measurements after each task. Request charges vary with your data and query configuration, so your values might differ from the examples.
 
 This exercise takes approximately **45** minutes to complete.
 
@@ -100,7 +100,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Record a baseline
 
-Three operations stand in for the shapes an application runs: a point read by ID, a query whose filter calls a case-conversion function, and a query filtering on two properties. Measure all three before changing anything.
+Measure three operations: a point read, a name lookup using case conversion, and a query that filters by category and price.
 
 1. In the terminal, create a project folder and a virtual environment.
 
@@ -167,7 +167,7 @@ Three operations stand in for the shapes an application runs: a point read by ID
 
     measure(
         "UPPER(name) lookup",
-        "SELECT * FROM c WHERE UPPER(c.name) = @name",
+        "SELECT * FROM c WHERE UPPER(CONCAT(c.name, '')) = @name",
         [{"name": "@name", "value": "TOURING-3000 BLUE, 62"}],
     )
 
@@ -199,13 +199,11 @@ The point read is your reference for the same item and consistency level. A poin
 
 ## Task 2: Inspect the same queries with query metrics
 
-The `UPPER(c.name)` query returns one item. The server-side metrics reveal how many documents the engine loaded to produce that result.
-
-**Don't change either SQL query or its parameters in this task.** Task 1 already executes `SELECT * FROM c WHERE UPPER(c.name) = @name`. Task 2 adds measurement to the same queries; it doesn't introduce a scan or optimize the filter. Similar RU charges in Tasks 1 and 2 are expected. The SQL changes in Task 3.
+The `UPPER(CONCAT(c.name, ''))` query returns one item. The server-side metrics reveal how many documents the engine loaded to produce that result.
 
 1. In **measure.py**, replace the entire `measure` function with the following version. Leave the point read and both `measure(...)` calls below it unchanged.
 
-    The response hook records each service response, including empty responses and responses the SDK combines into a single visible page. Reading only `last_response_headers` once per visible page can undercount both charges and query metrics.
+    The response hook totals the request charge and query metrics across all service responses.
 
     ```python
     def measure(label, query, parameters):
@@ -239,27 +237,26 @@ The `UPPER(c.name)` query returns one item. The server-side metrics reveal how m
     python measure.py
     ```
 
-The following example illustrates a run where the name query loaded every product. These are sample measurements, not required results.
+Example output:
 
 ```output
 UPPER(name) lookup      :    12.86 RU  retrieved  295  output    1
 category and price      :     3.29 RU  retrieved   12  output   12
 ```
 
-1. Interpret your measurements, not the sample values:
+1. Review the measurements:
 
     - **Retrieved** counts documents loaded by the engine; **output** counts documents returned. Retrieved greater than output is evidence of document loading that didn't contribute to the result.
-    - If the name query reports retrieved **295** and output **1** on the verified 295-item container, it demonstrates the full-container document scan described by the example.
-    - If it reports retrieved **1** and output **1**, your measurements don't demonstrate that scan. Record that result rather than treating it as a failed step. Confirm the container count with `SELECT VALUE COUNT(1) FROM c` in Data Explorer, then run `SELECT * FROM c WHERE UPPER(c.name) = "TOURING-3000 BLUE, 62"` there and compare **Query Stats** with the application's totals. A discrepancy between the two measurements needs investigation; it isn't a reason to reseed the container or change its indexing policy.
-    - The category and price query should still return **12** items on the canonical dataset. Record its retrieved count and charge too.
+    - The name query retrieves **295** documents but returns **1**, demonstrating a full-container document scan.
+    - The category and price query retrieves and returns **12** documents.
 
-Keep these measurements for Task 3, including a one-to-one result if that's what you observe.
+Record both queries' retrieved counts, output counts, and request charges for comparison in Task 3.
 
 ## Task 3: Rewrite the filter so the index serves it
 
-The [UPPER function documentation](https://learn.microsoft.com/en-us/cosmos-db/query/upper) states that the function doesn't utilize the index. Direct property equality is an index-friendly alternative. For this lookup, you know the exact stored product name, so you can compare it directly without converting its casing. Use your measurements to determine the effect of the rewrite; don't infer a full-container scan from the function name alone.
+Direct property equality is an index-friendly alternative to the baseline expression. For this lookup, you know the exact stored product name, so you can compare it directly without converting its casing.
 
-1. In **measure.py**, replace only the `measure(...)` call labeled `UPPER(name) lookup` with the following call. This is the first SQL change in the exercise. Leave the measurement function and the category and price query unchanged.
+1. In **measure.py**, replace only the `measure(...)` call labeled `UPPER(name) lookup` with the following call. Leave the measurement function and the category and price query unchanged.
 
     ```python
     # Compare the indexed property directly, using the name's stored casing.
@@ -276,47 +273,63 @@ The [UPPER function documentation](https://learn.microsoft.com/en-us/cosmos-db/q
     direct name match       :     2.87 RU  retrieved    1  output    1
     ```
 
-In the scan example, the retrieved count drops from 295 to 1 and the request charge falls. If your Task 2 query already reported retrieved 1 and output 1, the retrieved count might not fall, and any RU difference might be small. Record the actual comparison; don't claim a scan was removed unless your baseline demonstrated one. Nothing about the indexing policy changed; the default policy already indexed `/name/?`.
+The retrieved count drops from 295 to 1 and the request charge falls. The default policy already indexes `/name/?`, so this improvement requires no indexing policy change.
 
 ## Task 4: Add a composite index for the two-property filter
 
 For the category and price query, retrieved 12 and output 12 indicate that the engine loaded only the documents it returned. A composite index can still help, because a query combining an equality filter with a range filter can be answered from a single composite index rather than by intersecting two range indexes.
 
-1. Turn on index metrics for that query and look at what the engine reports.
-
-    Add `import base64` and `import json` at the top of **measure.py**, and add `populate_index_metrics=True` to the `query_items` call in `measure`. Then add the following code at the end of the nested `record_response` function, after updating `output`.
-
-    The hook can receive index utilization as a parsed dictionary or a Base64-encoded JSON string. Single-index entries carry an `IndexSpec` string. Composite entries carry an `IndexSpecs` list, so the code reads whichever one is present.
+1. In **measure.py**, add the following imports at the top of the file:
 
     ```python
-    # Index utilization describes used and potential indexes; it doesn't create them.
+    import base64
+    import json
+    ```
+
+    In `measure`, replace the `for` statement with the following:
+
+    ```python
+    for page in product.query_items(
+        query=query,
+        parameters=parameters,
+        enable_cross_partition_query=True,
+        populate_query_metrics=True,
+        populate_index_metrics=True,
+        response_hook=record_response,
+    ).by_page():
+        list(page)
+    ```
+
+1. Add the following code at the end of the nested `record_response` function, after updating `output`, to print the index utilization.
+
+    ```python
     utilization = headers["x-ms-cosmos-index-utilization"]
     if isinstance(utilization, str):
         utilization = json.loads(base64.b64decode(utilization))
 
+    print(f"\n{label} - index utilization")
     for section, entries in utilization.items():
+        if not entries:
+            continue
+        heading = section.replace("SingleIndexes", " single indexes").replace(
+            "CompositeIndexes", " composite indexes"
+        )
+        print(f"  {heading}")
         for entry in entries:
             spec = entry.get("IndexSpec") or ", ".join(entry.get("IndexSpecs", []))
-            print(f"  {section:<26}{spec:<30}{entry['IndexImpactScore']}")
+            print(f"    {spec} (impact: {entry['IndexImpactScore']})")
     ```
 
-1. Run the application and read the index utilization section. Record which paths appear as utilized and whether any composite index appears under the potential section. Your output resembles the following example, though the exact recommendations depend on how the engine evaluates your query against your data.
+1. Run the application and read the index utilization section for `category and price`. Record which paths appear as utilized and whether any composite index appears under the potential section. Example output:
 
     ```output
-    Index Utilization Information
-      Utilized Single Indexes
-        Index Spec: /categoryId/?
-        Index Impact Score: High
-        ---
-        Index Spec: /price/?
-        Index Impact Score: High
-        ---
-      Potential Single Indexes
-      Utilized Composite Indexes
-      Potential Composite Indexes
-        Index Spec: /categoryId ASC, /price ASC
-        Index Impact Score: High
-        ---
+    category and price - index utilization
+      Utilized single indexes
+        /price/? (impact: High)
+        /categoryId/? (impact: High)
+      Potential composite indexes
+        /categoryId ASC, /price ASC (impact: High)
+    category and price      :     3.27 RU  retrieved   12  output   12
     ```
 
 1. For a fresh core container with the default policy, create a file named **indexing-policy.json** in your project folder with the following content. The equality filter comes first and the range filter last, which is the ordering a composite index requires.
@@ -363,15 +376,15 @@ For the category and price query, retrieved 12 and output 12 indicate that the e
         --idx '@indexing-policy.json'
     ```
 
-1. In **Data Explorer**, open the `product` container's **Settings** and check the index transformation progress. Wait until the transformation completes, then run the application again and compare the request charge and index utilization against the baseline. An elapsed minute alone doesn't confirm that the new index is ready.
+1. In **Data Explorer**, open the `product` container's **Settings** and check the index transformation progress. Wait until the transformation completes, then run the application again and compare the request charge and index utilization against the baseline.
 
-Index transformation runs in the background and doesn't affect read or write availability, so the container keeps serving queries while it completes. At 295 items, the transformation finishes almost immediately.
+The container remains available for reads and writes during index transformation.
 
 ## Task 5: Compare fan-out with single-partition routing
 
 The `product` container is partitioned on `/categoryId`. Every query so far that filtered on `categoryId` routed to one partition. This task runs the same price filter with and without that routing.
 
-1. Add a query that filters only on price, leaving the partition key out entirely, and keep the scoped version alongside it.
+1. Replace the existing `measure(...)` call filtering on `category and price` with the following two calls. Keep the point read and the `direct name match` call unchanged.
 
     ```python
     # Without a partition-key equality filter, the query can visit every partition.
@@ -399,13 +412,9 @@ The `product` container is partitioned on `/categoryId`. Every query so far that
     price within category   :     3.29 RU  retrieved   12  output   12
     ```
 
-Both queries are fully index-served: retrieved equals output in each case. If the container has one physical partition, the unscoped query costs more because it returns 86 products across every category rather than the 12 in one category, not because it visited more partitions. A fresh core container with this data and throughput usually has one physical partition, but 295 items alone don't prove its layout. Confirm the partition count below before interpreting the difference. If the container has multiple physical partitions, fan-out can also contribute to the unscoped query's cost.
+Both queries use indexes: retrieved and output counts are equal. The price-only query returns 86 products; the category-scoped query returns 12. If the container has one physical partition, the lower RU charge comes from returning fewer products. With multiple physical partitions, the category filter also avoids querying other physical partitions.
 
-With one physical partition, that null result is worth understanding rather than skipping. The routing behavior is real, but scoping can't reduce the physical partition count below one. In a container with several physical partitions, the unscoped query checks every partition's index and merges the results, while the scoped query checks one. Documentation puts the point where that difference becomes significant at roughly 30,000 provisioned RU/s or about 100 GB of stored data.
-
-1. Inspect the **Physical Partition Count** metric in the Azure portal, as described below. A single active range in the normalized RU chart doesn't prove the container's partition count or history.
-
-1. To check the container's physical partition count, open the account in the Azure portal and select **Metrics**. Select **Physical Partition Count** with **Maximum** aggregation. Filter **DatabaseName** to `cosmicworks`, **CollectionName** to `product`, and **Region** to one account region. Use the latest metric sample and allow for reporting delay. A count of one confirms that there is no cross-physical-partition fan-out to remove for that sample.
+1. In the Azure portal, open the account and select **Metrics**. Select **Physical Partition Count** with **Maximum** aggregation. Filter **DatabaseName** to `cosmicworks`, **CollectionName** to `product`, and **Region** to one account region. Use the latest metric sample and allow for reporting delay. A value of 1 means both queries run on the same physical partition.
 
 ## Clean up resources
 
@@ -423,4 +432,4 @@ az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --
 
 The composite index you added in Task 4 stays on the `product` container until you remove it. Adding it preserves query results but can change query and write charges, including baselines in later exercises. Record the policy change before comparing costs in another exercise.
 
-Look back at the numbers you recorded. Identify which change reduced work or RU charge in your run, and which changes made little or no measurable difference. The sequence of measuring, reading the evidence, and comparing one change at a time is what separates tuning from guessing.
+Review your measurements and identify which changes reduced the number of documents retrieved or the request charge.

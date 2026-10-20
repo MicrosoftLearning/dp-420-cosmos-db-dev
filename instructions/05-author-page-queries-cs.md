@@ -14,7 +14,7 @@ lab:
 
 # Author and Page Queries in C#
 
-In this exercise, you build a query layer against an Azure Cosmos DB for NoSQL catalog container and run every query technique from this module. You load the CosmicWorks product catalog, then write a parameterized query that projects a custom shape. You reach into a nested tags array with a correlated subquery, expand that array with a cross-product query, and finish by paging a result set with continuation tokens. Throughout, you print the request charge so you can see what each choice costs.
+In this exercise, you query the CosmicWorks catalog using parameters, projections, array subqueries, joins, and continuation tokens. You also record request charges to compare query costs.
 
 ## Before you start
 
@@ -75,7 +75,7 @@ The script creates the following resources:
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
 | `cosmicworks` database | Holds every container this learning path uses |
-| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 request units per second (RU/s), loaded with the 295 CosmicWorks products every query in this exercise runs against |
+| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 request units per second (RU/s), loaded with 295 CosmicWorks products |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
@@ -86,9 +86,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Connect to the CosmicWorks catalog
 
-Every query in this exercise runs against the same data: the product catalog from the CosmicWorks sample, which the setup script already loaded into the `product` container.
-
-The catalog holds 295 products. Each one looks like this:
+The setup script loads 295 CosmicWorks products into `product`. Each product has the following structure:
 
 ```json
 {
@@ -135,8 +133,7 @@ The catalog holds 295 products. Each one looks like this:
 
     string endpoint = "<cosmos-endpoint>";
 
-    // Reuse one credential-backed client; GetContainer doesn't create resources
-    // or make a service request.
+    // Reuse one client for all queries.
     CosmosClient client = new(endpoint, new DefaultAzureCredential());
 
     Container container = client.GetContainer("cosmicworks", "product");
@@ -144,9 +141,7 @@ The catalog holds 295 products. Each one looks like this:
     Console.WriteLine("Container ready.");
     ```
 
-    `GetContainer` builds a client-side reference without calling the service. Creating a database or container is a control-plane operation, which a Cosmos DB data-plane role can't perform, so the setup script created them for you.
-
-1. Add the item types at the bottom of the file. Top-level statements come first, so every type declaration in this exercise belongs below the executable code:
+1. Add the following records at the end of **Program.cs**. Keep all executable code above these declarations throughout the exercise:
 
     ```csharp
     // Property names and nested tag objects match the stored JSON shape.
@@ -163,8 +158,6 @@ The catalog holds 295 products. Each one looks like this:
         Tag[] tags);
     ```
 
-    The record property names match the JSON exactly, so no naming policy is needed.
-
 1. Run the project:
 
     ```bash
@@ -175,19 +168,18 @@ The catalog holds 295 products. Each one looks like this:
 
 ## Task 2: Write a parameterized, projected query
 
-Query one category with a price filter and a prefix match, then project the result into the shape a product card needs. Compare what the query costs when it's scoped to the partition key against what it costs cross-partition.
+Query a category with price and name-prefix filters, then project the result for a product card. Run the same query with and without an explicit partition key in the request.
 
 The category for this task is **Components, Road Frames**, which holds 33 products.
 
-> &#128161; Each task appends to the same file, so every run repeats the queries from the earlier tasks. Comment out the earlier queries once you see their output.
+> &#128161; Each task adds code to the same file. Later runs also execute queries from the earlier tasks.
 
 1. Append the following code, above the record declarations. It defines the query with three parameters:
 
     ```csharp
     const string roadFrames = "3E4CEACD-D007-46EB-82D7-31F6141752B2";
 
-    // Project only the card fields. scannerData is a new nested result object,
-    // and STARTSWITH's third argument enables case-insensitive matching.
+    // Project the fields needed for a product card.
     string sql = """
         SELECT
             p.name,
@@ -250,15 +242,13 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
     public record ProductCard(string name, string category, ScannerData scannerData);
     ```
 
-    The result type matches the projection, not the stored item. A query that returns three fields deserializes into a type with three properties.
-
 1. Run the project and compare the two charges:
 
     ```bash
     dotnet run
     ```
 
-Both calls return the same 12 products, and the two charges are close to identical. This container's autoscale maximum of 1,000 RU/s puts it on a single physical partition, so the unscoped query has only that one partition to reach. Setting the partition key scopes a query to one physical partition; without it, the service fans out the query to every physical partition and merges the results, so the saving grows with the number of partitions the container spans. In a catalog API, the category is always known, so the partition key always belongs on the request.
+Both calls return the same 12 products and should have similar charges. The SQL includes an equality filter on `categoryId`, so Azure Cosmos DB can route either request to that partition. Passing the partition key in the request makes the intended scope explicit.
 
 ---
 
@@ -266,7 +256,7 @@ Both calls return the same 12 products, and the two charges are close to identic
 
 Filter products by what their nested `tags` array contains, and project a trimmed version of that array alongside each result.
 
-CosmicWorks tags are merchandising-assigned identifiers rather than descriptive words. A tag is an object with an `id` and a `name` such as `Tag-30`. The same tag appears on many products, and a product can carry several. A catalog often works that way in practice: the label is a key into a merchandising system, and the query matches it exactly.
+Each product's `tags` array contains objects with `id` and `name` properties, such as `Tag-30`. Products can have multiple tags, and the same tag can appear on multiple products.
 
 1. Append the following code. `EXISTS` filters items by the contents of the array, and the `ARRAY` expression projects the tag names alongside each match:
 
@@ -320,7 +310,7 @@ CosmicWorks tags are merchandising-assigned identifiers rather than descriptive 
     dotnet run
     ```
 
-Four products in this category carry `Tag-30`, and each one appears exactly once, no matter how many other tags it holds. The `tagNames` array lists every tag on those products, including the ones the filter never mentions.
+The query returns four products with `Tag-30`. Each product appears once, and `tagNames` contains all of its tags.
 
 Now narrow the projection. The `ARRAY` subquery can carry its own `WHERE` clause, separate from the one on the outer query.
 
@@ -336,19 +326,18 @@ Now narrow the projection. The `ARRAY` subquery can carry its own `WHERE` clause
     dotnet run
     ```
 
-The same four products come back, but each `tagNames` array now holds `Tag-30` alone. The outer `WHERE` clause decides which products the query returns, and the `WHERE` clause inside the `ARRAY` subquery decides what each returned array holds. Filtering items and shaping their arrays are separate decisions.
+The same four products come back, but each `tagNames` array now holds `Tag-30` alone. The outer `WHERE` clause selects products; the `WHERE` clause inside `ARRAY` selects the tags included in each result.
 
 ---
 
 ## Task 4: Expand the array with a cross-product query
 
-Ask a different question of the same data. A `JOIN` returns one result per array element rather than one result per product, which is the shape tag report needs.
+Use a `JOIN` to return one row per tag rather than one row per product.
 
 1. Append the following code. It expands every tag in the category and counts both the rows returned and the distinct products behind them:
 
     ```csharp
-    // This JOIN expands one product into one row per tag; an empty tags array
-    // produces no rows. It isn't a relational join between two containers.
+    // Expand each product into one row per tag; empty arrays produce no rows.
     QueryDefinition crossProduct = new QueryDefinition("""
             SELECT p.name, t.name AS tag
             FROM product p
@@ -390,9 +379,9 @@ Ask a different question of the same data. A `JOIN` returns one result per array
 
 1. Run the project.
 
-The query returns 98 rows drawn from 29 products, in a category that holds 33. Four products never appear. No predicate excludes them, because the query has none beyond the category. They carry an empty `tags` array, and the cross-product of a value with an empty set is empty.
+The query returns 98 product-tag rows from 29 of the 33 products. Four products have empty `tags` arrays, so they contribute no rows.
 
-Now watch the same effect against three products elsewhere in the catalog that carry no tags at all.
+Compare the results for three products with empty `tags` arrays.
 
 1. Append the following code. The first query finds the products by name, and the second runs the identical filter through a `JOIN`:
 
@@ -432,7 +421,7 @@ Now watch the same effect against three products elsewhere in the catalog that c
 
 1. Run the project.
 
-The first query returns all three products. The second returns none, even though both queries apply the same filter to the same items. The `JOIN` removes every product with an empty `tags` array before the filter runs. Nothing in the response warns you that those products dropped out, so a report built on a `JOIN` counts only the products that hold at least one tag. In this catalog, 45 of the 295 products disappear that way because their `tags` arrays are empty.
+The direct query returns three products; the `JOIN` returns none because all three have empty `tags` arrays. A `JOIN` over `tags` excludes all 45 products in the catalog that have empty tag arrays.
 
 When a result must include every product regardless of its tags, keep the array out of the `FROM` clause and project it instead, with the `ARRAY` expression from Task 3.
 
@@ -440,7 +429,7 @@ When a result must include every product regardless of its tags, keep the array 
 
 ## Task 5: Page a result set with continuation tokens
 
-Serve one category 10 items at a time, the way a stateless API does, resuming each page from the token the previous page returned.
+Request pages of up to 10 items and use continuation tokens to retrieve subsequent pages.
 
 1. Append the following code. The method fetches exactly one page and returns the token for the next one:
 
@@ -459,8 +448,7 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
             MaxItemCount = 10
         };
 
-        // Treat the token as opaque and reuse it with the same query, parameters,
-        // and partition scope. Fetch only one page in this stateless helper.
+        // Reuse the opaque token with the same query, parameters, and partition scope.
         using FeedIterator<PagedProduct> iterator =
             container.GetItemQueryIterator<PagedProduct>(paged, continuationToken, options);
 
@@ -494,7 +482,7 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
     while (token is not null);
     ```
 
-    The first request passes `null` and starts at the beginning. A `null` token in the response means the results are exhausted, which is why the loop tests the token rather than the item count.
+    The first request starts without a token. Paging ends when the response has no continuation token.
 
 1. Run the project:
 
@@ -502,9 +490,7 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
     dotnet run
     ```
 
-Watch the item counts. Most pages return 10 items, but the service can return fewer at any point and still have more results waiting. The token, not the count, is what tells you whether to ask again.
-
-Two limits are worth confirming yourself. Start with sorting.
+Test paging with an ordered query:
 
 1. In `GetPageAsync`, add `ORDER BY p.price` to the end of the query text:
 
@@ -518,9 +504,9 @@ Two limits are worth confirming yourself. Start with sorting.
     dotnet run
     ```
 
-Paging still works. The service resumes a sorted result set the same way it resumes an unsorted one, so a token survives an `ORDER BY` clause.
+Sorted queries also support continuation tokens.
 
-Now try an aggregate instead.
+Then test an aggregate query:
 
 1. In `GetPageAsync`, replace the query text with the following aggregate, which drops the `ORDER BY` clause you added:
 
@@ -534,7 +520,7 @@ Now try an aggregate instead.
     dotnet run
     ```
 
-This time the loop ends after one page. The aggregate returns a single result and no usable token, because it scans every matching item before it can produce an answer and can't checkpoint partway through that calculation.
+The aggregate returns one count result, so this example finishes after one page.
 
 ---
 

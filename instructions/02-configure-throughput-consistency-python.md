@@ -2,7 +2,7 @@
 lab:
   title: Configure throughput and consistency in Python
   module: Module 2 - Configure resources, throughput, and consistency
-  description: Configure autoscale throughput, set default and per-request consistency, and configure time to live, observing the effects on cost and behavior.
+  description: Configure autoscale throughput, compare read charges at different consistency levels, and test item and container time to live.
   duration: 30 minutes
   level: 300
   islab: true
@@ -14,7 +14,7 @@ lab:
 
 # Configure throughput and consistency in Python
 
-In this exercise, you apply the three levers from this module. Provision autoscale throughput for the Contoso workload's bursty traffic. Set an account default consistency level, then relax an individual read below it when needed. Configure time to live so temporary records expire on their own, without a cleanup job. Use a disposable container for the container-wide expiration test to protect the shared product catalog. Along the way, you read the actual request-unit charge of an operation, which is the measurement that turns a throughput estimate into a real number.
+In this exercise, you adjust autoscale throughput, compare read charges at strong and eventual consistency, and configure time to live (TTL). You test item-level expiration in the product catalog and a default lifetime in a separate container.
 
 This exercise takes approximately **30** minutes to complete.
 
@@ -99,11 +99,11 @@ Autoscale scales between 10 percent of the maximum you set and that maximum. Con
 
 1. Review the **Scale** section. The **Autoscale** option is selected, and the maximum throughput is **1,000 RU/s**.
 
-    Note the description of the scaling range. The container scales between **100 RU/s** and **1,000 RU/s** based on real-time demand. Billing uses the highest throughput reached during each hour, with a minimum charge for 100 RU/s even when idle. With dynamic scaling, the bill combines the hourly peaks for each physical partition and region.
+    The container scales between **100 RU/s** and **1,000 RU/s** based on demand. Throughput is billed at the highest level reached in each hour, with a minimum of 100 RU/s even when idle.
 
 1. Change **Maximum RU/s** to `4000` and select **Save**. Wait for the update to finish and confirm that the displayed range is **400 RU/s** to **4,000 RU/s**.
 
-    The minimum rises to 400 RU/s. Raising the ceiling raises the floor, which is why a high autoscale maximum increases your baseline cost.
+    A higher autoscale maximum also raises the minimum throughput and baseline cost.
 
 1. Set **Maximum RU/s** back to `1000` and select **Save**. Wait for the update to finish and confirm that the displayed range returns to **100 RU/s** to **1,000 RU/s**.
 
@@ -124,7 +124,7 @@ The account default applies to every read unless a client or request relaxes it.
 
 1. Wait for the change to apply before continuing.
 
-    > &#128221; Strong consistency requires a read from more than one replica to guarantee the latest write. That extra work shows up directly in the request charge you measure next.
+    > &#128221; Strong consistency reads from more than one replica to guarantee the latest committed write.
 
 ## Measure the request charge at each consistency level
 
@@ -156,7 +156,7 @@ Now connect from code and compare the request charge of the same read at strong 
     pip install azure-cosmos azure-identity
     ```
 
-1. In the **throughput-lab** folder, alongside the **`.venv`** folder rather than inside it, create a file named **script.py** and add the following code. Replace `<cosmos-endpoint>` with the account endpoint the setup script printed:
+1. In the **throughput-lab** folder, create **script.py** with the following code. Replace `<cosmos-endpoint>` with the account endpoint the setup script printed:
 
     ```python
     from azure.cosmos import CosmosClient
@@ -174,7 +174,7 @@ Now connect from code and compare the request charge of the same read at strong 
     partition_key = "4F34E180-384D-42FC-AC10-FEC30227577F"
 
     def print_charge(label):
-        # A response hook measures this request's RU charge, not elapsed time.
+        # Read the request charge from the response headers.
         def hook(headers, response):
             print(f"{label} request charge:\t{headers['x-ms-request-charge']} RUs")
         return hook
@@ -185,7 +185,7 @@ Now connect from code and compare the request charge of the same read at strong 
         response_hook=print_charge("STRONG"))
     ```
 
-    `DefaultAzureCredential` picks up the identity you signed in with through the Azure CLI, so no key appears in the code. The `response_hook` callback receives the response headers, where `x-ms-request-charge` reports the exact RU cost of the read.
+    The response hook reads `x-ms-request-charge` from the response headers.
 
 1. Run the script:
 
@@ -199,7 +199,7 @@ Now connect from code and compare the request charge of the same read at strong 
     STRONG request charge:  2 RUs
     ```
 
-1. Now relax the consistency level. The Python SDK sets consistency at the client level, so create a second client configured for eventual consistency. Add the following code to the end of **script.py**:
+1. Create a second client configured for eventual consistency. Add the following code to the end of **script.py**:
 
     ```python
     # Relax reads for this second client without changing the account's policy.
@@ -234,9 +234,9 @@ Now connect from code and compare the request charge of the same read at strong 
     EVENTUAL request charge:  1 RUs
     ```
 
-    Your exact values might differ slightly, but the strong read costs about twice the eventual one. The eventual read is served from a single replica instead of requiring agreement across replicas. On a read-heavy workload running thousands of operations per second, relaxing the reads that tolerate staleness is a direct and substantial cost reduction.
+    For the same item, a strong-consistency read costs about twice an eventual-consistency read. Relax consistency only when the application can tolerate stale data.
 
-1. Relaxing works in one direction only. The account default is the strongest level a client can use, so setting `consistency_level` above it isn't supported. When an operation needs a stronger guarantee, raise the account default and relax the other reads instead.
+1. The consistency override used here can weaken reads but can't exceed the account default. Set the account default to the strongest level your application needs, then relax reads where appropriate.
 
 
 1. When you finish testing, deactivate the Python environment:
@@ -247,7 +247,7 @@ Now connect from code and compare the request charge of the same read at strong 
 
 ## Restore the account default consistency
 
-*Strong* consistency roughly doubles the cost of every read, so set the account back to *Session*.
+Restore **Session** consistency before continuing with later exercises.
 
 1. Return to the Azure portal and open your Azure Cosmos DB account.
 
@@ -255,11 +255,11 @@ Now connect from code and compare the request charge of the same read at strong 
 
 1. Select **Session**, and then select **Save**.
 
-    Session is the default level for a new account. Wait for the change to apply, then restart any application with an existing SDK client so it picks up the new default. Each new run of the console application or Python script creates a new client.
+    Wait for the update to finish. Restart any running application so its client picks up the new default.
 
 ## Configure time to live and observe expiry
 
-Finally, configure automatic data retention on the container.
+Test item-level TTL on `product` and a container default on a disposable container.
 
 1. Return to the Azure portal and open the **Data Explorer**.
 
@@ -267,7 +267,7 @@ Finally, configure automatic data retention on the container.
 
 1. In the **Settings** tab, find **Time to Live** and select **On (no default)**.
 
-    This setting corresponds to a `DefaultTimeToLive` value of `-1`. It enables the TTL mechanism without expiring existing items, which lets individual items opt in to expiration.
+    **On (no default)** sets the container TTL to `-1`. Only items with a positive `ttl` value expire.
 
 1. Select **Save**.
 
@@ -292,15 +292,19 @@ Finally, configure automatic data retention on the container.
 
 1. Wait about 90 seconds, then run the query again.
 
-    The expired `temp-record-001` item no longer appears in query results. Physical deletion runs in the background and might finish later. The `ML Road Pedal` item remains, because it has no **`ttl`** property and the container default is `-1`.
-
-    The pattern for mixed retention in a single container is to enable Time to Live (TTL) on the container, then set `ttl` only on the items that should expire.
+    The expired `temp-record-001` item no longer appears in query results. `ML Road Pedal` remains because it has no `ttl` value and the container has no default lifetime.
 
 1. In the **product** container's **Scale and Settings**, change **Time to Live** back to **Off** and select **Save**. Wait for the update to finish.
 
     > &#9888; Don't set a positive default TTL on the shared product catalog. Expiration is measured from each item's last modification, not from when TTL is enabled. Existing items older than the default TTL can expire immediately.
 
-1. Run the temporary-item query again after TTL is **Off**. An expired item can reappear if background deletion is incomplete when you disable TTL. If `temp-record-001` reappears, open **Items**, filter for `WHERE c.id = "temp-record-001"`, and select that item. Verify its ID and **categoryId** match the test item, then select **Delete** and confirm. Run the query again and confirm that no item remains. Don't delete catalog products.
+1. Run the temporary-item query again after TTL is **Off**. If `temp-record-001` is still present, delete only that test item:
+
+    - Open **Items** and filter for `WHERE c.id = "temp-record-001"`.
+    - Select the item and verify that its `id` and `categoryId` match the test item. Then select **Delete** and confirm.
+    - Run the query again and confirm that no item remains.
+
+    An expired item can reappear if TTL is disabled before background deletion finishes.
 
 1. In **Data Explorer**, create a new container named **ttl-demo** in the existing **cosmicworks** database. Use `/categoryId` as the partition key and dedicated autoscale throughput with a maximum of **1,000 RU/s**. If that name already exists, use a new, unused name for this test.
 
@@ -338,5 +342,3 @@ If your lab environment provided the resource group, delete only the Azure Cosmo
 ```azurecli
 az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --yes
 ```
-
-You configured all three cost and performance levers: autoscale throughput sized to bursty traffic, a consistency level relaxed per request where staleness is acceptable, and time to live for automatic retention. The request-charge comparison you measured shows how consistency affects read cost; workload measurements and the billing model guide throughput sizing.

@@ -14,7 +14,7 @@ lab:
 
 # Design a model and partition strategy
 
-In this exercise, you measure what a data model costs and then build the partitioning strategy that lets it scale. You compare the request charge of assembling a customer from three containers against reading the same customer as one embedded item. You compare the cost of rendering a product page from four containers against reading it from one denormalized container. Then you create a subpartitioned container for a multitenant catalog and measure how query routing changes depending on which levels of the hierarchy a query names.
+In this exercise, you compare request charges for normalized, embedded, and denormalized models of the CosmicWorks catalog. You then create a container with a hierarchical partition key and compare queries that use different levels of the hierarchy.
 
 Every measurement in this exercise happens in Data Explorer. A setup script provisions the account and loads the sample data, so no application code is required.
 
@@ -26,7 +26,7 @@ If your lab environment isn't set up yet, follow [Set up your lab environment](h
 
 ## Set up your Azure Cosmos DB resources
 
-This exercise needs the CosmicWorks data at four stages of modeling, which the other exercises in this learning path don't provision. Run the setup script with the `modeling` profile to create a dedicated account, even if you already have an account from an earlier exercise. Use the resource group supplied by your lab environment.
+Use the `modeling` profile to create a dedicated account containing four versions of the CosmicWorks data. If your lab provides a resource group, use it.
 
 > &#9888; This exercise deletes its modeling resources when you finish. Keep lab-provided and shared resource groups. Delete only the modeling account when using one of those groups.
 
@@ -65,7 +65,7 @@ This exercise needs the CosmicWorks data at four stages of modeling, which the o
 
     Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab06a7f3k9`.
 
-1. Wait for the script to finish. The `modeling` profile creates 22 containers across four databases, so it takes 10-15 minutes, longer than the other exercises in this learning path.
+1. Wait for the script to finish. The `modeling` profile creates 22 containers across four databases and takes about 10-15 minutes.
 
 1. Record the **Account name** the script prints. You need it to find the account in the Azure portal.
 
@@ -97,19 +97,17 @@ The CosmicWorks sample publishes the same e-commerce data at four stages of mode
 | `database-v3` | Category and tag names denormalized onto the product | 5 |
 | `database-v4` | Entity types merged: customers with their sales orders, categories with tags | 3 |
 
-Each stage is a step in the same design process, so you measure the cost of one model and then the cost of the next.
-
 1. In a browser, go to the [Azure portal](https://portal.azure.com), select **Azure Cosmos DB**, and select the account the setup script created.
 
 1. On the left pane, select **Data Explorer**, and confirm that **database-v1**, **database-v2**, **database-v3**, and **database-v4** all appear in the tree.
 
-1. Expand **database-v4** and confirm it holds three containers: **customer**, **product**, and **productMeta**. That's the model this module designed, and the rest of the exercise measures the steps that led to it.
+1. Expand **database-v4** and confirm it holds three containers: **customer**, **product**, and **productMeta**.
 
 ---
 
 ## Task 2: Compare the normalized and embedded customer models
 
-When a customer signs in to the CosmicWorks store, the application needs the customer record, that customer's addresses, and the stored credential. The normalized model keeps each one in its own container. Azure Cosmos DB can't join across containers, so the application sends three separate requests to build one sign-in.
+The normalized customer model stores the customer, addresses, and credential in separate containers. Because Azure Cosmos DB doesn't support cross-container joins, the application needs three requests.
 
 ### Measure the normalized model
 
@@ -146,11 +144,11 @@ When a customer signs in to the CosmicWorks store, the application needs the cus
     | Customer password | 2.83 |
     | **Total** | **8.49** |
 
-> &#128221; Your figures vary slightly from run to run and from account to account, usually within a range of 0.1 RU. Record what you measure rather than the number we published here.
+> &#128221; Request charges can vary. Record your own measurements for comparison.
 
 ### Measure the embedded model
 
-`database-v2` embeds the address list and the credential into the customer item, exactly as the embed-or-reference rules in this module prescribe: the entities are read together, one relationship is one-to-one, and the other is bounded one-to-few.
+In `database-v2`, each customer item embeds its address list and credential. These related entities are read together, and their relationships are one-to-one or bounded one-to-few.
 
 1. Expand **database-v2** and select the **customer** container.
 
@@ -164,13 +162,13 @@ When a customer signs in to the CosmicWorks store, the application needs the cus
 
 1. Select **Query Stats** and record the request charge. It's about 2.83 RUs, against 8.49 for the three queries you ran before.
 
-Two notes are worth reviewing before you move on.
+Consider the trade-offs:
 
-- The saving comes from **request count**, not from a cheaper query. One request replaced three, so the latency is one round trip rather than three sequential ones, and the application needs no code to stitch the pieces together.
+- Embedding reduced three queries to one and removed the need to combine results in application code.
 
-- The embedded item is larger than any single item in the normalized model. That cost lands on writes, which is the trade you accepted. A profile update now rewrites the addresses and the credential too.
+- The larger embedded item can increase write costs. Consider how often the customer, addresses, and credential are updated.
 
-> &#128161; An application that knows both the item identifier and the partition key can read this item with a point read rather than a query. A point read of a 1-KB item costs 1 RU, and the charge rises with item size from there. Data Explorer runs queries, not point reads. Therefore, you can't measure the request charge for a point read here. A point read is the least expensive way to retrieve a known item. Embedding allows one point read to return all required data under one identifier.
+> &#128161; A point read retrieves a known item using its ID and partition key. For a 1-KB item, this costs 1 RU at session consistency. The embedded model needs only one point read to return the related data.
 
 ---
 
@@ -223,7 +221,7 @@ Rendering one category page against `database-v2` takes five queries: one for th
     | ML Headset tags | 3.20 |
     | **Total** | **15.54** |
 
-    Notice that the tag queries dominate. The cost increases with the number of products on the page. It also increases with the number of tags for each product. As the catalog grows, the page becomes slower and more expensive.
+    Resolving tag names adds one query per product, increasing both the number of requests and the total RU charge.
 
 ### Measure the denormalized model
 
@@ -241,7 +239,7 @@ Rendering one category page against `database-v2` takes five queries: one for th
 
 1. Select **Query Stats** and record the request charge, about 2.89 RUs, against 15.54 for the five queries you ran before.
 
-Five requests became one, and the cost fell by more than 80 percent. The price of that saving is a synchronization obligation: when a category is renamed, every product carrying the old `categoryName` is wrong until something updates it. That update is the job the change feed does, and the write cost of a rename is now proportional to how many items carry the copy.
+Five queries became one, reducing the request charge by more than 80 percent in this example. Category and tag names are now duplicated across products, so changes to those names must be synchronized. A category rename requires updating every product in that category.
 
 ### Combine entity types into one container
 
@@ -269,17 +267,17 @@ Five requests became one, and the cost fell by more than 80 percent. The price o
 
 1. Note the `salesOrderCount` property on the customer item, and count the items of type `salesOrder` in the result. The counts match.
 
-    That property is a preaggregate. Ranking customers by order count would otherwise scan every customer in the container, so the model stores the answer instead of computing it. Keeping it correct is what makes the merge necessary: an order insert and the counter increment have to succeed or fail together, and Azure Cosmos DB provides that guarantee only within a single logical partition.
+    `salesOrderCount` is a preaggregate: it stores a value that would otherwise be calculated from sales orders. Keeping the customer and orders in one logical partition allows an order insert and counter update to run in a single transaction.
 
 ---
 
 ## Task 4: Build a subpartitioned container for multiple tenants
 
-Contoso now hosts catalogs for several retail brands. Partitioning on the tenant alone is the intuitive choice and the one that fails first: tenants are wildly uneven, and the largest reaches the 20-GB logical partition ceiling while the others sit nearly empty.
+The catalog now serves multiple tenants with different data volumes. Partitioning only on `/tenantId` can create uneven logical partitions and limit each tenant to 20 GB.
 
-This task builds the alternative from the hierarchical partition keys unit: a three-level key of `/tenantId`, `/categoryId`, `/id`.
+Create a three-level hierarchical partition key: `/tenantId`, `/categoryId`, `/id`.
 
-The `tenantId` property doesn't exist in the CosmicWorks data, because the sample models a single retailer. The lab repository includes a tagged copy of the product data at **data/tenant-products.json**, which assigns every product in a category to the same tenant: 201 products to `contoso-outdoors`, 61 to `fabrikam-cycles`, and 33 to `adventure-works`. The skew is deliberate.
+The repository's **data/tenant-products.json** contains 295 products with `tenantId` values: 201 for `contoso-outdoors`, 61 for `fabrikam-cycles`, and 33 for `adventure-works`. Each category's products belong to the same tenant.
 
 1. In Data Explorer, select **New Container**.
 
@@ -308,7 +306,7 @@ The `tenantId` property doesn't exist in the CosmicWorks data, because the sampl
 
 ## Task 5: Compare query routing and spot the anti-pattern
 
-The reason to order a hierarchy around access patterns is routing. This task runs the same catalog query four ways, changing only which levels of the hierarchy the filter names.
+Compare queries that use different parts of the hierarchy.
 
 The category `3E4CEACD-D007-46EB-82D7-31F6141752B2` is *Components, Road Frames*. It holds 33 products, and all of them belong to `contoso-outdoors`.
 
@@ -344,33 +342,29 @@ The category `3E4CEACD-D007-46EB-82D7-31F6141752B2` is *Components, Road Frames*
     SELECT c.tenantId, COUNT(1) AS itemCount FROM c GROUP BY c.tenantId
     ```
 
-### What the numbers show
+### Interpret the measurements
 
-**The distribution is the finding.** The container reports 201 items for `contoso-outdoors`, 61 for `fabrikam-cycles`, and 33 for `adventure-works`. One first-level key value holds 68 percent of the data. That measurement is the anti-pattern this module warns about, made concrete: it's the same shape a real platform sees when one tenant dwarfs the others, and it's visible at 295 items exactly as it is at 295 million.
+The largest tenant holds 201 of the 295 products, or about 68 percent of the items. This uneven distribution matters when choosing a partition key.
 
-**Request charge tracks items evaluated, not partitions.** The tenant-only query returns 201 items and costs noticeably more than the tenant-and-category query returning 33. Narrowing the filter down the hierarchy cuts the charge, because the engine reads less, which the **Retrieved document count** and **Output document count** rows in Query Stats show directly.
+The tenant-only query returns 201 products; the tenant-and-category query returns 33. Result size also affects RU charges. Use **Retrieved document count** and **Output document count** in Query Stats to compare the work performed.
 
-### What this container is too small to show
+### Understand routing at larger scale
 
-The third query, filtering on category alone, skips the first level of the hierarchy and can't be routed. It costs about what the routable query costs, which is correct rather than a mistake in your setup.
+The category-only query skips `/tenantId`, so it can't use a partition-key prefix for routing. This new container holds 295 small items at 400 RU/s on one physical partition, so you might see little RU difference between the two queries that return 33 items.
 
-Your container holds 295 small items, which fits in a single physical partition. A query that can't be routed fans out to every physical partition, and here there's exactly one, so there's nothing to fan out to. Fan-out is invisible at this scale by definition.
+With multiple physical partitions, the category-only query can visit all of them, while the prefix query targets only the partitions holding that prefix.
 
-The cost is arithmetic rather than mystery. Each extra physical partition a query has to check adds two to three RUs before it reads a single item. A container spread across 100 physical partitions charges 200 to 300 RUs of pure overhead on the category-only query, while the tenant-prefixed query still reaches only the partitions holding that tenant. A container needs about 5 TB of data to reach 100 physical partitions. Alternatively, it needs 1,000,000 RU/s of provisioned throughput. This lab can demonstrate data skew, but it can't demonstrate fan-out at that scale.
-
-The design lesson survives the scale gap: you can measure distribution on day one, and distribution is what determines whether fan-out ever becomes your problem.
-
-### Review the design you didn't ship
+### Review a tenant-only partition key
 
 Suppose `tenantProduct` were partitioned on `/tenantId` alone. Using the distribution you measured, answer three questions:
 
 1. How many logical partitions would the container have, and how much of the data sits in the largest one?
 1. Which two of the criteria for a good partition key does that design fail?
-1. What happens to `contoso-outdoors` as its catalog grows, and at what point does it stop being a performance problem and start being an outage?
+1. How does the 20-GB logical partition limit affect `contoso-outdoors` as its catalog grows?
 
-The design has three logical partitions, and your own output shows one of them holding 68 percent of the items. This key has low cardinality and distributes data unevenly. It sends all writes for a tenant to one logical partition. As a result, the partition receives all write throughput for that tenant. When `contoso-outdoors` reaches 20 GB, writes for that tenant stop, and the fix at that point is a container migration rather than a configuration change.
+A tenant-only key creates three logical partitions. The largest holds 201 products, or about 68 percent, so the key has low cardinality and uneven distribution. Each tenant is limited to 20 GB in one logical partition; growing beyond that limit requires a new partitioning strategy.
 
-The hierarchy you built avoids all three outcomes. The first level still groups a tenant's data for routing, while the deeper levels let one tenant's data spread across as many physical partitions as it needs.
+The hierarchical key keeps `/tenantId` as a routing prefix, while the full `/tenantId`, `/categoryId`, `/id` combination defines each logical partition. A tenant's data can therefore span multiple logical and physical partitions.
 
 ---
 

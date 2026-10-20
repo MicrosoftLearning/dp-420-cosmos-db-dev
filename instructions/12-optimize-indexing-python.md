@@ -28,9 +28,7 @@ You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed
 
 ## Set up your Azure Cosmos DB resources
 
-This exercise creates its own Azure Cosmos DB account and deletes it at the end, so it doesn't use the shared account from the rest of this learning path.
-
-Global secondary indexes require continuous backup on the account, and moving an account to continuous backup can't be undone, which is why this exercise provisions an account of its own rather than changing a shared one.
+This exercise uses a separate Azure Cosmos DB account with continuous backup, which global secondary indexes require. Delete this account at the end of the exercise.
 
 1. Start **Visual Studio Code**.
 
@@ -86,7 +84,7 @@ Task 6 adds a fourth container for the GSI. Throughput and storage charges apply
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> &#9888; Use only the account this script creates for this exercise, not an account from an earlier indexing run. Existing policies or a GSI invalidate the before-and-after tests.
+> &#9888; Use the new account created by the setup script. Existing indexes can affect the baseline measurements.
 
 > &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
@@ -122,7 +120,7 @@ Because key-based authentication is disabled, no key or connection string appear
     CATEGORY_ID = "AE48F0AA-4F65-4734-A4CF-D48B8F82267F"
     PRODUCT_ID = "FD48A179-6CF5-45F2-8605-9DA19B9D4409"
     SKU = "BK-R93R-44"
-    # Use the identity from az login; these clients reference existing resources.
+    # Use the identity from az login.
     client = CosmosClient(os.environ["COSMOS_ENDPOINT"], AzureCliCredential())
     database = client.get_database_client("cosmicworks")
     product = database.get_container_client("product")
@@ -265,7 +263,7 @@ Because key-based authentication is disabled, no key or connection string appear
     print(json.dumps(rows[:3], indent=2))
     ```
 
-1. Run `python measure.py`. Expect HTTP **400** stating that the two-property `ORDER BY` needs a composite index. Other errors aren't the expected result.
+1. Run `python measure.py`. Expect HTTP **400** stating that the two-property `ORDER BY` needs a composite index.
 
 1. Create **product-policy.json**. Keep the catalog's range indexes and add the composite in query order:
 
@@ -321,13 +319,10 @@ Because key-based authentication is disabled, no key or connection string appear
         }
     }
     $containerDefinition | ConvertTo-Json -Depth 30 | Set-Content .\product-definition.json -Encoding utf8
-    # Use ARM for container changes; the application keeps keyless SDK data access.
     az rest --method PUT --uri "https://management.azure.com${containerId}?api-version=2025-04-15" --body "@product-definition.json"
     az resource wait --ids $containerId --api-version 2025-04-15 `
         --custom "properties.resource.computedProperties[0].name == 'cp_primaryCategory'" --interval 5 --timeout 900
     ```
-
-    Container changes use the management API because keyless authentication doesn't authorize SDK container replacement.
 
 1. Replace the Python task-code block with:
 
@@ -387,7 +382,7 @@ Because key-based authentication is disabled, no key or connection string appear
         --database-name cosmicworks --name indexingLab --idx "@index-policy.json"
     ```
 
-1. Replace the Python task-code block with the following. These are sandbox copies with **lab-only coordinates**, not geocoded CosmicWorks addresses:
+1. Replace the Python task-code block with the following to create three sandbox copies with sample location coordinates:
 
     ```python
     # TASK CODE
@@ -420,7 +415,7 @@ Because key-based authentication is disabled, no key or connection string appear
     print(f"Within 25 km: {sorted(row['fulfillmentCity'] for row in rows)}; {charge:.2f} RU")
     ```
 
-1. Run `python measure.py`, repeating if progress is below **100%**. **Check:** Seattle and Bellevue match; Boston doesn't. GeoJSON coordinates use longitude, then latitude.
+1. Run `python measure.py`, repeating if progress is below **100%**. The query should return Seattle and Bellevue, but not Boston.
 
 ## Task 6: Create and query a global secondary index
 
@@ -450,7 +445,6 @@ Because key-based authentication is disabled, no key or connection string appear
 1. Enable the feature and wait for the account update:
 
     ```powershell
-    # The account API still calls the GSI feature enableMaterializedViews.
     az rest --method PATCH --uri "https://management.azure.com${accountId}?api-version=2022-11-15-preview" --body "@capabilities.json"
     if ($LASTEXITCODE -ne 0) { throw "The feature update failed. Check the error above." }
     az resource wait --ids $accountId --api-version 2022-11-15-preview `
@@ -494,16 +488,15 @@ Because key-based authentication is disabled, no key or connection string appear
     Write-Host "Created productBySku."
     ```
 
-    Confirm **Created productBySku.** appears before continuing. The application waits for data only after the container exists.
+    Confirm **Created productBySku.** appears before continuing.
 
 1. Replace the Python task-code block. Notice the explicit SKU partition key and the source-ID mapping:
 
     ```python
     # TASK CODE
     product_by_sku = database.get_container_client("productBySku")
-    # A client reference doesn't create the container; this read checks it exists.
     product_by_sku.read()
-    # ARM container creation doesn't prove that initial data copying has finished.
+    # Wait for the initial 295-product copy.
     wait_for_rows(product_by_sku, "SELECT VALUE COUNT(1) FROM c", [], [295])
     parameters = [{"name": "@sku", "value": SKU}]
     # SKU isn't the source partition key, so this lookup isn't partition-scoped.
@@ -528,9 +521,9 @@ Because key-based authentication is disabled, no key or connection string appear
     print(f"Source replace after GSI: {replace_charge(product, source):.2f} RU")
     ```
 
-1. Run `python measure.py`. The program waits for data, not a Metrics label.
+1. Run `python measure.py`.
 
-    **Compare:** the two lookup charges are from this run. Compare source replace with **before GSI** from this task; the policy and item are unchanged. Equal lookup charges are valid for this small catalog. The GSI's generated `id` differs; the source ID is in `_id`.
+    Compare the source and GSI lookup charges, then compare **Source replace after GSI** with the baseline recorded at the start of this task. Lookup charges might be equal for this small catalog.
 
 1. Replace the task-code block once more to test source-only writes and automatic propagation:
 

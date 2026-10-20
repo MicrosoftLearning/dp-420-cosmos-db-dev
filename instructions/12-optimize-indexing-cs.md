@@ -28,9 +28,7 @@ You also need the [.NET 10 SDK](https://dotnet.microsoft.com/download) or later 
 
 ## Set up your Azure Cosmos DB resources
 
-This exercise creates its own Azure Cosmos DB account and deletes it at the end, so it doesn't use the shared account from the rest of this learning path.
-
-Global secondary indexes require continuous backup on the account, and moving an account to continuous backup can't be undone, which is why this exercise provisions an account of its own rather than changing a shared one.
+This exercise uses a separate Azure Cosmos DB account with continuous backup, which global secondary indexes require. Delete this account at the end of the exercise.
 
 1. Start **Visual Studio Code**.
 
@@ -86,7 +84,7 @@ Task 6 adds a fourth container for the GSI. Throughput and storage charges apply
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
 
-> &#9888; Use only the account this script creates for this exercise, not an account from an earlier indexing run. Existing policies or a GSI invalidate the before-and-after tests.
+> &#9888; Use the new account created by the setup script. Existing indexes can affect the baseline measurements.
 
 > &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
@@ -111,7 +109,7 @@ Because key-based authentication is disabled, no key or connection string appear
     dotnet add package Newtonsoft.Json --version 13.0.3
     ```
 
-1. Replace **Program.cs** with this complete listing. Construct the SDK objects and JSON documents as shown; keep the helpers above the **`// TASK CODE`** marker for every subsequent task.
+1. Replace **Program.cs** with the following code. Keep the declarations and helpers above the `// TASK CODE` marker for later tasks.
 
     ```csharp
     using System.Globalization;
@@ -126,7 +124,7 @@ Because key-based authentication is disabled, no key or connection string appear
     const string productId = "FD48A179-6CF5-45F2-8605-9DA19B9D4409";
     string endpoint = Environment.GetEnvironmentVariable("COSMOS_ENDPOINT")
         ?? throw new InvalidOperationException("Set COSMOS_ENDPOINT in this terminal.");
-    // Use the identity from az login; these clients reference existing resources.
+    // Use the identity from az login.
     using CosmosClient client = new(endpoint, new AzureCliCredential());
     Database database = client.GetDatabase("cosmicworks");
     Container product = database.GetContainer("product");
@@ -317,8 +315,7 @@ Because key-based authentication is disabled, no key or connection string appear
     dotnet run
     ```
 
-    Expect HTTP **400 mentioning a missing composite index**; don't treat authorization, service, or unrelated query errors as this expected result.
-    If the query already succeeds, the account isn't a valid pre-index baseline.
+    Expect HTTP **400** stating that the two-property `ORDER BY` needs a composite index.
 
 1. Create **product-policy.json** with root indexing and a matching composite index:
 
@@ -380,7 +377,6 @@ Because key-based authentication is disabled, no key or connection string appear
     }
     $containerDefinition | ConvertTo-Json -Depth 30 |
         Set-Content .\product-definition.json -Encoding utf8
-    # Use ARM for container changes; the application keeps keyless SDK data access.
     az rest --method PUT `
         --uri "https://management.azure.com${containerId}?api-version=2025-04-15" `
         --body "@product-definition.json"
@@ -388,8 +384,6 @@ Because key-based authentication is disabled, no key or connection string appear
         --custom "properties.resource.computedProperties[0].name == 'cp_primaryCategory'" `
         --interval 5 --timeout 900
     ```
-
-    The native container CLI has no computed-properties flag; stable ARM **2025-04-15** supports this definition.
 
 1. **Replace everything from `// TASK CODE` to EOF** with:
 
@@ -423,7 +417,7 @@ Because key-based authentication is disabled, no key or connection string appear
     dotnet run
     ```
 
-    Repeat if transformation is incomplete, then expect HTTP **400 mentioning the missing ORDER BY index**, not an unrelated error: root wildcard indexing doesn't cover computed properties.
+    If index transformation is incomplete, wait and run the program again. Expect HTTP **400** for the missing `ORDER BY` index. The root wildcard doesn't index computed properties.
 
 1. Edit **product-policy.json** to add the explicit computed path, retaining the composite index:
 
@@ -496,7 +490,7 @@ Because key-based authentication is disabled, no key or connection string appear
         --database-name cosmicworks --name indexingLab --idx "@index-policy.json"
     ```
 
-1. **Replace everything from `// TASK CODE` to EOF** with the following code, constructing three copies with explicit GeoJSON objects:
+1. **Replace everything from `// TASK CODE` to EOF** with the following code to create three sandbox copies with sample GeoJSON locations:
 
     ```csharp
     // TASK CODE
@@ -555,7 +549,7 @@ Because key-based authentication is disabled, no key or connection string appear
     dotnet run
     ```
 
-    Confirm Seattle and Bellevue, not Boston, within **25,000 meters**; these are lab-only coordinates, not dataset geocoding, and the three copies retain the source's original tags.
+    The query should return Seattle and Bellevue, but not Boston, within **25,000 meters**.
 
 ## Task 6: Create a GSI and test automatic propagation
 
@@ -591,7 +585,6 @@ Because key-based authentication is disabled, no key or connection string appear
 
     ```powershell
     $accountId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.DocumentDB/databaseAccounts/$accountName"
-    # The account API still calls the GSI feature enableMaterializedViews.
     az rest --method PATCH `
         --uri "https://management.azure.com${accountId}?api-version=2022-11-15-preview" `
         --body "@capabilities.json"
@@ -640,7 +633,7 @@ Because key-based authentication is disabled, no key or connection string appear
     Write-Host "Created productBySku."
     ```
 
-    Confirm **Created productBySku.** appears before continuing. The container must exist before the application can wait for its data.
+    Confirm **Created productBySku.** appears before continuing.
 
 1. In **Program.cs**, insert this **generic polling helper immediately before `// TASK CODE`**, after the existing helpers:
 
@@ -665,11 +658,10 @@ Because key-based authentication is disabled, no key or connection string appear
     }
     ```
 
-1. Now **replace everything from `// TASK CODE` to EOF** with this block, keeping the polling helper above it. It compares request charges and checks that a source-only update reaches the GSI.
+1. **Replace everything from `// TASK CODE` to EOF** with this block, keeping the polling helper above it. The code compares request charges and checks that a source-only update reaches the GSI.
 
     ```csharp
     // TASK CODE
-    // Connect to the GSI created in step 5; this doesn't create a container.
     Container productBySku = database.GetContainer("productBySku");
     // SKU isn't the source partition key, so this lookup isn't partition-scoped.
     QueryDefinition sourceQuery = new QueryDefinition(
@@ -686,7 +678,7 @@ Because key-based authentication is disabled, no key or connection string appear
     (List<JObject> Items, double RU)? gsiLookup = null;
     int lastCopied = -1;
     Console.WriteLine("Waiting for the GSI copy...");
-    // ARM container creation doesn't prove that initial data copying has finished.
+    // Wait for the initial 295-product copy.
     await WaitAsync("productBySku", async token =>
     {
         var count = await QueryAsync<JToken>(productBySku,
@@ -779,11 +771,11 @@ Because key-based authentication is disabled, no key or connection string appear
     dotnet run
     ```
 
-    The copy check has a **15-minute limit** and prints the product count.
+    The program prints the initial copy progress. Each copy or propagation check has a **15-minute timeout**.
 
-    A GSI generates its own `id` and exposes the source `id` as **`_id`**; compare the matching `sourceId` projections, not the two containers' raw IDs.
-    Equal read charges are legitimate for this small, single-physical-partition dataset; source replacements incur extra GSI maintenance cost.
-    Confirm both the temporary change and restoration propagated; the code writes **only to the source**, and each propagation wait is bounded to **15 minutes**.
+    Compare the source and GSI lookup charges and the before-and-after source replacement charges. Lookup charges might be equal for this small catalog. The `sourceId` projections use `id` from the source and `_id` from the GSI.
+
+    Confirm that both the temporary price change and the restored price appear in the GSI. The program writes only to the source container.
 
 ## Clean up
 
@@ -792,8 +784,6 @@ Delete **only the Cosmos DB account created for this lab**, preserving the suppl
 ```powershell
 az cosmosdb delete --resource-group $resourceGroup --name $accountName --yes
 ```
-
-Keep your notes locally; don't commit or publish your student-generated **Shared\indexing-lab** files.
 
 ## References
 

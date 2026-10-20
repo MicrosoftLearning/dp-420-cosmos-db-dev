@@ -14,9 +14,7 @@ lab:
 
 # Secure an account in Python
 
-Contoso needs evidence that its product reader can't write products and respects network restrictions. You host a client in Azure Container Instances (ACI) with a system-assigned managed identity and test container-scoped access. Your local Azure CLI identity manages resources. Only the hosted identity accesses data.
-
-Key rotation and dynamic data masking aren't part of this exercise.
+In this exercise, you host a product reader in Azure Container Instances (ACI), authenticate with a system-assigned managed identity, and test read-only access and network restrictions. Your local Azure CLI identity manages resources; the hosted identity accesses data.
 
 This exercise takes approximately **45** minutes to complete.
 
@@ -26,19 +24,19 @@ To complete this exercise, you need an [Azure subscription](https://azure.micros
 
 If your lab environment isn't set up yet, follow [Set up your lab environment](https://github.com/MicrosoftLearning/dp-420-cosmos-db-dev/blob/main/Allfiles/Labs/Shared/00-setup-local-environment.md) to install Visual Studio Code, Git, the Azure CLI, and PowerShell 7.
 
-You don't need a local Python installation. The container image supplies the runtime, and every line of application code in this exercise runs inside that container.
+The application runs inside the container, so you don't need to install Python locally.
 
 This exercise also requires:
 
-- Azure **Contributor** access to the resources in the resource group you use. Cosmos DB native role assignments are resource-provider operations rather than generic Azure role assignments, so a data-plane role isn't enough to make them.
-- Registered `Microsoft.DocumentDB` and `Microsoft.ContainerInstance` resource providers, or permission to register them. Registration requires each provider's `/register/action` permission at subscription scope. Your subscription administrator or lab provider can register missing providers when you don't have this permission. See [Azure resource providers and types](/azure/azure-resource-manager/management/resource-providers-and-types).
+- Azure **Contributor** access to the resources in the resource group you use.
+- Registered `Microsoft.DocumentDB` and `Microsoft.ContainerInstance` resource providers, or permission to register them at subscription scope. See [Azure resource providers and types](/azure/azure-resource-manager/management/resource-providers-and-types).
 - A region, such as `eastus`, that supports Azure Cosmos DB serverless and Linux [Azure Container Instances](/azure/container-instances/container-instances-region-availability), with quota for 2 CPUs and 4 GB of memory. The container needs outbound access to Azure Cosmos DB, the managed identity endpoint, GitHub, and package repositories.
 
 Charges include ACI uptime and Azure Cosmos DB serverless request units (RUs) and storage. Complete the cleanup task even after a failure.
 
 ## Set up your Azure Cosmos DB resources
 
-This exercise creates its own Azure Cosmos DB account and deletes it at the end, so it doesn't use the shared account from the rest of this learning path. Later steps switch public network access off and back on, which would interrupt every other exercise running against a shared account.
+This exercise creates a separate Azure Cosmos DB account. Delete this account at the end of the exercise.
 
 > &#9888; Use only the account this script creates for this exercise. The network test deliberately blocks all public data access to that account. Never point this exercise at a shared training or production account.
 
@@ -91,7 +89,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
         --query documentEndpoint --output tsv
     ```
 
-1. Confirm the security baseline. Expect **LocalAuthDisabled** to be **True** and **PublicAccess** to be **Enabled**. These values mean local authentication is disabled and public network access is enabled.
+1. Confirm the security baseline. Expect **LocalAuthDisabled** to be **True** and **PublicAccess** to be **Enabled**.
 
     ```azurecli
     az cosmosdb show --resource-group $resourceGroup --name $account `
@@ -104,19 +102,17 @@ The script creates the following resources:
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, serverless, with key-based authentication disabled and public network access enabled |
 | `cosmicworks` database | Holds the container this exercise uses |
-| `product` container | Partitioned on `/categoryId`, serverless, and empty. Loading it is the first thing you prove the hosted identity can do |
+| `product` container | Partitioned on `/categoryId`, serverless, and initially empty |
 
-Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. No command retrieves an account key.
-
-The `security` profile deliberately grants **no** data-plane role to your signed-in identity. The tests use the hosted managed identity. Assigning a data-plane role to your local Azure CLI identity doesn't change the hosted identity's permissions.
+The setup script grants no data-plane role to your local Azure CLI identity. You assign data-plane permissions to the hosted managed identity in Task 2.
 
 ## Task 1: Write the managed identity client
 
-Prepare source locally before creating ACI. The client downloads 295 CosmicWorks v4 products once into `products.json` inside the container, retaining their full schema. All tests reuse the cached first record's actual `id` and `categoryId`. A different count or invalid structure stops the client.
+The client downloads and caches 295 CosmicWorks products inside the container. Each test uses the first product's item ID and partition key.
 
-The `seed` mode upserts the dataset. The `read` mode performs a point read. The `check` mode reads, then attempts replacement with the original downloaded values. Only a replacement 403 after read success counts as expected denial. Unexpected write success returns failure without changing business values, although server-maintained metadata can change.
+The client has three modes: `seed` loads the catalog, `read` performs a point read, and `check` verifies that reading succeeds while replacement is denied with HTTP 403.
 
-1. In **local PowerShell**, create a `dp420-security` subfolder under the current **Allfiles/Labs/Shared** folder and change to it. This local folder is separate from the container's working directory.
+1. In **local PowerShell**, create a `dp420-security` subfolder under the current **Allfiles/Labs/Shared** folder and change to it.
 
     ```powershell
     $workFolder = Join-Path $PWD.Path 'dp420-security'
@@ -124,7 +120,7 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
     Set-Location $workFolder
     ```
 
-1. In the **dp420-security** folder, create `app.py` in Visual Studio Code with the following complete program. Preserve Python indentation. Output contains statuses, not tokens, products, or full exception messages. Python uses Gateway mode. The outer handler also covers client initialization, because initialization can contact the account. The context manager closes the client, and `finally` closes the credential.
+1. In the **dp420-security** folder, create `app.py` in Visual Studio Code with the following code.
 
     ```python
     import json
@@ -139,9 +135,6 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
 
 
     def main():
-        # Run one stage per process:
-        # seed loads products, read tests connectivity and read permission,
-        # and check verifies that reading succeeds but writing is denied.
         # Exit codes: 0 = expected result, 1 = unexpected result,
         # 2 = invalid arguments or configuration, 3 = seed or read denied.
         if len(sys.argv) != 2 or sys.argv[1] not in {"seed", "read", "check"}:
@@ -149,28 +142,21 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
             return 2
 
         mode = sys.argv[1]
-        # Setup can fail before a credential exists. This lets finally safely
-        # close the credential only if it was created.
         credential = None
         try:
-            # ACI receives the account URL through an environment variable.
-            # The URL identifies the account; it isn't an account key or token.
             endpoint = os.environ.get("COSMOS_ENDPOINT")
             if not endpoint or not endpoint.strip():
                 print("COSMOS_ENDPOINT is required.")
                 return 2
 
-            # Download the public sample dataset once into the container's
-            # current directory. Later runs reuse it, including during the
-            # Cosmos DB network test, so they don't need another download.
+            # Cache the catalog for reuse across test runs.
             source_url = "https://raw.githubusercontent.com/AzureCosmosDB/CosmicWorks/main/data/database-v4/product"
             cache_file = Path("products.json")
             if not cache_file.exists():
                 with urlopen(source_url, timeout=60) as response:
                     cache_file.write_bytes(response.read())
 
-            # Reject an unexpected dataset before accessing Cosmos DB.
-            # Keep each complete product document for seeding and replacement.
+            # Validate the catalog before accessing Cosmos DB.
             products = json.loads(cache_file.read_text(encoding="utf-8"))
             if not isinstance(products, list) or len(products) != 295 or any(
                 not isinstance(product, dict)
@@ -180,77 +166,56 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
             ):
                 raise ValueError("Invalid dataset")
 
-            # A point read needs both the item ID and partition key value.
-            # Reuse the first cached product so every test targets the same
-            # item in the container, whose partition key path is /categoryId.
+            # Use the same product and partition key for every test.
             first_product = products[0]
             product_id = first_product["id"]
             category_id = first_product["categoryId"]
-            # Inside ACI, request tokens for the host's system-assigned managed
-            # identity, not your local Azure CLI identity. No account key is used.
-            # The identity still needs a Cosmos DB data-plane role assignment.
+            # Authenticate as the container's system-assigned managed identity.
             credential = ManagedIdentityCredential()
-            # Python uses Gateway mode (HTTPS). The with block closes the client
-            # on return or exception; the outer try also covers initialization.
             with CosmosClient(endpoint, credential=credential) as client:
-                # These references target resources already created by setup;
-                # they don't create a database or container.
                 database = client.get_database_client("cosmicworks")
                 container = database.get_container_client("product")
 
                 if mode == "seed":
-                    # Temporary Data Contributor permission allows loading.
-                    # Upsert creates a missing item or replaces an existing one,
-                    # so retrying doesn't create duplicate copies of the items.
                     for product in products:
                         container.upsert_item(body=product)
                     print(f"Seed succeeded: {len(products)} items.")
                     return 0
 
-                # Both read and check must first prove this identity can read.
-                # A failed read skips the write attempt and reaches a handler.
+                # Confirm read access before testing write denial.
                 container.read_item(item=product_id, partition_key=category_id)
                 print("Read succeeded.")
                 if mode == "read":
                     return 0
 
                 try:
-                    # Only check reaches here. Data Reader should allow the
-                    # preceding read but reject this replacement with HTTP 403.
-                    # Use the original values to avoid intentional business-data
-                    # changes if writing succeeds, but metadata can still change.
+                    # Test write permission using the original product values.
                     container.replace_item(item=product_id, body=first_product)
                     print("UNEXPECTED: Write succeeded.")
                     return 1
                 except CosmosHttpResponseError as exception:
-                    # Only a forbidden replacement counts as expected denial.
-                    # Other Cosmos DB errors must reach the outer error handler.
+                    # Only a 403 from replacement is an expected write denial.
                     if exception.status_code != 403:
                         raise
                     print("Write denied (403). Expected.")
                     return 0
         except CosmosHttpResponseError as exception:
-            # A 403 during initialization, seeding, or reading is different
-            # from the expected write denial. Exit 3 is expected only for
-            # the read test while the lab has public network access disabled.
+            # Return a distinct result when seeding or reading is denied.
             if exception.status_code == 403:
                 print("Seed denied (403)." if mode == "seed" else "Read denied (403).")
                 return 3
             print(f"Unexpected Cosmos status ({exception.status_code}).")
             return 1
         except Exception as exception:
-            # Report the failure type without exposing full exception details,
-            # which can include request information unsuitable for lab output.
+            # Report the error type without exposing request details.
             print(f"Unexpected failure ({type(exception).__name__}).")
             return 1
         finally:
-            # Always release credential resources, even after an early return.
             if credential is not None:
                 credential.close()
 
 
     if __name__ == "__main__":
-        # Expose the result to Bash so echo $? can verify the test outcome.
         sys.exit(main())
     ```
 
@@ -263,17 +228,17 @@ The `seed` mode upserts the dataset. The `read` mode performs a point read. The 
 
 ## Task 2: Host the client and load products
 
-ACI supplies the Linux process with a managed identity endpoint. Temporary Data Contributor access at product-container scope permits loading. This exercise simplification differs from production, where a separate loader identity keeps the application read-only.
+Temporarily grant Data Contributor to load the catalog, then replace it with Data Reader for the application. Use a separate loader identity in production.
 
 ### Create the host identity
 
-1. Encode the source file in **local PowerShell**. Base64 transfers text through an environment variable. It isn't encryption, and this source contains no secrets.
+1. Encode the source file in **local PowerShell** for transfer to the container. Base64 encoding doesn't encrypt the source.
 
     ```powershell
     $sourceBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Resolve-Path $sourceFile)))
     ```
 
-1. Create ACI with a system-assigned identity and an idle process for repeated sessions. Omit identity `--scope` and `--role`: no Azure management grant is needed. Public IP, DNS label, and port options remain unset.
+1. Create an ACI container group with a system-assigned identity. Keep the container running for the following tests.
 
     ```azurecli
     az container create --resource-group $resourceGroup --name $containerGroupName `
@@ -282,7 +247,7 @@ ACI supplies the Linux process with a managed identity endpoint. Temporary Data 
         --environment-variables "COSMOS_ENDPOINT=$endpoint" "SOURCE_BASE64=$sourceBase64"
     ```
 
-1. Check for `Running` and capture the principal object ID. Continue only with a nonempty ID. Investigate provisioning or capacity errors otherwise.
+1. Confirm that the container is `Running` and capture its managed identity's principal object ID. Continue only when the ID is nonempty.
 
     ```powershell
     az container show --resource-group $resourceGroup --name $containerGroupName `
@@ -311,7 +276,7 @@ ACI supplies the Linux process with a managed identity endpoint. Temporary Data 
     az container exec --resource-group $resourceGroup --name $containerGroupName --exec-command /bin/bash
     ```
 
-1. Initialize the project in **container Bash**. Decode the source and install unpinned supported packages. Continue only after installation completes successfully.
+1. Initialize the project in **container Bash**. Decode the source and install the required packages.
 
     ```bash
     mkdir -p /work/security
@@ -321,7 +286,7 @@ ACI supplies the Linux process with a managed identity endpoint. Temporary Data 
     .venv/bin/python -m pip install azure-cosmos azure-identity
     ```
 
-1. Load the products in **container Bash**. Expect `Seed succeeded: 295 items.` and exit code `0`. For a 403, check the recorded principal and scope locally, allow propagation, and retry. Don't broaden the grant. A retry uses the cache and upserts the same products. If the pasted commands haven't started running, press **Enter**.
+1. Load the products in **container Bash**. Expect `Seed succeeded: 295 items.` and exit code `0`. Role assignments can take several minutes to propagate; wait and retry if needed.
 
     ```bash
     .venv/bin/python app.py seed
@@ -334,11 +299,11 @@ ACI supplies the Linux process with a managed identity endpoint. Temporary Data 
     exit
     ```
 
-Reattach to the same running container without restarting it. Container files aren't durable: restart or replacement can lose the cache and dependencies. After such a loss, repeat initialization and establish a fresh baseline.
+Keep the container running between tasks so its workspace and cached catalog remain available.
 
 ## Task 3: Enforce and test read-only access
 
-Adding Reader doesn't cancel Contributor. Remove the temporary grant, then test with the principal, data, and network unchanged to isolate authorization.
+Role permissions are additive. Remove the temporary Contributor assignment before testing Data Reader, and keep the identity and network settings unchanged.
 
 1. Add native Data Reader in **local PowerShell**, at the same scope. Data Reader is the application's intended steady-state permission.
 
@@ -357,20 +322,20 @@ Adding Reader doesn't cancel Contributor. Remove the temporary grant, then test 
         --account-name $account --role-assignment-id $seedAssignment --yes
     ```
 
-1. Inspect all native assignments for the principal in **local PowerShell**. Expect only Reader, ending in `0001`, at the product scope. Don't accept a remaining Contributor or broader assignment.
+1. Inspect all native assignments for the principal in **local PowerShell**. Confirm that only Data Reader, ending in `0001`, remains at product-container scope.
 
     ```azurecli
     az cosmosdb sql role assignment list --resource-group $resourceGroup --account-name $account `
         --query "[?principalId=='$principalId'].{Role:roleDefinitionId,Scope:scope,Assignment:id}" --output table
     ```
 
-1. To test the hosted identity, not your CLI identity, reenter **container Bash** from **local PowerShell**.
+1. Reenter **container Bash** from **local PowerShell**.
 
     ```azurecli
     az container exec --resource-group $resourceGroup --name $containerGroupName --exec-command /bin/bash
     ```
 
-1. Run the check in **container Bash**. Each invocation starts a new process whose read and replacement share one client and identity.
+1. Run the check in **container Bash**.
 
     ```bash
     cd /work/security
@@ -378,7 +343,7 @@ Adding Reader doesn't cancel Contributor. Remove the temporary grant, then test 
     echo $?
     ```
 
-    Expect this output. Initial read denial prevents the write and fails the test. If writing succeeds, stop, verify assignment removal, allow propagation, and rerun a new process. Continue only with both expected results.
+    Expect a successful read followed by a denied replacement, with exit code `0`. Allow time for role changes to propagate and rerun if needed before continuing.
 
     ```output
     Read succeeded.
@@ -394,9 +359,9 @@ Adding Reader doesn't cancel Contributor. Remove the temporary grant, then test 
 
 ## Task 4: Block and restore the public network path
 
-Change only public-network access. Keep the role, principal, container, cache, and item address unchanged. This change tests a public-network restriction, not an IP allowlist or private endpoint deployment.
+Disable and restore public network access while keeping the managed identity and Data Reader assignment unchanged.
 
-> &#9888; This isolated account has no private endpoint. Disabling public access creates a complete data-access outage for this exercise, not proof of working private connectivity. Restore the public baseline only on this disposable account.
+> &#9888; This account has no private endpoint. Disabling public network access blocks all data access until you enable it again. Use only the lab account.
 
 ### Verify the blocked read
 
@@ -408,19 +373,19 @@ Change only public-network access. Keep the role, principal, container, cache, a
 
     > **Note:** This command can take **5 minutes or more** to complete and might not display progress while Azure applies the change. Wait for the PowerShell prompt to return before continuing.
 
-1. Inspect the setting in **local PowerShell**. Expect `Disabled`. This management-plane request still works and doesn't demonstrate data access.
+1. Inspect the setting in **local PowerShell**. Expect `Disabled`.
 
     ```azurecli
     az cosmosdb show --resource-group $resourceGroup --name $account --query publicNetworkAccess --output tsv
     ```
 
-1. To reuse the same network source and managed identity, enter **container Bash** from **local PowerShell**.
+1. Enter **container Bash** from **local PowerShell**.
 
     ```azurecli
     az container exec --resource-group $resourceGroup --name $containerGroupName --exec-command /bin/bash
     ```
 
-1. Run the point read in **container Bash**. Expect `Read denied (403).` and intentional exit code `3`. Allow up to 15 minutes for network propagation. Don't accept successful reads as isolation: check the setting and retry. Other errors are inconclusive.
+1. Run the point read in **container Bash**. Expect `Read denied (403).` and exit code `3`. Network changes can take up to 15 minutes to propagate; wait and repeat the read if needed.
 
     ```bash
     cd /work/security
@@ -428,7 +393,7 @@ Change only public-network access. Keep the role, principal, container, cache, a
     echo $?
     ```
 
-1. To restore the baseline, return to **local PowerShell**, including if the blocked test remains inconclusive.
+1. Return to **local PowerShell** to restore public access, even if the test failed.
 
     ```bash
     exit
@@ -451,7 +416,7 @@ Change only public-network access. Keep the role, principal, container, cache, a
     az container exec --resource-group $resourceGroup --name $containerGroupName --exec-command /bin/bash
     ```
 
-1. Repeat the read and authorization check in **container Bash**. Expect read success, then the earlier read-success and write-denial pair, each with exit code `0`. Retry after propagation as needed. Don't accept unexpected results or change roles to make reads succeed.
+1. Repeat the read and authorization check in **container Bash**. Expect read success, then the read-success and write-denial pair, each with exit code `0`. Allow time for the network change to propagate and retry if needed.
 
     ```bash
     cd /work/security
@@ -461,13 +426,13 @@ Change only public-network access. Keep the role, principal, container, cache, a
     echo $?
     ```
 
-1. Return to **local PowerShell** for cleanup. Python uses its virtual environment's interpreter directly, so no environment deactivation is necessary.
+1. Return to **local PowerShell** for cleanup.
 
     ```bash
     exit
     ```
 
-Record observations, timestamps, principal, and scope against this table, without credentials or product values. Operations gets outage evidence, while security reviewers check that restored connectivity doesn't restore writes. All comparisons must match before you record a pass.
+Compare your results with the expected outcomes below. Record each result, timestamp, managed identity principal ID, and role scope without credentials or product values.
 
 | Stage | Public access | Native role | Expected read | Expected replacement |
 | --- | --- | --- | --- | --- |
@@ -495,7 +460,7 @@ Remove this exercise's disposable resources when you finish, even after a partia
     az group delete --name $resourceGroup
     ```
 
-1. Verify deletion in **local PowerShell**. Expect `false`; otherwise investigate deletion status. Whole-group cleanup includes resources from incomplete setup.
+1. Verify deletion in **local PowerShell**. Confirm that the result is `false`.
 
     ```azurecli
     az group exists --name $resourceGroup
@@ -507,5 +472,3 @@ If your lab provided the resource group, or the group holds other resources, del
 az cosmosdb delete --name $account --resource-group $resourceGroup --yes
 az container delete --name $containerGroupName --resource-group $resourceGroup --yes
 ```
-
-This exercise demonstrates three distinct boundaries: hosted identity, scoped data permissions, and network access. The paired positive and negative tests provide evidence for those operations without claiming production-wide security.

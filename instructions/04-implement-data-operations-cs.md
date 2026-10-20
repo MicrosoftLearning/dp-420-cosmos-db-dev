@@ -14,7 +14,7 @@ lab:
 
 # Implement Data Operations in C#
 
-In this exercise, you build a small data layer against an Azure Cosmos DB for NoSQL container and exercise every operation from this module. You read an item with a point read and compare its cost with the cost of an equivalent query. You then run the full set of write operations. You apply a conditional patch and protect a replace operation with an ETag. You set a time to live (TTL) value to expire an item. You commit a transactional batch. You finish with a bulk load. Throughout, you print the request charge so you can see what each choice costs.
+In this exercise, you compare read and write request charges, apply conditional updates, expire an item with time to live (TTL), commit a transactional batch, and load items in bulk.
 
 ## Before you start
 
@@ -91,7 +91,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Set up the project and connect to the container
 
-Task 5 expires an item with time to live (TTL), so enable it on the container now. Replace <your-account-name> with your actual account name:
+Enable item-level TTL on the `operations` container. Replace `<your-account-name>` with your account name:
 
 ```azurecli
 az cosmosdb sql container update `
@@ -129,8 +129,7 @@ A value of `-1` expires only the items that set their own `ttl`.
 
     string endpoint = "<cosmos-endpoint>";
 
-    // Reuse one credential-backed client. Getting a container reference
-    // doesn't create it or confirm that it exists.
+    // Reuse one client for all operations.
     CosmosClient client = new(endpoint, new DefaultAzureCredential());
     Container container = client.GetContainer("cosmicworks", "operations");
 
@@ -138,8 +137,6 @@ A value of `-1` expires only the items that set their own `ttl`.
 
     Console.WriteLine("Container ready.");
     ```
-
-    `GetContainer` builds a client-side reference without calling the service, so it needs no control-plane permission.
 
 1. Add a second file named **Models.cs** with the item types:
 
@@ -157,11 +154,7 @@ A value of `-1` expires only the items that set their own `ttl`.
         Tag[] tags);
     ```
 
-    The `Product` record mirrors the cosmicworks product document: `tags` is an array of objects, each with its own `id` and `name`, not an array of strings.
-
-    Keeping the types in their own file leaves **Program.cs** holding nothing but top-level statements, so you can append to the end of it without worrying about declaration order.
-
-    > &#10071; Each task that follows replaces only the code **below the marker comment**. The lines above it, including your endpoint, stay put for the whole exercise. That way every run does only the work of the task you're on, instead of repeating everything before it.
+    > &#10071; For each task, replace only the code **below the marker comment**. Keep the imports, client setup, and endpoint above it unchanged.
 
 1. Run the project and confirm the output reads `Container ready.`:
 
@@ -251,7 +244,7 @@ Create one item, then read it back two ways and compare the request charge.
     Query:       2.92 RU
     ```
 
-A point read costs about 1 request unit (RU). Fetching the same item by query costs two to three times as much, because it goes through the query engine. Use a point read whenever your code already knows the `id` and the partition key.
+The point read costs less than the query because it doesn't use the query engine. Use a point read when you know both the item ID and partition key.
 
 ---
 
@@ -275,7 +268,7 @@ Replace, upsert, and delete the item, then recreate it for the tasks that follow
     Console.WriteLine($"Replace:     {replaced.RequestCharge:0.00} RU");
     ```
 
-    `ReplaceItemAsync` takes the `id` as a separate argument, and it fails with 404 if the item no longer exists.
+    A replace fails with HTTP 404 if the item doesn't exist.
 
 1. Add an upsert that suppresses the response payload:
 
@@ -306,13 +299,13 @@ Replace, upsert, and delete the item, then recreate it for the tasks that follow
     Delete:      9.52 RU
     ```
 
-A write costs several times a point read, because the charge covers the document itself plus every index term the container's indexing policy maintains. The replace is the most expensive of the three: it deletes the existing document and inserts the new one, paying the document cost twice, while the delete pays it once. Request charges are deterministic for a given operation over a given dataset, so rerunning the project reproduces these numbers, though your values depend on item size and the container's indexing policy. Suppressing the response payload saves network bandwidth, not request units, which is why the replace and the upsert cost the same.
+Writes include document and index-maintenance work, so they generally cost more than point reads. Charges depend on item size and indexing policy. Suppressing the response body saves bandwidth, not RUs.
 
 ---
 
 ## Task 4: Apply a conditional patch and guard a replace with an ETag
 
-Change one property without rewriting the whole document, and make that change conditional. Patch and replace express a condition differently: a patch uses a filter predicate, and a replace uses an ETag. You use both here.
+Patch selected properties with a price condition, then use an ETag to prevent replacing an item version that has changed.
 
 1. In **Program.cs**, replace everything below the marker comment with the following code. It patches two properties, guarded by a filter predicate that tests the current price:
 
@@ -404,13 +397,13 @@ Change one property without rewriting the whole document, and make that change c
 
 1. Run the project. The first replace succeeds and changes the item's ETag, so the second one fails.
 
-This exercise conditions the patch with a filter predicate and the replace with an ETag. The .NET standalone `PatchItemAsync` method doesn't support `IfMatchEtag`, so don't substitute that option for the patch predicate. A replace supports an ETag precondition, but not a filter predicate. Both conditions demonstrated here reject a conflicting write with 412 Precondition Failed. Re-read the item and decide whether to reapply the change. Patch operations inside a transactional batch have separate request options; don't infer their behavior from the standalone method.
+Both examples reject the write with HTTP 412 when its precondition isn't met. Read the current item before deciding whether to reapply the change.
 
 ---
 
 ## Task 5: Expire an item with time to live
 
-Write a transient item, give it a short lifetime, and watch it disappear.
+Expire a session item after 30 seconds.
 
 1. In **Program.cs**, replace everything below the marker comment with the following code. It creates a session item with a 30-second lifetime:
 
@@ -432,9 +425,7 @@ Write a transient item, give it a short lifetime, and watch it disappear.
     Console.WriteLine("Session created with a 30 second TTL.");
     ```
 
-    Using an upsert rather than a create lets you rerun the task without a conflict.
-
-1. Add two reads, one before the lifetime elapses and one after, so you can see the item disappear rather than find it missing:
+1. Add reads before and after expiration:
 
     ```csharp
     async Task ReadSession(string label)
@@ -450,7 +441,7 @@ Write a transient item, give it a short lifetime, and watch it disappear.
         }
     }
 
-    // Check before and after expiry, with a margin beyond the 30-second lifetime.
+    // Read before and after the item's 30-second TTL.
     await Task.Delay(TimeSpan.FromSeconds(10));
     await ReadSession("After 10s:");
 
@@ -458,7 +449,7 @@ Write a transient item, give it a short lifetime, and watch it disappear.
     await ReadSession("After 35s:");
     ```
 
-    To leave a margin, the second read lands at 35 seconds rather than exactly 30. An expired item stops appearing in results as soon as its lifetime elapses, even though the physical delete happens later, as a background task.
+    Items are excluded from reads and queries once their TTL expires. Physical deletion happens later in the background.
 
 1. Run the project. The first read succeeds and the second returns 404:
 
@@ -468,13 +459,13 @@ Write a transient item, give it a short lifetime, and watch it disappear.
     After 35s: session expired
     ```
 
-A container TTL of `-1` turns on expiration without giving anything a default lifetime. Only items that set their own `ttl` expire: the session item did, and the product item from Task 2 didn't.
+With a container TTL of `-1`, only items with their own positive `ttl` expire. The session expires; the product remains.
 
 ---
 
 ## Task 6: Commit a transactional batch
 
-To see how the failure reports itself, write two related items atomically, then break the same-partition rule on purpose.
+Write two items atomically within one partition, then test a batch containing different partition keys.
 
 1. In **Program.cs**, replace everything below the marker comment with the following code. Both items share the partition key value used throughout this exercise:
 
@@ -500,8 +491,6 @@ To see how the failure reports itself, write two related items atomically, then 
 
     Console.WriteLine($"Batch:       {batchResponse.StatusCode} ({batchResponse.RequestCharge:0.00} RU)");
     ```
-
-    The batch upserts rather than creates, so rerunning the task doesn't fail on items that already exist.
 
 1. Run the project. The status is `OK`, and both items exist in the container.
 
@@ -529,17 +518,17 @@ To see how the failure reports itself, write two related items atomically, then 
     }
     ```
 
-1. Run the project. The batch fails. One operation reports the real error, and the other reports **424 Failed Dependency**, which means it was rolled back rather than rejected on its own merits. Confirm in the Azure portal's **Data Explorer** that neither item was written.
+1. Run the project. One operation reports the error; the other reports **424 Failed Dependency** because the batch was rolled back. Confirm in the Azure portal's **Data Explorer** that neither item was written.
 
 ---
 
 ## Task 7: Load items in bulk
 
-Write a few thousand independent items and measure how long the load takes.
+Load 2,000 independent items and record the elapsed time.
 
-This task writes to the `bulkload` container rather than `operations`, so the items you created in earlier tasks stay out of the timing measurement.
+This task loads items into `bulkload`.
 
-1. In **Program.cs**, replace everything below the marker comment with the following code. It uses a second client with bulk execution enabled, because that setting can't be changed after a client is created:
+1. In **Program.cs**, replace everything below the marker comment with the following code. It enables bulk execution on a client targeting `bulkload`:
 
     ```csharp
     // Bulk execution groups independent concurrent writes for throughput;
@@ -552,7 +541,7 @@ This task writes to the `bulkload` container rather than `operations`, so the it
     List<Product> items = Enumerable.Range(0, 2000)
         .Select(i => new Product(
             id: Guid.NewGuid().ToString(),
-            // These values create logical partitions, not 20 physical partitions.
+            // Distribute the items across 20 logical partitions.
             categoryId: $"bulk-category-{i % 20}",
             categoryName: $"Bulk Category {i % 20}",
             sku: $"BL-{i:D5}",
@@ -580,8 +569,7 @@ This task writes to the `bulkload` container rather than `operations`, so the it
                     exception.StatusCode == HttpStatusCode.TooManyRequests ||
                     exception.StatusCode == (HttpStatusCode)449)
                 {
-                    // Return only known rejections for retry. Other exceptions surface;
-                    // a timed-out create might already have committed.
+                    // Retry this rejected item; other exceptions propagate.
                     return item;
                 }
             })
@@ -610,9 +598,11 @@ This task writes to the `bulkload` container rather than `operations`, so the it
     Console.WriteLine($"Retried:     {firstPassFailures} on the first pass, {pending.Count} still outstanding");
     ```
 
-    `AllowBulkExecution` lets the client group concurrent operations by partition key range and send each group as a single request. The 20 partition key values create logical partitions, not physical partitions. This small container can have only one physical partition. Distributing keys supports parallelism across physical partitions when the container scales out.
+    `AllowBulkExecution` groups concurrent operations into requests by partition key range.
 
-    The handler retries only 429 and 449 responses, which indicate retryable rejections. Cancellation, nonretryable errors, and ambiguous outcomes such as timeouts propagate instead of being reported as unwritten items. A timed-out create might already have committed, so resolve its outcome before replaying it. `Task.WhenAll` waits for all tasks; its returned task retains their exceptions even though awaiting it throws one.
+    The generated items use 20 logical partition key values. A well-distributed key allows write activity to spread across physical partitions as the container scales.
+
+    The loader retries HTTP 429 and 449 responses and stops on other errors. A timed-out create might have committed, so check its outcome before retrying.
 
 1. Run the project and note the elapsed time:
 
@@ -625,9 +615,9 @@ This task writes to the `bulkload` container rather than `operations`, so the it
     Retried:     14 on the first pass, 0 still outstanding
     ```
 
-    This output is an example; elapsed time and retry counts vary. The SDK might handle all throttling without surfacing any first-pass failures. If retryable rejections remain, the next pass retries those items, but success isn't guaranteed. Check the final outstanding count. Restarting the whole load creates fresh `Guid` values and can write 2,000 more items instead of finishing the first 2,000.
+    Elapsed time and retry counts vary. Confirm that 2,000 items were written and none are outstanding. Rerunning the program generates new IDs and can add another 2,000 items.
 
-Bulk mode doesn't make each write cheaper. Every item costs the same RU charge it would cost on its own. What changes is how many requests are in flight at once, so the load finishes in a fraction of the time the same writes would take one after another. Elapsed time is bounded by the container's provisioned throughput, which is why ingest jobs raise RU/s during a load and lower it afterward.
+Bulk loading improves throughput by running independent writes concurrently; it doesn't reduce each item's RU charge. Completion time depends on available RU/s and client-side concurrency.
 
 ---
 

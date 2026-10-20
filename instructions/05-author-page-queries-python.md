@@ -14,7 +14,7 @@ lab:
 
 # Author and Page Queries in Python
 
-In this exercise, you build a query layer against an Azure Cosmos DB for NoSQL catalog container and run every query technique from this module. You load the CosmicWorks product catalog, then write a parameterized query that projects a custom shape. You reach into a nested tags array with a correlated subquery, expand that array with a cross-product query, and finish by paging a result set with continuation tokens. Throughout, you print the request charge so you can see what each choice costs.
+In this exercise, you query the CosmicWorks catalog using parameters, projections, array subqueries, joins, and continuation tokens. You also record request charges to compare query costs.
 
 ## Before you start
 
@@ -75,7 +75,7 @@ The script creates the following resources:
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled |
 | `cosmicworks` database | Holds every container this learning path uses |
-| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 request units per second (RU/s), loaded with the 295 CosmicWorks products every query in this exercise runs against |
+| `product` container | Partitioned on `/categoryId`, autoscale up to 1,000 request units per second (RU/s), loaded with 295 CosmicWorks products |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
@@ -86,9 +86,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Connect to the CosmicWorks catalog
 
-Every query in this exercise runs against the same data: the product catalog from the CosmicWorks sample, which the setup script already loaded into the `product` container.
-
-The catalog holds 295 products. Each one looks like this:
+The setup script loads 295 CosmicWorks products into `product`. Each product has the following structure:
 
 ```json
 {
@@ -137,7 +135,7 @@ The catalog holds 295 products. Each one looks like this:
     pip install azure-cosmos azure-identity
     ```
 
-1. In the **cosmos-queries-exercise** folder, alongside the **.venv** folder rather than inside it, create a file named **app.py** with the following contents. Set `endpoint` to the account endpoint the setup script printed:
+1. In the **cosmos-queries-exercise** folder, create **app.py** with the following code. Set `endpoint` to the account endpoint the setup script printed:
 
     ```python
     from azure.cosmos import CosmosClient
@@ -145,16 +143,13 @@ The catalog holds 295 products. Each one looks like this:
 
     endpoint = "<cosmos-endpoint>"
 
-    # Reuse one credential-backed client; the container reference doesn't create
-    # resources or make a service request.
+    # Reuse one client for all queries.
     client = CosmosClient(url=endpoint, credential=DefaultAzureCredential())
 
     container = client.get_database_client("cosmicworks").get_container_client("product")
 
     print("Container ready.")
     ```
-
-    `get_container_client` builds a client-side reference without calling the service. Creating a database or container is a control-plane operation, which a Cosmos DB data-plane role can't perform, so the setup script created them for you.
 
 1. Run the script:
 
@@ -166,19 +161,18 @@ The catalog holds 295 products. Each one looks like this:
 
 ## Task 2: Write a parameterized, projected query
 
-Query one category with a price filter and a prefix match, then project the result into the shape a product card needs. Compare what the query costs when it's scoped to the partition key against what it costs cross-partition.
+Query a category with price and name-prefix filters, then project the result for a product card. Run the same query with and without an explicit partition key in the request.
 
 The category for this task is **Components, Road Frames**, which holds 33 products.
 
-> &#128161; Each task appends to the same file, so every run repeats the queries from the earlier tasks. Comment out the earlier queries once you see their output.
+> &#128161; Each task adds code to the same file. Later runs also execute queries from the earlier tasks.
 
 1. Append the following code. It defines the query with three parameters:
 
     ```python
     ROAD_FRAMES = "3E4CEACD-D007-46EB-82D7-31F6141752B2"
 
-    # Project only the card fields. scannerData is a new nested result object,
-    # and STARTSWITH's third argument enables case-insensitive matching.
+    # Project the fields needed for a product card.
     sql = """
         SELECT
             p.name,
@@ -207,7 +201,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
         charges = []
 
         def record_charge(headers, _results):
-            # Capture each page's RU charge, not just the final response's.
+            # Record each service response's RU charge.
             charges.append(float(headers["x-ms-request-charge"]))
 
         # Keep SQL and parameters identical; only request scoping changes.
@@ -237,7 +231,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
     print(f"Cross-part.: {unscoped_count} items, {unscoped_charge:.2f} RU")
     ```
 
-    The SDK invokes `response_hook` once per page, so summing what it records gives the charge for the whole query.
+    The response hook records the charge for each service response. The helper sums them for the query total.
 
 1. Run the script and compare the two charges:
 
@@ -245,7 +239,7 @@ The category for this task is **Components, Road Frames**, which holds 33 produc
     python app.py
     ```
 
-Both calls return the same 12 products, and the two charges are close to identical. This container's autoscale maximum of 1,000 RU/s puts it on a single physical partition, so the unscoped query has only that one partition to reach. Setting the partition key scopes a query to one physical partition; without it, the service fans out the query to every physical partition and merges the results, so the saving grows with the number of partitions the container spans. In a catalog API, the category is always known, so the partition key always belongs on the request.
+Both calls return the same 12 products and should have similar charges. The SQL includes an equality filter on `categoryId`, so Azure Cosmos DB can route either request to that partition. Passing the partition key in the request makes the intended scope explicit.
 
 ---
 
@@ -253,7 +247,7 @@ Both calls return the same 12 products, and the two charges are close to identic
 
 Filter products by what their nested `tags` array contains, and project a trimmed version of that array alongside each result.
 
-CosmicWorks tags are merchandising-assigned identifiers rather than descriptive words. A tag is an object with an `id` and a `name` such as `Tag-30`. The same tag appears on many products, and a product can carry several. A catalog often works that way in practice: the label is a key into a merchandising system, and the query matches it exactly.
+Each product's `tags` array contains objects with `id` and `name` properties, such as `Tag-30`. Products can have multiple tags, and the same tag can appear on multiple products.
 
 1. Append the following code. `EXISTS` filters items by the contents of the array, and the `ARRAY` expression projects the tag names alongside each match:
 
@@ -299,7 +293,7 @@ CosmicWorks tags are merchandising-assigned identifiers rather than descriptive 
     python app.py
     ```
 
-Four products in this category carry `Tag-30`, and each one appears exactly once, no matter how many other tags it holds. The `tagNames` array lists every tag on those products, including the ones the filter never mentions.
+The query returns four products with `Tag-30`. Each product appears once, and `tagNames` contains all of its tags.
 
 Now narrow the projection. The `ARRAY` subquery can carry its own `WHERE` clause, separate from the one on the outer query.
 
@@ -315,19 +309,18 @@ Now narrow the projection. The `ARRAY` subquery can carry its own `WHERE` clause
     python app.py
     ```
 
-The same four products come back, but each `tagNames` array now holds `Tag-30` alone. The outer `WHERE` clause decides which products the query returns, and the `WHERE` clause inside the `ARRAY` subquery decides what each returned array holds. Filtering items and shaping their arrays are separate decisions.
+The same four products come back, but each `tagNames` array now holds `Tag-30` alone. The outer `WHERE` clause selects products; the `WHERE` clause inside `ARRAY` selects the tags included in each result.
 
 ---
 
 ## Task 4: Expand the array with a cross-product query
 
-Ask a different question of the same data. A `JOIN` returns one result per array element rather than one result per product, which is the shape tag report needs.
+Use a `JOIN` to return one row per tag rather than one row per product.
 
 1. Append the following code. It expands every tag in the category and counts both the rows returned and the distinct products behind them:
 
     ```python
-    # This JOIN expands one product into one row per tag; an empty tags array
-    # produces no rows. It isn't a relational join between two containers.
+    # Expand each product into one row per tag; empty arrays produce no rows.
     cross_product = """
         SELECT p.name, t.name AS tag
         FROM product p
@@ -357,9 +350,9 @@ Ask a different question of the same data. A `JOIN` returns one result per array
 
 1. Run the script.
 
-The query returns 98 rows drawn from 29 products, in a category that holds 33. Four products never appear. No predicate excludes them, because the query has none beyond the category. They carry an empty `tags` array, and the cross-product of a value with an empty set is empty.
+The query returns 98 product-tag rows from 29 of the 33 products. Four products have empty `tags` arrays, so they contribute no rows.
 
-Now watch the same effect against three products elsewhere in the catalog that carry no tags at all.
+Compare the results for three products with empty `tags` arrays.
 
 1. Append the following code. The first query finds the products by name, and the second runs the identical filter through a `JOIN`:
 
@@ -390,7 +383,7 @@ Now watch the same effect against three products elsewhere in the catalog that c
 
 1. Run the script.
 
-The first query returns all three products. The second returns none, even though both queries apply the same filter to the same items. The `JOIN` removes every product with an empty `tags` array before the filter runs. Nothing in the response warns you that those products dropped out, so a report built on a `JOIN` counts only the products that hold at least one tag. In this catalog, 45 of the 295 products disappear that way because their `tags` arrays are empty.
+The direct query returns three products; the `JOIN` returns none because all three have empty `tags` arrays. A `JOIN` over `tags` excludes all 45 products in the catalog that have empty tag arrays.
 
 When a result must include every product regardless of its tags, keep the array out of the `FROM` clause and project it instead, with the `ARRAY` expression from Task 3.
 
@@ -398,7 +391,7 @@ When a result must include every product regardless of its tags, keep the array 
 
 ## Task 5: Page a result set with continuation tokens
 
-Serve one category 10 items at a time, the way a stateless API does, resuming each page from the token the previous page returned.
+Request pages of up to 10 items and use continuation tokens to retrieve subsequent pages.
 
 1. Append the following code. The function fetches exactly one page and returns the token for the next one:
 
@@ -418,8 +411,7 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
             ),
         )
 
-        # Treat the token as opaque and reuse it with the same query, parameters,
-        # and partition scope. Fetch only one page in this stateless helper.
+        # Reuse the opaque token with the same query, parameters, and partition scope.
         pager = results.by_page(continuation_token)
         page = list(next(pager))
 
@@ -443,7 +435,7 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
             break
     ```
 
-    The first call passes `None` and starts at the beginning. A `None` token means the results are exhausted, which is why the loop tests the token rather than the item count.
+    The first request starts without a token. Paging ends when the response has no continuation token.
 
 1. Run the script:
 
@@ -451,9 +443,7 @@ Serve one category 10 items at a time, the way a stateless API does, resuming ea
     python app.py
     ```
 
-Watch the item counts. Most pages return 10 items, but the service can return fewer at any point and still have more results waiting. The token, not the count, is what tells you whether to ask again.
-
-Two limits are worth confirming yourself. Start with sorting.
+Test paging with an ordered query:
 
 1. In `get_page`, add `ORDER BY p.price` to the end of the query string:
 
@@ -467,9 +457,9 @@ Two limits are worth confirming yourself. Start with sorting.
     python app.py
     ```
 
-Paging still works. The service resumes a sorted result set the same way it resumes an unsorted one, so a token survives an `ORDER BY` clause.
+Sorted queries also support continuation tokens.
 
-Now try an aggregate instead.
+Then test an aggregate query:
 
 1. In `get_page`, replace the query string with the following aggregate, which drops the `ORDER BY` clause you added:
 
@@ -483,7 +473,7 @@ Now try an aggregate instead.
     python app.py
     ```
 
-This time the loop ends after one page. The aggregate returns a single result and no usable token, because it scans every matching item before it can produce an answer and can't checkpoint partway through that calculation.
+The aggregate returns one count result, so this example finishes after one page.
 
 ---
 

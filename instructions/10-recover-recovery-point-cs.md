@@ -14,9 +14,7 @@ lab:
 
 # Recover from a recovery point in C#
 
-In this exercise, you protect an Azure Cosmos DB for NoSQL account with continuous backup, destroy data the way an accidental operation would, and recover it to a point in time you choose. You work with the real CosmicWorks product catalog, so the verification steps compare against actual data rather than placeholder values.
-
-You load 295 products into an account provisioned at the `Continuous7Days` tier, capture a verified restore point, delete an item and then the container that held it, and restore the container into the same account. You finish by testing whether repeating that restore recovers another deleted item from the live container, and by removing everything you created.
+In this exercise, you use continuous backup to recover a deleted Azure Cosmos DB container and its data. You load the CosmicWorks catalog, record a restore point, delete data, and restore it into the same account. You also test whether repeating the restore recovers a deleted item in an existing container.
 
 This exercise takes approximately **45** minutes to complete.
 
@@ -24,17 +22,17 @@ This exercise takes approximately **45** minutes to complete.
 
 To complete this exercise, you need an [Azure subscription](https://azure.microsoft.com/free/) with permission to create resources and assign roles.
 
-You also need permission to discover restorable accounts and restore their resources. For the CLI workflow in this exercise, ask your administrator for the **CosmosRestoreOperator** role at subscription scope, or equivalent permissions. Resource-group permissions and the data-plane role created by the setup script don't grant these actions. See [restore permissions](/azure/cosmos-db/continuous-backup-restore-permissions).
+You also need the **CosmosRestoreOperator** role at subscription scope, or equivalent permissions, to discover restorable accounts and restore resources. See [restore permissions](/azure/cosmos-db/continuous-backup-restore-permissions).
 
 If your lab environment isn't set up yet, follow [Set up your lab environment](https://github.com/MicrosoftLearning/dp-420-cosmos-db-dev/blob/main/Allfiles/Labs/Shared/00-setup-local-environment.md) to install Visual Studio Code, Git, the Azure CLI, and PowerShell 7.
 
 You also need the [.NET 10 SDK](https://dotnet.microsoft.com/download) or later installed.
 
-The in-account restore commands need [Azure CLI](/cli/azure/install-azure-cli) version 2.65.0 or later. Earlier versions don't accept the `--disable-ttl` option this exercise uses.
+The in-account restore commands need [Azure CLI](/cli/azure/install-azure-cli) version 2.65.0 or later.
 
 ## Set up your Azure Cosmos DB resources
 
-This exercise creates its own Azure Cosmos DB account and deletes it at the end, so it doesn't use the shared account from the rest of this learning path. Enabling continuous backup on an existing account is a one-way migration, and this exercise deletes and restores the container it works in.
+This exercise creates a separate account with continuous backup. Delete this account at the end of the exercise.
 
 > &#9888; Use only the account this script creates for this exercise. Later steps delete a container and then restore it. Never point this exercise at a shared training or production account.
 
@@ -89,7 +87,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     az cosmosdb show --name $accountName --resource-group $resourceGroup --query "backupPolicy"
     ```
 
-    The output reports a `type` of `Continuous`, a `tier` of `Continuous7Days`, and a `migrationState` of `null`. Naming the tier is deliberate: an account created without `--continuous-tier` gets the charged 30-day tier.
+    The output reports a `type` of `Continuous`, a `tier` of `Continuous7Days`, and a `migrationState` of `null`.
 
 The script creates the following resources:
 
@@ -97,7 +95,7 @@ The script creates the following resources:
 | :--- | :--- |
 | Azure Cosmos DB account | API for NoSQL, with key-based authentication disabled and continuous backup at the `Continuous7Days` tier |
 | `cosmicworks` database | Holds the container this exercise uses |
-| `product` container | Partitioned on `/categoryId`, 400 RU/s, and empty. You load it yourself, so the restore point you capture sits after a write you made |
+| `product` container | Partitioned on `/categoryId`, 400 RU/s, and initially empty |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
 Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. The SDK examples use `AzureCliCredential` to select the identity from your `az login` session. Microsoft Entra ID authentication is the recommended approach for new accounts.
@@ -118,13 +116,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
     dotnet add package Azure.Identity
     ```
 
-    `Microsoft.Azure.Cosmos` requires an explicit `Newtonsoft.Json` reference. Without it, the build fails with a message naming the missing package rather than a problem in your code.
-
-    The `Microsoft.Azure.Cosmos` package provides the client for item operations and queries. The `Azure.Identity` package provides `AzureCliCredential`, which authenticates those requests with your Azure CLI sign-in.
-
 1. Replace the contents of `Program.cs` with the following code. Replace `<cosmos-endpoint>` with the account endpoint the setup script printed.
-
-    This helper uses the SDK to load, inspect, and delete catalog data. It doesn't configure backups or restore resources; you use Azure CLI commands for those management operations later in the exercise.
 
     ```csharp
     using System.Net;
@@ -143,7 +135,6 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
     // Use the identity from az login, not an account key.
     using CosmosClient client = new(endpoint, new AzureCliCredential());
-    // GetContainer references an existing container; it doesn't create or restore it.
     Container container = client.GetContainer("cosmicworks", "product");
 
     string command = args.Length > 0 ? args[0] : "count";
@@ -152,7 +143,6 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
     {
         case "seed":
         {
-            // On Windows, HttpClient already uses native certificate validation.
             using HttpClient http = new();
             string json = await http.GetStringAsync(DataUrl);
             // Map the downloaded JSON to the record types defined below.
@@ -181,8 +171,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
-                // A not-found response is expected after the intentional item deletion.
-                // Other errors, such as authorization failures, still surface.
+                // Report the expected result after deleting the item.
                 Console.WriteLine("The item was not found.");
             }
             break;
@@ -231,7 +220,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
     | `delete` | Deletes only that product, not the container | Simulates the first accidental data loss |
     | `count` (or no argument) | Counts items across the container | Checks that the catalog contains 295 products before deletion and after restore |
 
-    Run `seed` only when loading the initial catalog. Running it after a restore would recreate missing products and could hide an incomplete recovery. The count checks the catalog size, while the point read checks the selected product's values; neither check alone validates every restored product.
+    Run `seed` only for the initial load. Rerunning it after a restore would recreate missing products and could hide an incomplete recovery.
 
 1. Load the catalog.
 
@@ -240,8 +229,6 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
     ```
 
     The command reports `Loaded 295 products.`
-
-    If the download fails with a certificate-chain error, it fails before any products are written. Ask your lab administrator to check the VM's trusted certificates and any HTTPS-inspecting proxy. Don't disable certificate verification to continue the exercise.
 
 1. Read the product you recover later, and confirm the count.
 
@@ -252,7 +239,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
     The read reports `Found Road-350-W Yellow, 48 priced at 1700.99.` and the count reports 295.
 
-1. Ask the service how far its backups reach, and record the value. This timestamp is your restore point.
+1. Retrieve the latest restorable timestamp and record it as your restore point.
 
     ```azurecli
     az cosmosdb sql retrieve-latest-backup-time `
@@ -265,7 +252,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
     The response contains a `latestRestorableTimestamp`. Convert it to the ISO 8601 UTC form the restore command expects, for example `2026-09-06T14:10:00Z`, and keep it available.
 
-    If the command reports a timestamp earlier than your seeding, wait a minute and run it again. Backups catch up asynchronously, and restoring to a point before the writes landed recovers an empty container.
+    If the timestamp is earlier than the catalog load, wait a minute and run the command again.
 
 ## Task 2: Delete the data and restore it into the same account
 
@@ -278,7 +265,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
     The read now reports `The item was not found.`
 
-1. Delete the container that held it, simulating a broader accidental operation.
+1. Delete the `product` container.
 
     ```azurecli
     az cosmosdb sql container delete `
@@ -319,7 +306,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
         --output table
     ```
 
-    Find the `product` row with **Operation** set to `Delete`. **EventTimeUTC** shows when the deletion occurred. Choose a restore timestamp before that deletion, when the container existed in the account's current write region and its data was backed up, within the retention window. The verified post-seed timestamp from Task 1 meets these conditions and predates both deletions.
+    Find the `product` row with **Operation** set to `Delete`. Confirm that its **EventTimeUTC** is later than the restore timestamp recorded in Task 1.
 
 1. Restore the container into the same account, targeting the timestamp from Task 1.
 
@@ -335,7 +322,7 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
     > &#128221; The restore could take 5 minutes or more. The container reports a status of `Creating` while it runs. Wait for the restore to finish before running the verification commands in the next step.
 
-    The container has no time-to-live policy, so `--disable-ttl True` changes nothing here. Include it as a habit: restoring a container that does have an expiry policy can delete the recovered items almost immediately.
+    The `--disable-ttl True` option prevents time-to-live settings from deleting recovered items after the restore.
 
 1. Verify that both the container and the deleted product came back.
 
@@ -346,11 +333,9 @@ This exercise creates billable resources. The `Continuous7Days` tier has no back
 
     The count reports 295 and the read reports `Found Road-350-W Yellow, 48 priced at 1700.99.` One restore recovered both losses, because the restore point predates both the item deletion and the container deletion.
 
-    The account-scoped data-plane role assignment the setup script made continues to apply after this same-account restore. If either command fails with an authorization error, check the error details, your signed-in identity, and its data-plane role assignment. Also check the account's network access settings. Each command starts a new SDK client, so it doesn't reuse session or continuation tokens from the earlier run.
-
 ## Task 3: Test the limits of same-account restore
 
-Same-account restore recovers deleted containers, not individual deleted items in a live container. Test the effect of repeating the restore by comparing container history and checking the item, rather than relying on the command's success or failure.
+Same-account restore recovers deleted containers; it doesn't overwrite an existing container. Repeat the restore to check whether it recovers an item deleted from the restored container.
 
 1. After the first restore has finished, list the container events again.
 
@@ -386,7 +371,7 @@ Same-account restore recovers deleted containers, not individual deleted items i
         --disable-ttl True
     ```
 
-    Wait for the command to finish. It can return a successful response, but that alone doesn't show that the container or its data was restored again.
+    Wait for the command to finish before continuing.
 
 1. List the container events again and compare them with the history you recorded.
 
@@ -407,11 +392,11 @@ Same-account restore recovers deleted containers, not individual deleted items i
     dotnet run read
     ```
 
-    The read should still report `The item was not found.` Together, the unchanged container creation history and the missing item show that the repeated request didn't recreate the container or recover the item you just deleted. A successful command response isn't proof of data recovery.
+    The read should still report `The item was not found.` The repeated restore hasn't recovered the item from the existing container.
 
-1. Consider what the alternative costs. To recover a live container holding wrong data, you restore into a new account with `az cosmosdb restore`, then reconcile the recovered data back into production yourself. That path creates a second billable account, takes considerably longer, and charges a restore fee based on the volume of data restored. Don't run it in this exercise.
+1. For item-level recovery, you can restore to a new account with `az cosmosdb restore` and copy the required data back. This incurs additional charges; don't run it in this exercise.
 
-1. Review the restore in the account's activity log. In the Azure portal, open the account, select **Activity log**, and filter on **InAccount Restore Deleted**. The entry names the principal that started the restore, which is the evidence an incident review asks for.
+1. In the Azure portal, open the account, select **Activity log**, and filter on **InAccount Restore Deleted**. Identify the principal that started the restore.
 
 ## Clean up resources
 
@@ -421,10 +406,8 @@ Delete the resource group only if you created it for this exercise and it contai
 az group delete --name $resourceGroup --yes --no-wait
 ```
 
-Deleting the resource group removes the account, the database, the container, and the data-plane role assignment together. If your lab provided the group, or it holds other resources, delete only the Azure Cosmos DB account instead:
+If your lab provided the group, or it holds other resources, delete only the Azure Cosmos DB account instead:
 
 ```azurecli
 az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
 ```
-
-You enabled continuous backup, captured a verified restore point, recovered a deleted container and the item inside it, and tested a repeated restore request by checking container history and item data.

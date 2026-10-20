@@ -30,13 +30,9 @@ This exercise also requires:
 - [Node.js](https://nodejs.org) 22 or later, which supplies the `npx` command the MCP server runs under.
 - Visual Studio Code with the [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) extension.
 
-GitHub Copilot supplies the model for Chat. You don't deploy a chat or embedding model for this exercise.
-
 ## Set up your Azure Cosmos DB resources
 
 This exercise uses the `core` profile, which creates the CosmicWorks catalog and supporting containers. The MCP tasks inspect and query only the `cosmicworks/product` container.
-
-To create the lab resources and load the catalog data, run setup once.
 
 1. Start **Visual Studio Code**.
 
@@ -73,7 +69,7 @@ To create the lab resources and load the catalog data, run setup once.
 
     Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab08a7f3k9`.
 
-1. Wait for **Setup complete** in the terminal. Deployment failures stop setup and appear in the log.
+1. Wait for **Setup complete** in the terminal.
 
 1. Record the **Account name** and **Account endpoint** values the script prints. The Cosmos DB endpoint looks like `https://<your-account-name>.documents.azure.com:443/`.
 
@@ -89,7 +85,7 @@ To create the lab resources and load the catalog data, run setup once.
     ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile core
     ```
 
-    Continue only after setup and verification succeed. To resume a failed setup, replace `-NamePrefix dp420lab08` with `-AccountName <your-account-name>` in the setup command. Keep the resource group and profile unchanged.
+    Continue only after verification succeeds.
 
 Setup creates these resources:
 
@@ -109,34 +105,30 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Configure and start Azure MCP Server
 
-The tasks use the existing **cosmicworks/product** catalog. You interact with its data through the Azure MCP Server tools in Chat.
-
 1. In **Explorer**, under **Allfiles/Labs/Shared**, create a folder called **ai-tools-lab**. If the folder already exists, reuse it.
 
-1. If **ai-tools-lab** isn't already the open workspace folder, select **File > Open Folder** and choose it. Changing the terminal's directory doesn't change the VS Code workspace.
+1. Select **File > Open Folder** and open **ai-tools-lab** as the workspace folder.
 
-Under the **ai-tools-lab** folder, create a folder called **.vscode**. Inside **.vscode**, create a file called **mcp.json** and add this configuration:
+1. Under **ai-tools-lab**, create a folder called **.vscode**. Inside **.vscode**, create **mcp.json** and add this configuration:
 
-```json
-{
-  "servers": {
-    "Azure MCP Server": {
-      "command": "npx",
-      "args": ["-y", "@azure/mcp@latest", "server", "start"]
+    ```json
+    {
+      "servers": {
+        "Azure MCP Server": {
+          "command": "npx",
+          "args": ["-y", "@azure/mcp@latest", "server", "start"]
+        }
+      }
     }
-  }
-}
-```
+    ```
 
 1. If the Chat pane isn't open, select **View > Chat** from the menu bar.
 
-1. Check the mode selector in the chat input area. If **Agent** is already selected, keep it selected. Otherwise, open the selector showing the current mode, such as **Ask**, and choose **Agent**.
+1. In Chat, select **Agent** from the mode selector.
 
-1. Open the model picker in the chat input area. It can display **Models**, **Auto**, or a model name. If it shows **Sign in to use Copilot**, select that option and sign in with a GitHub account that has access to Copilot. After signing in, reopen the model picker. Keep an existing model or **Auto** selection. If no model is selected, choose a model available for Agent mode.
+1. If prompted, sign in to GitHub Copilot. In the model picker, select an available model or **Auto**.
 
-1. Press **Ctrl+Shift+P**, enter **MCP: List Servers**, and select the command. Choose **Azure MCP Server**. If it isn't running, select **Start Server**. Review any server-trust prompt before continuing. If the server is missing or disabled, use the recovery steps in this task.
-
-1. If the **Azure MCP Server** isn't listed, select **Add Server** and follow the prompts to add it. If you still don't see it, select **Browse MCP Server** (Enable the Marketplace if needed) and search and install it.
+1. Press **Ctrl+Shift+P**, enter **MCP: List Servers**, and select the command. Choose **Azure MCP Server**. If it isn't running, select **Start Server**. Review any server-trust prompt before continuing.
 
 Continue only when the Azure MCP Server is running and its tools are available in Chat.
 
@@ -144,9 +136,7 @@ Continue only when the Azure MCP Server is running and its tools are available i
 
 Keep the same Chat conversation for these requests. Replace **<your-account-name>** with the account name recorded during setup. If the assistant asks for a subscription or resource group, provide the values you used for this exercise.
 
-Start by checking the catalog count through MCP:
-
-In the chat input area, enter the following request, allow access if needed:
+In Chat, enter the following request:
 
 ```text
 Use the Azure MCP Server to count all items in the product container
@@ -155,7 +145,7 @@ Return the total count, not a sample of documents. Use this account
 and database for my remaining requests.
 ```
 
-Review the tool call and approve it if prompted. Confirm that it targets your lab account and returns a count of **295**. If the count differs, check the target account, database, and container against your setup values before continuing. Don't change the data to match the expected count.
+Review the tool call and approve it if prompted. Confirm that it targets your lab account and returns a count of **295**.
 
 Next, ask the assistant to inspect the document structure:
 
@@ -163,8 +153,6 @@ Next, ask the assistant to inspect the document structure:
 Infer the schema of the product container in the cosmicworks database
 for my Azure Cosmos DB account.
 ```
-
-Note that this might ask for confirmation or additional information depending on the assistant's configuration and the state of your Azure Cosmos DB account.
 
 The schema tool samples documents and reports top-level properties, inferred types, and property occurrence counts. Compare the result with the catalog fields: `id`, `categoryId`, `categoryName`, `sku`, `name`, `description`, `price`, and `tags`. The sample is not a guarantee that every document has the same structure.
 
@@ -183,15 +171,13 @@ Query the product container for items where categoryId is
 3E4CEACD-D007-46EB-82D7-31F6141752B2, and return only name and price.
 ```
 
-Review and approve each tool call when prompted. For the filtered request, check that the query uses the specified category ID and projects `name` and `price`. Inspect the returned values, not only the assistant's statement that it ran a query.
-
-> &#128221; The server also carries text search and vector similarity search. Neither is exercised here, because text search needs a full-text index on the target property and vector search needs both a vector index and an embedding deployment. The `product` container has neither. That constraint belongs to the tools, not to your prompt: they operate on the indexing policy you configured.
+Review and approve each tool call when prompted. Confirm that the query filters on the specified category ID and returns only `name` and `price`.
 
 ## Task 3: Verify the results and the tool's scope
 
-An assistant's explanation is not a substitute for checking the tool output. Verify one catalog item and identify what the tool does and doesn't establish.
+Verify a returned item and review the schema tool's limitations.
 
-1. Expand a tool call from Task 2. Confirm that it comes from **Azure MCP Server** and targets your account, **cosmicworks**, and **product**. A Query Editor extension or another database tool is not the Azure MCP Server used in this exercise. If a different tool ran, return to Task 1 and confirm the server is available before repeating the request.
+1. Expand a tool call from Task 2. Confirm that it comes from **Azure MCP Server** and targets your account, **cosmicworks**, and **product**.
 
 1. Use the `id` and `categoryId` you recorded from the recent-items result. Replace both placeholders in this request:
 
@@ -205,9 +191,9 @@ An assistant's explanation is not a substitute for checking the tool output. Ver
 
 1. Explain the limits of the schema result. Which properties appear in the sample? Does a top-level `array` or `object` type describe all nested fields? The schema tool doesn't inspect nested structures recursively. To inspect any nested values it contains, use the retrieved document.
 
-The catalog tools used here are read-only. Other tools enabled in Copilot can have different permissions, so inspect the tool source and requested action before approval. The setup script grants **Cosmos DB Built-in Data Contributor** to load the data; that role allows writes even though these MCP calls only read.
+These catalog tools only read data. The setup script assigns **Cosmos DB Built-in Data Contributor**, which also permits writes. Review each tool's source and requested action before approving it.
 
-Identify one decision the MCP tools don't make for you, such as choosing the partition key, setting throughput, or granting access. Describe what evidence you need before making that decision. The tools help inspect data, but your team remains responsible for database design and access control.
+Identify one decision the MCP tools don't make for you, such as choosing the partition key, setting throughput, or granting access. Describe what evidence you need before making that decision.
 
 ## Clean up resources
 

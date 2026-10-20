@@ -14,7 +14,7 @@ lab:
 
 # Connect an app to Azure Cosmos DB in Python
 
-In this exercise, you set up an Azure Cosmos DB SDK project, connect to the local emulator, validate the connection, add a logging handler to observe SDK traffic, and then point the same app at a cloud account by changing nothing but the connection.
+In this exercise, you connect an SDK application to the local Azure Cosmos DB emulator, add logging and error handling, and then connect the same application to a cloud account with Microsoft Entra authentication.
 
 ## Before you start
 
@@ -24,7 +24,7 @@ If your lab environment isn't set up yet, follow [Set up your lab environment](h
 
 You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed.
 
-You also need the **Azure Cosmos DB emulator** installed locally. Follow [Use the Azure Cosmos DB emulator for local development](/azure/cosmos-db/how-to-develop-emulator) to install either the Windows emulator or the legacy Linux container image on an x64 host. These steps use their default endpoint and Data Explorer. The vNext image described in the emulator unit uses a different Data Explorer endpoint. Task 2 starts the emulator.
+Install the **Azure Cosmos DB emulator** using the [local development guide](/azure/cosmos-db/how-to-develop-emulator). Use the Windows emulator or legacy Linux container image on an x64 host for this exercise.
 
 ## Set up your Azure Cosmos DB resources
 
@@ -88,7 +88,7 @@ The `core` profile prepares a shared account for this exercise and later exercis
 
 The four autoscale containers each have their own 1,000 RU/s maximum. The `leases` container has separate manual throughput. Provisioned throughput incurs charges even when the containers are empty.
 
-Because key-based authentication is disabled, this exercise doesn't use a cloud account key or connection string. The public emulator key is used only for local development. Every operation against the cloud account uses `AzureCliCredential` to authenticate with the identity from your `az login` session.
+Use the public emulator key only for local development. The cloud account disables key-based authentication and uses your Azure CLI identity through `AzureCliCredential`.
 
 > &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
@@ -118,15 +118,13 @@ Because key-based authentication is disabled, this exercise doesn't use a cloud 
     from azure.identity import AzureCliCredential
     ```
 
-> &#10071; You build up a single file across Tasks 2 through 6. The block that creates the client is marked with `==== CLIENT ====` comments. Type those markers along with the code. Task 6 replaces that block, changes the endpoint, and removes the emulator key. The account read, container access, logging handler, and error handling remain unchanged.
+> &#10071; Build a single file across Tasks 2 through 6. Keep the client markers shown in the code; later tasks use them to identify which block to replace.
 
 ---
 
 ## Task 2: Start the emulator and read account properties
 
-The emulator runs a local Azure Cosmos DB endpoint that costs nothing and needs no connection to Azure. With the default Windows or legacy Linux configuration used here, it listens on `https://localhost:8081/` and accepts the documented well-known key. The code in this task hardcodes those defaults. Custom startup settings can change the endpoint or key.
-
-A key is the only credential the emulator accepts. Microsoft Entra ID isn't an option against a local endpoint. This exercise should be the only exercise in this course that uses a key and only uses that key in the local emulator. The Azure Cosmos DB Account the setup script created has key authentication disabled outright, and Task 6 switches to `AzureCliCredential` when it connects there.
+The emulator provides a local endpoint at `https://localhost:8081/` and uses a documented public key. It doesn't require an Azure connection.
 
 1. Start the emulator.
 
@@ -136,7 +134,7 @@ A key is the only credential the emulator accepts. Microsoft Entra ID isn't an o
     & "$env:ProgramFiles\Azure Cosmos DB Emulator\Microsoft.Azure.Cosmos.Emulator.exe"
     ```
 
-    If Windows displays a **User Account Control** prompt, confirm that it is for the emulator and that the verified publisher is **Microsoft Corporation**, then select **Yes**. If Windows requests administrator credentials, ask your lab administrator to approve the startup. Don't disable User Account Control.
+    If Windows displays a **User Account Control** prompt, verify that the publisher is **Microsoft Corporation** before approving. Ask your lab administrator if credentials are required; don't disable User Account Control.
 
     If you installed the container image instead, start it with:
 
@@ -144,13 +142,11 @@ A key is the only credential the emulator accepts. Microsoft Entra ID isn't an o
     docker run --publish 8081:8081 --publish 10250-10255:10250-10255 --name cosmos-emulator --detach mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
     ```
 
-1. Give the emulator a minute or two to finish starting. It provisions its partitions on first run, and requests fail until that task finishes.
+1. Wait a minute or two for the emulator to finish starting.
 
-1. Confirm it's running by opening the **Data Explorer** at `https://localhost:8081/_explorer/index.html`. The Windows emulator opens the web page for you once it's ready. The explorer section is empty for now, and Task 3 uses it to create the database and container.
+1. Confirm that the emulator is running by opening **Data Explorer** at `https://localhost:8081/_explorer/index.html`.
 
-    Leave the emulator running. Tasks 2 through 5 all work against it, and Task 6 switches to the cloud account.
-
-To verify the connection, now point the SDK at that endpoint and read the account properties.
+    Keep the emulator running for Tasks 2 through 5.
 
 1. In **app.py**, below the imports, add the emulator connection constants and client initialization:
 
@@ -163,8 +159,6 @@ To verify the connection, now point the SDK at that endpoint and read the accoun
     client = CosmosClient(url=endpoint, credential=key, connection_verify=False)
     # ==== END CLIENT ====
     ```
-
-    The two constants sit outside the markers because they don't change until Task 6.
 
     > &#9888; `connection_verify=False` disables SSL certificate validation. ***Use this setting only for the local emulator; never use it in production code***. Alternatively, import the emulator certificate and remove this parameter.
 
@@ -184,7 +178,7 @@ To verify the connection, now point the SDK at that endpoint and read the accoun
     main()
     ```
 
-    Everything Tasks 3 and 5 add goes below that marker and stays indented four spaces, so it runs inside `main`. The `main()` call stays the last line of the file.
+    Add the code for Tasks 3 and 5 inside `main`, below its marker. Keep the four-space indentation and leave the `main()` call as the last line of the file.
 
 1. Run the script:
 
@@ -199,10 +193,6 @@ To verify the connection, now point the SDK at that endpoint and read the accoun
 ## Task 3: Create the database and container, then reference them in code
 
 The emulator starts empty, so create the `cosmicworks` database and `product` container in its **Data Explorer**. The setup script already created the same pair in your cloud account.
-
-Provisioning stays out of this application on purpose. Creating a database or container requires *control plane* access. Per [Diagnose and troubleshoot forbidden exceptions](/azure/cosmos-db/troubleshoot-forbidden#nondata-operations-arent-allowed), a Microsoft Entra identity with a data-plane role can't create those resources through the data SDK's `create*` or `createIfNotExists` methods. An application can provision them through a management SDK with suitable control-plane permissions. This exercise uses the setup script for cloud provisioning and Data Explorer for local provisioning.
-
-Because the app only ever *references* resources, the code you write here's the code that runs against the cloud account in Task 6, unchanged.
 
 1. Open the emulator's **Data Explorer** at `https://localhost:8081/_explorer/index.html`.
 
@@ -228,7 +218,7 @@ Because the app only ever *references* resources, the code you write here's the 
         print(f"Container:        {properties['id']}")
     ```
 
-    `get_database_client` and `get_container_client` build client-side references without calling the service. `container.read()` is the call that actually reaches the emulator, so it confirms the container you created is there.
+    The container read confirms that the resource exists and that the application can access it.
 
 1. Run the script again and confirm both names appear in the output.
 
@@ -236,13 +226,12 @@ Because the app only ever *references* resources, the code you write here's the 
 
 ## Task 4: Add a logging handler
 
-Add logging so you can see request methods, URIs, status codes, and request-unit charges. The .NET custom handler records requests that pass through its pipeline, not every internal network attempt.
+Configure SDK logging to inspect request methods, URIs, status codes, and headers.
 
 1. Between the `# ==== END CLIENT ====` marker and the `def main():` line, configure the `azure.cosmos` logger to `DEBUG`. This code is at the top level of the file, not indented inside `main`:
 
     ```python
-    # Send SDK diagnostics to the console for this development exercise.
-    # DEBUG logging is deliberately more verbose than normal production logging.
+    # Send SDK diagnostics to the console.
     logging.basicConfig(
         stream=sys.stdout,
         level=logging.DEBUG,
@@ -257,9 +246,9 @@ Add logging so you can see request methods, URIs, status codes, and request-unit
 
 ---
 
-## Task 5: Handle a simulated connection error
+## Task 5: Handle a missing-item error
 
-Attempt to read an item that doesn't exist, then inspect the resulting exception. This exception confirms the difference between transient errors, which are worth retrying, and permanent errors, which need a code fix.
+Read a nonexistent item and inspect the SDK exception and status code.
 
 1. Below the two `print` lines that show the database and container names, still indented four spaces so it stays inside `main`, add a `try/except` block that attempts to read a nonexistent item:
 
@@ -271,7 +260,7 @@ Attempt to read an item that doesn't exist, then inspect the resulting exception
                 partition_key="nonexistent-category"
             )
         except exceptions.CosmosResourceNotFoundError as ex:
-            # Report the failure; this block doesn't implement a retry loop.
+            # Inspect the exception's status code.
             print(f"\nCaught CosmosResourceNotFoundError:")
             print(f"  Status code:    {ex.status_code}")
             print(f"  Is retryable:   {ex.status_code in (429, 503)}")
@@ -281,16 +270,13 @@ Attempt to read an item that doesn't exist, then inspect the resulting exception
             print(f"  Is retryable:   {ex.status_code in (429, 503)}")
     ```
 
-1. Run the script. The output shows a **404 Not Found** error. `Is retryable` prints `False`: a missing resource requires a code fix, not a retry.
+1. Run the script. Confirm that the output shows **404 Not Found** and that `Is retryable` is `False`.
 
 ---
 
 ## Task 6: Point the app at the cloud account
 
-Everything so far ran against the emulator. Now aim the same app at the Azure Cosmos DB account the setup script created.
-
-The connection is the only thing that changes. The account read, the database and container references, the logging handler, and the error handling are all untouched, because none of them care which endpoint they're talking to. This task illustrates the point: an app written against the SDK is portable between a developer's machine and a real account, and swapping targets is a configuration concern rather than a rewrite.
-One detail differs, and it isn't the endpoint. The emulator accepts a key; the cloud account has key authentication disabled, so the client uses `AzureCliCredential` to select your `az login` identity explicitly. Different credential type, same client, same everything after it.
+Connect the application to the cloud account using `AzureCliCredential` and your Azure CLI sign-in. Keep the existing account read, container access, logging, and error handling.
 
 1. Point `endpoint` at the account the setup script printed, and delete the `key` line. Key-based authentication is disabled for this account:
 
@@ -307,15 +293,13 @@ One detail differs, and it isn't the endpoint. The emulator accepts a key; the c
     # ==== END CLIENT ====
     ```
 
-    `connection_verify=False` is gone. It existed only because the emulator uses a self-signed certificate.
-
-1. Run the script. Nothing below the client changed:
+1. Run the script:
 
     ```bash
     python app.py
     ```
 
-1. The endpoint in the output is now your cloud account, and `container.read()` returns the `product` container the setup script created. The 404 from Task 5 still appears, because that item doesn't exist in this account either.
+1. Confirm that the output identifies your cloud account and the `product` container. The intentional 404 from Task 5 should still appear.
 
 ---
 
@@ -332,16 +316,3 @@ If your lab environment provided the resource group, delete only the Azure Cosmo
 ```azurecli
 az cosmosdb delete --name <your-account-name> --resource-group $resourceGroup --yes
 ```
-
----
-
-## Summary
-
-In this exercise you:
-
-- Set up an SDK project and installed `Microsoft.Azure.Cosmos` (.NET) or `azure-cosmos` (Python).
-- Connected to the Azure Cosmos DB emulator using the well-known endpoint and key.
-- You created the `cosmicworks` database and `product` container in the emulator's Data Explorer, and referenced them from code.
-- Added a logging handler to observe SDK HTTP traffic and request-unit charges.
-- Caught a `CosmosException` / `CosmosResourceNotFoundError` and distinguished a permanent 404 from transient retryable errors.
-- Pointed the same app at a cloud account by changing the endpoint and client construction and removing the emulator key. The data operations stayed unchanged, while provisioning remained separate from the data-plane application.

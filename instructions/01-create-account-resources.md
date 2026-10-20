@@ -14,11 +14,11 @@ lab:
 
 # Create an Azure Cosmos DB for NoSQL account
 
-In this exercise, you provision your first Azure Cosmos DB for NoSQL account and use the Data Explorer to create a database, a container, and a few items. You then run a query to confirm the resources work as expected. These operations are the same as those operations you learned about in the previous unit, now performed hands-on. Most of this exercise takes place in the Azure portal, with a few commands run in Azure Cloud Shell to grant yourself access to the data.
+In this exercise, you create an Azure Cosmos DB for NoSQL account, add a database, container, and items in Data Explorer, and query the data. You also use Azure Cloud Shell to grant data access.
 
 This exercise should take approximately **25** minutes to complete.
 
-> &#128221; You need your own Azure subscription to complete this exercise, because creating an Azure Cosmos DB account isn't supported in the free sandbox. If you don't have a subscription, you can create a [free account](https://azure.microsoft.com/free/) before you begin. Provisioned throughput incurs charges while the account exists, so follow the clean-up steps at the end to avoid unnecessary costs.
+> &#128221; You need an Azure subscription with permission to create resources and assign Cosmos DB data roles. If you don't have a subscription, create a [free account](https://azure.microsoft.com/free/) before you begin. Provisioned throughput can incur charges, so complete the cleanup steps when you finish.
 
 ## Register the Azure Cosmos DB resource provider
 
@@ -28,7 +28,7 @@ Before you can create a resource type, the resource provider that owns it must b
 
 1. In the search bar at the top of the portal, enter *Subscriptions*, and then select **Subscriptions** in the results.
 
-1. Select the subscription you want to use for this exercise. If you have more than one, check this setting carefully, because you register the provider for one subscription at a time.
+1. Select the subscription you want to use for this exercise.
 
 1. In the resource menu, under **Settings**, select **Resource providers**.
 
@@ -40,15 +40,15 @@ Before you can create a resource type, the resource provider that owns it must b
 
 > &#128221; If the status already shows **Registered**, you don't need to register this provider again. Registering this provider requires the `Microsoft.DocumentDB/register/action` permission at the subscription scope. The Owner and Contributor roles include this permission.
 
-You might also need to register **Microsoft.CloudShell** in the same subscription by repeating these steps. Azure Cloud Shell requires this provider.
+If **Microsoft.CloudShell** isn't registered, register it in the same subscription before opening Cloud Shell.
 
 ## Create an Azure Cosmos DB for NoSQL account
 
-First, create the account that hosts your data. You can't change the API later, so select the NoSQL API now.
+Choose Azure Cosmos DB for NoSQL. The account's API can't be changed after creation.
 
 1. In the Azure portal, select **Create a resource**, search for *Azure Cosmos DB*, and select **Create** in the results.
 
-1. When prompted, from the **Recommended APIs** tab, to select an API option, select **Create** in the **Azure Cosmos DB for NoSQL** section.
+1. On **Recommended APIs**, select **Create** under **Azure Cosmos DB for NoSQL**.
 
 1. On the **Basics** tab, enter the following settings, and leave the remaining settings at their default values:
 
@@ -71,13 +71,11 @@ First, create the account that hosts your data. You can't change the API later, 
 
 1. When deployment completes, select **Go to resource** to open your new account.
 
-You now have an Azure Cosmos DB for NoSQL account ready to hold data.
-
 ## Grant yourself access to the data
 
-The account uses Microsoft Entra ID rather than account keys, so your Azure role doesn't grant access to the data inside it. Azure Cosmos DB controls data access with its own set of roles, and you assign one to yourself before the Data Explorer can read or write items.
+Azure management roles don't grant access to items. Assign yourself **Cosmos DB Built-in Data Contributor** to read and write data in Data Explorer.
 
-> &#128221; Data plane role assignments can't be made in the Azure portal, so you use the Azure CLI for this step. Creating an assignment requires permissions to read SQL role definitions and to read and write SQL role assignments. The Owner and Contributor roles include these permissions.
+> &#128221; Use Azure CLI to create the role assignment. Your Azure role must allow reading SQL role definitions and managing SQL role assignments. The Owner and Contributor roles include these permissions.
 
 1. In the Azure portal toolbar, select the **Cloud Shell** icon (`>_`) to open Azure Cloud Shell, and choose the **Bash** experience if you're prompted.
 
@@ -104,11 +102,11 @@ The account uses Microsoft Entra ID rather than account keys, so your Azure role
 
 1. Wait for the command to finish, then close the Cloud Shell pane.
 
-You can now work with data in this account. If the Data Explorer reports that your principal lacks permissions, wait a minute for the assignment to take effect and refresh the page.
+Allow a few minutes for the role assignment to take effect, then refresh Data Explorer.
 
 ## Create a database and container
 
-Next, use the Data Explorer to add a database and a container. Recall that the partition key path is the most important choice you make when you create a container.
+Use `/categoryId` as the partition key so products with the same category ID share a logical partition.
 
 1. In your account's resource menu, select **Data Explorer**.
 
@@ -126,11 +124,9 @@ Next, use the Data Explorer to add a database and a container. Recall that the p
 
 1. In the **Data Explorer** pane, expand the **`cosmicworks`** database node, and confirm that the **product** container appears beneath it.
 
-You created a database and a container partitioned by `/categoryId`.
-
 ## Create items
 
-Now add a couple of JSON items to the container. Each item is a document, and items in the same container can differ in shape.
+Add two JSON items to the container. Each item is a document, and items in the same container can differ in shape.
 
 1. In the **Data Explorer** pane, expand the **`cosmicworks`** database, expand the **product** container, and then select **Items**.
 
@@ -162,11 +158,9 @@ Now add a couple of JSON items to the container. Each item is a document, and it
 
 1. Select each item in the tree to view its full JSON, including the properties the service added.
 
-You created two items and confirmed the service stored them.
-
 ## Query your data
 
-Finally, run a query to read data back and see how much throughput a query consumes.
+Run a query and inspect its request charge.
 
 1. In the **Data Explorer** pane, with the **product** container selected, select **New SQL Query**.
 
@@ -178,11 +172,9 @@ Finally, run a query to read data back and see how much throughput a query consu
 
 1. Review the results. The query returns one item, **ML Road Pedal**, because it's the only product priced above 50.
 
-1. Select **Query Stats**, and note the **Request Charge** value. It shows how many request units the query consumed, typically a small number for a container this size.
+1. Select **Query Stats** and record **Request Charge**, the number of request units (RUs) used by the query.
 
 1. Change the filter to `p.price > 25` and run the query again. Both items match this time, because both prices are above 25.
-
-You queried your container and observed the request charge for the operation.
 
 ## Clean up your resources
 
@@ -195,5 +187,3 @@ If you created a new resource group for this exercise and it contains only exerc
 1. Enter the resource group name to confirm, and then select **Delete**.
 
 If you used an existing resource group or the group contains resources you need to keep, delete only the Azure Cosmos DB account you created for this exercise. Open the account in the Azure portal, select **Delete**, and confirm the deletion. Don't delete the resource group.
-
-You successfully created an Azure Cosmos DB for NoSQL account, added a database, container, and items, and queried your data, all from the portal.
