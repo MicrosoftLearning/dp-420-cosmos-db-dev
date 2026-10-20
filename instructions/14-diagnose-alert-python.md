@@ -2,7 +2,7 @@
 lab:
   title: Diagnose throttling and configure an alert in Python
   module: Module 14 - Monitor and Troubleshoot Azure Cosmos DB
-  description: Generate real throttling, investigate client diagnostics and live metrics, configure a metric alert, and practice KQL with synthetic incident records without waiting for log ingestion.
+  description: Generate throttling, investigate client diagnostics and Azure Monitor metrics, configure a metric alert, and analyze synthetic diagnostic records with KQL.
   duration: 45 minutes
   level: 300
   islab: true
@@ -14,13 +14,9 @@ lab:
 
 # Diagnose throttling and configure an alert in Python
 
-In this exercise, you generate real rate limiting on an Azure Cosmos DB account, investigate client diagnostics and Azure Monitor metrics, and configure an alert for future incidents. You also use Kusto Query Language (KQL) to investigate a supplied synthetic incident, including a request identified by its activity ID.
-
-The client output, metrics, and alert use your own account. The required KQL investigation uses clearly labeled sample records defined in the query itself, not telemetry from your account. You configure diagnostic logging, but **don't wait for live logs or an alert email** to complete the exercise.
+In this exercise, you generate rate limiting on an Azure Cosmos DB account, investigate client diagnostics and Azure Monitor metrics, and configure an alert. You then use Kusto Query Language (KQL) to analyze synthetic diagnostic records and find a request by its activity ID.
 
 This exercise takes approximately **45** minutes to complete.
-
-Plan for 10 minutes of setup, 8 minutes to configure monitoring, 6 minutes to create and run the workload project, 7 minutes for metrics, 8 minutes for KQL, and 3 minutes for cleanup, leaving 3 minutes of buffer. Copy the code blocks rather than typing the workload from scratch. Azure provisioning times can vary.
 
 ## Before you start
 
@@ -98,9 +94,9 @@ Provisioned throughput values are in request units per second (RU/s). The script
 | `product` container | Partitioned on `/categoryId`, **400 RU/s manual throughput**, loaded with 295 CosmicWorks products |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
-The container uses manual throughput rather than autoscale on purpose. A fixed 400-RU/s ceiling makes rate limiting easier to reproduce within the lab time budget. Autoscale can absorb more load up to its configured maximum, but requests that exceed that maximum are still rate limited.
+The fixed 400-RU/s limit makes it easier to observe throttling under load.
 
-Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. The examples authenticate with Microsoft Entra ID through `DefaultAzureCredential`. This credential can use your `az login` session, but it checks other credential sources first. Make sure the identity it selects has the data-plane role assignment.
+The application authenticates with Microsoft Entra ID through `DefaultAzureCredential`. This credential can use your `az login` session, but it checks other credential sources first. Make sure the identity it selects has the data-plane role assignment.
 
 > &#9888; Use only the account this script creates for this exercise. Later steps attach a diagnostic setting and an alert rule. Never point this exercise at a shared training or production account.
 
@@ -108,7 +104,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Configure diagnostic logging and a metric alert
 
-Platform metrics are collected automatically; diagnostic logs are opt-in. Configure both the log destination and a real metric alert before generating load. The alert uses platform metrics, so it doesn't depend on Log Analytics ingestion.
+Platform metrics are collected automatically; diagnostic logs are opt-in. Configure a log destination and an alert on rate-limited requests before generating load. The alert uses platform metrics, not diagnostic logs.
 
 1. From the **Allfiles/Labs/Shared** terminal, create a Log Analytics workspace and capture its resource ID.
 
@@ -139,7 +135,7 @@ Platform metrics are collected automatically; diagnostic logs are opt-in. Config
         --logs "@$logCategories"
     ```
 
-    The `@<file>` argument avoids PowerShell's inline JSON quoting issues. Resource-specific mode sends the categories to `CDBDataPlaneRequests` and `CDBPartitionKeyRUConsumption`, rather than the legacy `AzureDiagnostics` table. Request logs can incur ingestion and retention charges.
+    The `@<file>` argument reads the log categories from the JSON file. Resource-specific mode stores the logs in `CDBDataPlaneRequests` and `CDBPartitionKeyRUConsumption`. Request logs can incur ingestion and retention charges.
 
 1. Confirm the setting exists and lists both categories.
 
@@ -155,9 +151,7 @@ Platform metrics are collected automatically; diagnostic logs are opt-in. Config
     PartitionKeyRUConsumption
     ```
 
-    This confirms configuration, not that delivery has started. Initial log delivery can exceed the lab time budget. The required investigation in Task 4 doesn't depend on it.
-
-1. Create an action group and capture its resource ID. Replace the email address with your own. You might receive an action-group notification or verification message; don't wait for it to continue.
+1. Create an action group and capture its resource ID. Replace the email address with your own. You might receive an action-group confirmation email.
 
     ```powershell
     $actionGroupId = az monitor action-group create `
@@ -168,7 +162,7 @@ Platform metrics are collected automatically; diagnostic logs are opt-in. Config
         --query id --output tsv
     ```
 
-1. Create a metric alert scoped to the account. It counts **Total Requests** filtered to a `StatusCode` of `429`, not all requests or the number of request units.
+1. Create a metric alert scoped to the account. It counts **Total Requests** filtered to a `StatusCode` of `429`.
 
     ```azurecli
     az monitor metrics alert create `
@@ -193,11 +187,11 @@ Platform metrics are collected automatically; diagnostic logs are opt-in. Config
 
     Confirm `enabled` is `true`, the scope is your account ID, the metric is `TotalRequests` with `Count` aggregation, the threshold is `100`, the dimension selects `429`, and the action references your action group. Explain why removing the status-code dimension would change the alert's meaning.
 
-    The rule can take about 10 minutes to become active. Continue with the workload while it activates. Creating and verifying the rule is required; an alert firing or an email arriving isn't. A threshold of 100 is for this deliberate lab load, not a production recommendation.
+    The rule can take about 10 minutes to become active. Continue to Task 2 without waiting for an alert notification. For a production workload, choose a threshold based on expected traffic and acceptable latency.
 
 ## Task 2: Drive the container into rate limiting
 
-Now you generate the incident. The application reads every product in the container and upserts each one back, repeatedly, for one minute. At 400 RU/s, that workload asks for far more throughput than the container has.
+The application reads the products once, then repeatedly upserts them for one minute. Concurrent writes exceed the container's 400-RU/s limit and produce rate-limited responses.
 
 The Python client allows one retry before a remaining 429 reaches your code. This setting makes throttling easier to observe in the exercise; it isn't the default production retry setting.
 
@@ -334,9 +328,9 @@ The Python client allows one retry before a remaining 429 reaches your code. Thi
     Activity ID of a rate-limited request: 4f2c8b1e-6a3d-4c05-9f7b-1d2e3a4b5c6d
     ```
 
-1. Record your UTC workload window, rate-limited count, sample client elapsed times, and activity ID. These are from your account, unlike the synthetic records in Task 4.
+1. Record your UTC workload window, rate-limited count, sample client elapsed times, and activity ID.
 
-    The output above is illustrative. Your counts and timings depend on region, item size, and client concurrency. The run takes about a minute plus catalog reads and in-flight requests. If no 429 reaches your code, verify that you targeted the disposable 400-RU/s account and inspect the service metrics; don't invent a count or repeatedly rerun the workload to wait for logs.
+    Your counts and timings will differ from the example. If no 429 reaches your code, confirm that you used the 400-RU/s lab account and check the service metrics in Task 3.
 
 1. Return to the shared folder for subsequent CLI commands.
 
@@ -346,7 +340,7 @@ The Python client allows one retry before a remaining 429 reaches your code. Thi
 
 ## Task 3: Investigate throttling, latency, and partition utilization
 
-The client saw its own failures. Now confirm the same event from the service's side, where the count includes every rate-limited response rather than only the ones that reached your code.
+Use Azure Monitor metrics to compare the client's results with the requests recorded by the service.
 
 1. In a browser, open the [Azure portal](https://portal.azure.com) and go to the Azure Cosmos DB account this exercise created.
 
@@ -354,7 +348,7 @@ The client saw its own failures. Now confirm the same event from the service's s
 
 1. Select the **Requests** tab and find the **Total Requests by Status Code** chart. Set the time range to the last hour and filter to the `cosmicworks` database and `product` container.
 
-    Locate your recorded workload window and look for 429 responses alongside successful requests. Platform metrics can take a few minutes to appear. If the newest points aren't present, do Task 4 and check once more before cleanup; don't wait for diagnostic logs.
+    Locate your recorded workload window and look for 429 responses alongside successful requests. Platform metrics can take a few minutes to appear. If the newest points aren't present, do Task 4 and check again before cleanup.
 
 1. Select the **Throughput** tab and find the **Normalized RU Consumption (%) By PartitionKeyRangeID** chart.
 
@@ -368,19 +362,23 @@ The client saw its own failures. Now confirm the same event from the service's s
 
     The split chart separates the status codes present in the selected window. Successful upserts of the existing products return 200; an upsert returns 201 only when it creates an item. Compare the 429 count here with the count your application reported.
 
-    The service's count includes attempts retried inside the SDK, while the application counts only operations that still fail after the permitted retry. Increasing `retry_throttle_total` can reduce application-visible failures, but it also changes this timed workload's pacing and request volume. The service's 429 count isn't guaranteed to remain the same between runs.
+    The service counts every rate-limited attempt, including those the SDK retries. Your application counts only operations that still fail after the permitted retry, so its count can be lower. Compare counts from the same workload window.
 
 1. Select **New chart** and use the same scope and metric namespace. Choose **Server Side Latency Gateway** with **Avg** aggregation. Python uses gateway connectivity. Filter to the `cosmicworks` database and `product` container and, for an upsert comparison, the `Upsert` operation type.
 
-    Compare the chart during your workload window with the sample client elapsed times. The chart measures server processing; the client timing also includes network transit and any SDK retry waits. A single client sample and an aggregated metric aren't identical measurements, so don't subtract them to calculate exact network latency or treat a difference as proof of a service fault.
+    Compare the chart during your workload window with the sample client elapsed times. The chart measures server processing; client timing also includes network transit and SDK retry waits. Because the chart aggregates many requests and the application reports individual samples, the difference isn't an exact measure of network latency.
 
 1. Record a short finding: which status code indicates throttling, what the utilization chart supports, and why client elapsed time can exceed server-side latency. Choose an alert threshold for a real application against expected traffic and acceptable latency rather than copying this lab's threshold.
 
 ## Task 4: Investigate a synthetic incident with KQL
 
-This required task uses synthetic teaching data, not logs captured from your workload. The `datatable` operator defines rows inside the query, so you can run the investigation immediately even if your account's diagnostic tables don't exist yet.
+Use KQL to investigate synthetic diagnostic records. The `datatable` operator defines the sample data within the query; it doesn't read your account's logs.
 
-1. In the Azure portal, open the **dp420lab14-logs** Log Analytics workspace you created, then select **Logs**. Close the queries dialog if it opens.
+1. In the search bar at the top of the Azure portal, enter **Log Analytics workspaces**. Under **Services**, select **Log Analytics workspaces**.
+
+1. On the workspace list, select **dp420lab14-logs** in the resource group you used in Task 1. You are opening the workspace resource, not the Azure Cosmos DB account.
+
+1. In the workspace's resource menu, select **Logs**. Close the queries dialog if it opens.
 
     > **Note**: You might need to turn off **Agent mode** and select **KQL mode** in the upper-right corner of the Logs pane to display the query editor.
 
@@ -432,7 +430,7 @@ This required task uses synthetic teaching data, not logs captured from your wor
     | order by RateLimitedPercent desc
     ```
 
-    `SampleRequests` models selected fields from `CDBDataPlaneRequests`; `SamplePartitionRU` models per-key, per-second charges from `CDBPartitionKeyRUConsumption`. They are query-local tables, not workspace tables, and nothing is ingested. Their timestamps are generated relative to query execution to keep the sample in a recent time range.
+    `SampleRequests` models selected fields from `CDBDataPlaneRequests`; `SamplePartitionRU` models per-key, per-second charges from `CDBPartitionKeyRUConsumption`. Both tables exist only within this query.
 
     The first result should be:
 
@@ -441,7 +439,7 @@ This required task uses synthetic teaching data, not logs captured from your wor
     | Upsert | 10 | 4 | 42 | 40 |
     | Read | 4 | 0 | 4 | 0 |
 
-    Explain why the status-code filter matters: only upserts are rate limited in this sample. These small records are an illustrative subset, not enough evidence to measure the account's full workload or diagnose every cause of 429.
+    Only upserts are rate limited in this sample. Identify the condition in the query that distinguishes throttled requests from successful requests.
 
 1. Keep all declarations above the `// Investigation query` comment. Replace only the final `SampleRequests` pipeline with the following query, then select all the text and run it:
 
@@ -451,7 +449,7 @@ This required task uses synthetic teaching data, not logs captured from your wor
     | order by TotalRU desc
     ```
 
-    Expect `bikes` at **36 RU**, `components` at **8 RU**, and `accessories` at **2 RU**. The charges total 46 RU, matching the first query. `bikes` dominates this subset; that suggests a question about skew, not proof of a hot physical partition. Use the physical-partition utilization pattern and a representative workload window before choosing between more throughput and a partition-key change.
+    Expect `bikes` at **36 RU**, `components` at **8 RU**, and `accessories` at **2 RU**. The charges total 46 RU, matching the first query. The `bikes` key consumes most of the sample's request units. Before concluding that a key is causing throttling, check physical-partition utilization over a representative workload window.
 
 1. A **synthetic client error** for this incident reports status `429` and activity ID `11111111-1111-4111-8111-111111111105`. Keeping the declarations, replace the final pipeline with:
 
@@ -461,26 +459,13 @@ This required task uses synthetic teaching data, not logs captured from your wor
     | project TimeGenerated, OperationName, StatusCode, RequestCharge, DurationMs
     ```
 
-    Expect one `Upsert` row with status `429`, charge **0 RU**, and duration **0.3 ms**. You correlated a supplied client error with its supplied request record. Don't substitute your own activity ID here: your workload didn't create these sample rows.
-
-### Optional: Inspect your account's live logs
-
-Only if time remains, run this separate query in the workspace. These are real diagnostic records, unlike the required sample investigation:
-
-```kusto
-CDBDataPlaneRequests
-| where TimeGenerated >= ago(2h)
-| where DatabaseName == "cosmicworks" and CollectionName == "product"
-| summarize Requests = count() by AccountName, StatusCode
-```
-
-If no records are returned or the table doesn't exist yet, skip this extension. Don't wait or rerun the workload. If records are present, insert an `ActivityId` filter using your own recorded ID before `summarize` to try request correlation. Missing live logs or an unmatched ID doesn't prevent completion.
+    Expect one `Upsert` row with status `429`, charge **0 RU**, and duration **0.3 ms**. The activity ID links the sample client error to its matching request record.
 
 ## Clean up resources
 
 This exercise creates an Azure Cosmos DB account, a Log Analytics workspace, an alert rule, and an action group. Remove the resources you created when you finish. Provisioned throughput remains billable even without requests, and Log Analytics can charge for data ingestion and retention.
 
-Deleting the diagnostic setting first is deliberate. A setting left behind can attach itself to a resource later recreated with the same name and quietly resume ingesting.
+Delete the diagnostic setting before deleting the account. Otherwise, a resource later created with the same name could inherit the setting.
 
 ```azurecli
 az monitor diagnostic-settings delete `
@@ -496,4 +481,4 @@ az group delete --name $resourceGroup --yes --no-wait
 
 If your lab provided `ResourceGroup1`, or the group holds other resources, keep the group. In the Azure portal, delete only this exercise's account, Log Analytics workspace, alert rule, and action group.
 
-You generated and investigated live throttling, compared client and server-side signals, configured a real metric alert, and practiced request-level investigation with synthetic diagnostic records. You completed the required work without depending on live log delivery or an alert notification.
+You generated throttling, compared client and service metrics, configured a metric alert, and used KQL to investigate synthetic diagnostic records.
