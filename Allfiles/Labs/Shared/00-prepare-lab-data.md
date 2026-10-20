@@ -165,6 +165,8 @@ It creates an account holding a `cosmicworks` database with one `product` contai
 
 Manual throughput is deliberate. The exercise has to reach rate limiting inside its time budget, and an autoscale maximum would let the container absorb the load instead of returning 429 responses.
 
+Both language versions have learners create a workload project for client diagnostics and live platform metrics, using the inline code in their exercise. Learners configure a real metric alert before generating load. The required KQL investigation uses explicitly synthetic, query-local tables defined in the instructions; it doesn't wait for diagnostic-log ingestion or an alert email. Queries against the account's own diagnostic records are an optional extension.
+
 ## The mirroring profile
 
 Serves the operational analytics exercise. Microsoft Fabric mirroring requires continuous backup on the source account. Eligible existing accounts can [migrate to continuous backup](https://learn.microsoft.com/azure/cosmos-db/migrate-continuous-backup), but continuous backup can't be disabled afterward. This profile creates a dedicated lab account rather than migrating an existing account. Use the resource group supplied by the lab, or a new group containing only this exercise's resources.

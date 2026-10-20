@@ -30,7 +30,26 @@ The command returns `Registered`.
 
 ## Register additional providers
 
-Follow your exercise's instructions for additional services. The shared setup script registers the providers its selected profile needs. The change feed exercise runs its function locally, so it doesn't require a Function App deployment.
+The shared [setup script](setup.ps1) registers the following providers based on the selected profile and switches. The same registrations apply to the Python and C# exercises.
+
+| Provider | Required by | Purpose |
+| :--- | :--- | :--- |
+| `Microsoft.DocumentDB` | All profiles | Azure Cosmos DB accounts, databases, and containers |
+| `Microsoft.ContainerInstance` | `security` profile | The hosted container used to access Azure Cosmos DB with a managed identity |
+| `Microsoft.Insights` | `monitoring` profile | Diagnostic settings and alert rules |
+| `Microsoft.OperationalInsights` | `monitoring` profile | Log Analytics workspaces |
+| `Microsoft.CognitiveServices` | Any profile with `-EnableFoundry` | Foundry resources, projects, and model deployments |
+
+Normal setup handles these registrations automatically. For manual registration or check-only mode, run only the additional commands that apply to your exercise:
+
+```azurecli
+az provider register --namespace Microsoft.ContainerInstance --wait
+az provider register --namespace Microsoft.Insights --wait
+az provider register --namespace Microsoft.OperationalInsights --wait
+az provider register --namespace Microsoft.CognitiveServices --wait
+```
+
+Use the `az provider show` command from the previous section with each provider's namespace to confirm registration. The change feed exercise runs its function locally, so it doesn't require a Function App deployment.
 
 If an error names another unregistered provider, replace `Microsoft.DocumentDB` in the register and show commands with that provider's namespace. Confirm registration, then rerun the failed step.
 

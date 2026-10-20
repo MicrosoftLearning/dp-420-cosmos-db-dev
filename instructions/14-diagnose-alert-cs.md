@@ -2,7 +2,7 @@
 lab:
   title: Diagnose throttling and configure an alert in C#
   module: Module 14 - Monitor and Troubleshoot Azure Cosmos DB
-  description: Enable diagnostic logging, drive a container past its provisioned throughput, confirm the rate limiting from client diagnostics, Azure Monitor metrics, and Log Analytics, then create an alert rule.
+  description: Generate real throttling, investigate client diagnostics and live metrics, configure a metric alert, and practice KQL with synthetic incident records without waiting for log ingestion.
   duration: 45 minutes
   level: 300
   islab: true
@@ -14,11 +14,13 @@ lab:
 
 # Diagnose throttling and configure an alert in C#
 
-In this exercise, you work an incident end to end. You enable diagnostic logging on an Azure Cosmos DB account, drive a container past its provisioned throughput until it starts rate limiting, then confirm what happened from three separate vantage points: the client's own exception handling, Azure Monitor metrics, and a Kusto query over the diagnostic logs. You finish by creating an alert rule so the same condition announces itself next time.
+In this exercise, you generate real rate limiting on an Azure Cosmos DB account, investigate client diagnostics and Azure Monitor metrics, and configure an alert for future incidents. You also use Kusto Query Language (KQL) to investigate a supplied synthetic incident, including a request identified by its activity ID.
 
-The order of the tasks matters. Diagnostic logs take several minutes to reach Log Analytics after the requests that produce them, so you enable logging first and query it last, with the metrics and alerting work filling the interval.
+The client output, metrics, and alert use your own account. The required KQL investigation uses clearly labeled sample records defined in the query itself, not telemetry from your account. You configure diagnostic logging, but **don't wait for live logs or an alert email** to complete the exercise.
 
 This exercise takes approximately **45** minutes to complete.
+
+Plan for 10 minutes of setup, 8 minutes to configure monitoring, 6 minutes to create and run the workload project, 7 minutes for metrics, 8 minutes for KQL, and 3 minutes for cleanup, leaving 3 minutes of buffer. Copy the code blocks rather than typing the workload from scratch. Azure provisioning times can vary.
 
 ## Before you start
 
@@ -77,6 +79,16 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     $accountName = "<your-account-name>"
     ```
 
+1. Capture the account ID and endpoint. Keep using this PowerShell terminal throughout the exercise so these variables remain available.
+
+    ```powershell
+    $account = az cosmosdb show `
+        --resource-group $resourceGroup `
+        --name $accountName --output json | ConvertFrom-Json
+    $accountId = $account.id
+    $endpoint = $account.documentEndpoint
+    ```
+
 Provisioned throughput values are in request units per second (RU/s). The script creates the following resources:
 
 | Resource | Configuration |
@@ -94,45 +106,29 @@ Because key-based authentication is disabled, no key or connection string appear
 
 > &#128221; A new role assignment takes a few minutes to propagate. If a later step fails with a 403 error, wait a moment and try again.
 
-## Task 1: Send diagnostic logs to a Log Analytics workspace
+## Task 1: Configure diagnostic logging and a metric alert
 
-Metrics are collected without any configuration. Resource logs aren't: nothing is recorded until a diagnostic setting exists. Enabling it first means the requests you generate in the next task are captured.
+Platform metrics are collected automatically; diagnostic logs are opt-in. Configure both the log destination and a real metric alert before generating load. The alert uses platform metrics, so it doesn't depend on Log Analytics ingestion.
 
-1. Create a Log Analytics workspace in the same resource group.
-
-    ```azurecli
-    az monitor log-analytics workspace create `
-        --resource-group $resourceGroup `
-        --workspace-name "dp420lab14-logs" `
-        --location $location
-    ```
-
-1. Capture the resource IDs of the workspace and the Azure Cosmos DB account. The diagnostic setting needs both.
+1. From the **Allfiles/Labs/Shared** terminal, create a Log Analytics workspace and capture its resource ID.
 
     ```powershell
-    $workspaceId = az monitor log-analytics workspace show `
+    $workspaceId = az monitor log-analytics workspace create `
         --resource-group $resourceGroup `
         --workspace-name "dp420lab14-logs" `
-        --query "id" --output tsv
-
-    $accountId = az cosmosdb show `
-        --resource-group $resourceGroup `
-        --name $accountName `
+        --location $location `
         --query "id" --output tsv
     ```
 
-1. Write the log categories to a file. Collecting `DataPlaneRequests` records every operation individually, and `PartitionKeyRUConsumption` records request unit consumption per logical partition key.
+1. Create a JSON file that enables `DataPlaneRequests` for request-level details and `PartitionKeyRUConsumption` for logical partition key consumption.
 
     ```powershell
     $logCategories = Join-Path ([System.IO.Path]::GetTempPath()) "cosmos-log-categories.json"
-
     '[{"category":"DataPlaneRequests","enabled":true},{"category":"PartitionKeyRUConsumption","enabled":true}]' |
         Set-Content -LiteralPath $logCategories -Encoding utf8
     ```
 
-    PowerShell removes the double quotation marks from an inline JSON argument before the Azure CLI sees it. The Azure CLI's `@<file>` convention avoids the problem by reading the value from the file instead.
-
-1. Create the diagnostic setting.
+1. Create a diagnostic setting using the file.
 
     ```azurecli
     az monitor diagnostic-settings create `
@@ -143,7 +139,7 @@ Metrics are collected without any configuration. Resource logs aren't: nothing i
         --logs "@$logCategories"
     ```
 
-    The `--export-to-resource-specific` argument sends each category to its own strongly typed table rather than to the shared legacy `AzureDiagnostics` table. That decision applies to data ingested from now on, so it can't be changed retroactively.
+    The `@<file>` argument avoids PowerShell's inline JSON quoting issues. Resource-specific mode sends the categories to `CDBDataPlaneRequests` and `CDBPartitionKeyRUConsumption`, rather than the legacy `AzureDiagnostics` table. Request logs can incur ingestion and retention charges.
 
 1. Confirm the setting exists and lists both categories.
 
@@ -159,169 +155,20 @@ Metrics are collected without any configuration. Resource logs aren't: nothing i
     PartitionKeyRUConsumption
     ```
 
-## Task 2: Drive the container into rate limiting
+    This confirms configuration, not that delivery has started. Initial log delivery can exceed the lab time budget. The required investigation in Task 4 doesn't depend on it.
 
-Now you generate the incident. The application reads every product in the container and upserts each one back, repeatedly, for one minute. At 400 RU/s, that workload asks for far more throughput than the container has.
-
-The .NET client disables automatic retries on rate limiting. This setting makes throttling easier to observe in the exercise; it isn't the default production retry setting.
-
-1. Open a new integrated terminal in **Visual Studio Code** and create a console project.
+1. Create an action group and capture its resource ID. Replace the email address with your own. You might receive an action-group notification or verification message; don't wait for it to continue.
 
     ```powershell
-    mkdir throttle-lab
-    cd throttle-lab
-    dotnet new console
-    ```
-
-1. Add the packages the project needs. `Microsoft.Azure.Cosmos` requires an explicit `Newtonsoft.Json` reference, and without it the project doesn't build.
-
-    ```powershell
-    dotnet add package Microsoft.Azure.Cosmos
-    dotnet add package Azure.Identity
-    dotnet add package Newtonsoft.Json
-    ```
-
-1. Replace the contents of **Program.cs** with the following code, then replace `<cosmos-endpoint>` with the endpoint you recorded earlier.
-
-    ```csharp
-    using Azure.Identity;
-    using Microsoft.Azure.Cosmos;
-    using System.Net;
-
-    string endpoint = "<cosmos-endpoint>";
-
-    // DefaultAzureCredential can use your developer sign-in, such as az login.
-    CosmosClient client = new(
-        accountEndpoint: endpoint,
-        tokenCredential: new DefaultAzureCredential(),
-        clientOptions: new CosmosClientOptions
-        {
-            // Expose HTTP 429 responses for the lab instead of retrying them.
-            MaxRetryAttemptsOnRateLimitedRequests = 0
-        });
-
-    Container container = client.GetContainer("cosmicworks", "product");
-
-    // Load every catalog page once so the load loop performs writes, not queries.
-    List<dynamic> products = new();
-    using (FeedIterator<dynamic> iterator = container.GetItemQueryIterator<dynamic>("SELECT * FROM c"))
-    {
-        while (iterator.HasMoreResults)
-        {
-            foreach (dynamic item in await iterator.ReadNextAsync())
-            {
-                products.Add(item);
-            }
-        }
-    }
-
-    Console.WriteLine($"Read {products.Count} products.");
-
-    int succeeded = 0;
-    int throttled = 0;
-    double charge = 0;
-    object chargeLock = new();
-    string lastActivityId = string.Empty;
-
-    DateTime deadline = DateTime.UtcNow.AddSeconds(60);
-
-    while (DateTime.UtcNow < deadline)
-    {
-        // Overlap writes to exceed 400 RU/s while preserving each item's identity.
-        await Task.WhenAll(products.Select(async product =>
-        {
-            try
-            {
-                ItemResponse<dynamic> response = await container.UpsertItemAsync<dynamic>(
-                    product,
-                    new PartitionKey((string)product.categoryId));
-
-                // Concurrent tasks share these counters; update them atomically.
-                Interlocked.Increment(ref succeeded);
-                lock (chargeLock) { charge += response.RequestCharge; }
-            }
-            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
-            {
-                // Only throttling is expected. Other failures still surface.
-                // Keep an activity ID to correlate the failure with diagnostic logs.
-                Interlocked.Increment(ref throttled);
-                lastActivityId = ex.ActivityId;
-            }
-        }));
-    }
-
-    Console.WriteLine($"Succeeded: {succeeded}");
-    Console.WriteLine($"Rate limited (429): {throttled}");
-    Console.WriteLine($"Request units consumed: {charge:0}");
-    Console.WriteLine($"Activity ID of a rate-limited request: {lastActivityId}");
-    ```
-
-1. Run the application. It takes about a minute plus the time to read the container.
-
-    ```powershell
-    dotnet run
-    ```
-
-    ```output
-    Read 295 products.
-    Succeeded: 3184
-    Rate limited (429): 9260
-    Request units consumed: 22947
-    Activity ID of a rate-limited request: 4f2c8b1e-6a3d-4c05-9f7b-1d2e3a4b5c6d
-    ```
-
-1. Record your rate-limited count and the activity ID. You use the activity ID in Task 5.
-
-    Your numbers differ from the sample values, and they should. Throughput consumption depends on item size, region, and how much concurrency your machine sustains. What matters is the shape of the result: a substantial fraction of requests rejected, against a container that never went down and never returned an error other than 429.
-
-## Task 3: Confirm the throttling in Azure Monitor metrics
-
-The client saw its own failures. Now confirm the same event from the service's side, where the count includes every rate-limited response rather than only the ones that reached your code.
-
-1. In a browser, open the [Azure portal](https://portal.azure.com) and go to the Azure Cosmos DB account this exercise created.
-
-1. In the resource menu, under **Monitoring**, select **Insights**.
-
-1. Select the **Requests** tab and find the **Total Requests by Status Code** chart. Set the time range to the last hour.
-
-    The chart shows a block of 429 responses alongside the successful ones, aligned with the minute your application ran.
-
-1. Select the **Throughput** tab and find the **Normalized RU Consumption (%) By PartitionKeyRangeID** chart.
-
-    The container sits at 100 percent for the duration of the run. Note how many separate lines the chart draws: at 295 items the container occupies a single physical partition, so there's one line. In a container large enough to have split, this chart is how you tell a container that needs more throughput from one with a hot partition.
-
-1. In the resource menu, select **Metrics**, then choose the **Total Requests** metric with the **Count** aggregation.
-
-1. Select **Apply splitting**, choose the `StatusCode` dimension, and set the time range to the last hour.
-
-    The split chart separates the status codes present in the selected window. Successful upserts of the existing products return 200; an upsert returns 201 only when it creates an item. Compare the 429 count here with the count your application reported.
-
-    The two numbers are close for the same workload window because you disabled automatic 429 retries. With the default retries, some rate-limited attempts succeed on retry and never become application errors. Rerunning this timed workload can also change the request volume and the service's 429 count, so compare each run within its own time window.
-
-## Task 4: Create an alert on rate-limited requests
-
-The event is over. An alert makes sure you hear about the next one without watching a chart.
-
-1. Return to the terminal and create an action group. Replace the email address with your own.
-
-    ```azurecli
-    az monitor action-group create `
+    $actionGroupId = az monitor action-group create `
         --name "dp420lab14-oncall" `
         --resource-group $resourceGroup `
         --short-name "dp420lab14" `
-        --action email oncall you@contoso.com
+        --action email oncall you@contoso.com `
+        --query id --output tsv
     ```
 
-1. Capture the action group's resource ID.
-
-    ```powershell
-    $actionGroupId = az monitor action-group show `
-        --name "dp420lab14-oncall" `
-        --resource-group $resourceGroup `
-        --query "id" --output tsv
-    ```
-
-1. Create a metric alert rule scoped to the account, watching the **Total Requests** metric filtered to a `StatusCode` of `429`.
+1. Create a metric alert scoped to the account. It counts **Total Requests** filtered to a `StatusCode` of `429`, not all requests or the number of request units.
 
     ```azurecli
     az monitor metrics alert create `
@@ -335,74 +182,304 @@ The event is over. An alert makes sure you hear about the next one without watch
         --description "More than 100 rate-limited requests in five minutes."
     ```
 
-1. Confirm the rule exists and is enabled.
+1. Verify the rule's scope, condition, action group, and enabled state.
 
     ```azurecli
     az monitor metrics alert show `
         --name "Rate limited requests" `
         --resource-group $resourceGroup `
-        --query "{name:name, enabled:enabled, severity:severity, window:windowSize}"
+        --query "{enabled:enabled, scopes:scopes, condition:criteria.allOf, actions:actions}"
+    ```
+
+    Confirm `enabled` is `true`, the scope is your account ID, the metric is `TotalRequests` with `Count` aggregation, the threshold is `100`, the dimension selects `429`, and the action references your action group. Explain why removing the status-code dimension would change the alert's meaning.
+
+    The rule can take about 10 minutes to become active. Continue with the workload while it activates. Creating and verifying the rule is required; an alert firing or an email arriving isn't. A threshold of 100 is for this deliberate lab load, not a production recommendation.
+
+## Task 2: Drive the container into rate limiting
+
+Now you generate the incident. The application reads every product in the container and upserts each one back, repeatedly, for one minute. At 400 RU/s, that workload asks for far more throughput than the container has.
+
+The .NET client disables automatic retries on rate limiting. This setting makes throttling easier to observe in the exercise; it isn't the default production retry setting.
+
+1. In the same terminal, create a project folder and a console application.
+
+    ```powershell
+    mkdir throttle-lab-cs
+    Set-Location throttle-lab-cs
+    dotnet new console --framework net10.0
+    ```
+
+1. Add the Cosmos DB SDK, `Azure.Identity`, and the explicit `Newtonsoft.Json` reference the Cosmos DB SDK requires.
+
+    ```powershell
+    dotnet add package Microsoft.Azure.Cosmos --version 3.63.0
+    dotnet add package Azure.Identity --version 1.21.0
+    dotnet add package Newtonsoft.Json --version 13.0.4
+    ```
+
+1. Replace **Program.cs** in your project with the following code. The endpoint is passed when you run it, so you don't need to edit the code.
+
+    ```csharp
+    using System.Diagnostics;
+    using System.Net;
+    using Azure.Identity;
+    using Microsoft.Azure.Cosmos;
+    using Newtonsoft.Json.Linq;
+
+    if (args.Length != 1 || !Uri.TryCreate(args[0], UriKind.Absolute, out Uri? endpoint) ||
+        endpoint.Scheme != Uri.UriSchemeHttps)
+    {
+        throw new ArgumentException("Usage: dotnet run -- <https-cosmos-endpoint>");
+    }
+
+    using CosmosClient client = new(
+        accountEndpoint: endpoint.AbsoluteUri,
+        tokenCredential: new DefaultAzureCredential(),
+        clientOptions: new CosmosClientOptions
+        {
+            ConnectionMode = ConnectionMode.Direct,
+            MaxRetryAttemptsOnRateLimitedRequests = 0
+        });
+
+    Container container = client.GetContainer("cosmicworks", "product");
+    List<JObject> products = new();
+    using (FeedIterator<JObject> iterator = container.GetItemQueryIterator<JObject>("SELECT * FROM c"))
+    {
+        while (iterator.HasMoreResults)
+        {
+            products.AddRange(await iterator.ReadNextAsync());
+        }
+    }
+    if (products.Count == 0)
+    {
+        throw new InvalidOperationException("The product container is empty. Complete setup with seeding enabled.");
+    }
+    Console.WriteLine($"Read {products.Count} products.");
+
+    int succeeded = 0;
+    int throttled = 0;
+    object resultLock = new();
+    RequestSample? successfulSample = null;
+    RequestSample? throttledSample = null;
+    Console.WriteLine($"Workload start (UTC): {DateTimeOffset.UtcNow:O}");
+    Stopwatch workload = Stopwatch.StartNew();
+
+    while (workload.Elapsed < TimeSpan.FromSeconds(60))
+    {
+        await Parallel.ForEachAsync(
+            products,
+            new ParallelOptions { MaxDegreeOfParallelism = 32 },
+            async (product, cancellationToken) =>
+            {
+                string categoryId = product.Value<string>("categoryId")
+                    ?? throw new InvalidOperationException("A seeded product is missing categoryId.");
+                Stopwatch request = Stopwatch.StartNew();
+                try
+                {
+                    ItemResponse<JObject> response = await container.UpsertItemAsync(
+                        product, new PartitionKey(categoryId), cancellationToken: cancellationToken);
+                    lock (resultLock)
+                    {
+                        succeeded++;
+                        successfulSample ??= new(request.Elapsed.TotalMilliseconds, response.ActivityId, null);
+                    }
+                }
+                catch (CosmosException error) when (error.StatusCode == HttpStatusCode.TooManyRequests)
+                {
+                    lock (resultLock)
+                    {
+                        throttled++;
+                        throttledSample ??= new(
+                            request.Elapsed.TotalMilliseconds, error.ActivityId, error.RetryAfter?.TotalMilliseconds);
+                    }
+                }
+            });
+    }
+
+    Console.WriteLine($"Workload end (UTC): {DateTimeOffset.UtcNow:O}");
+    Console.WriteLine($"Succeeded: {succeeded}");
+    Console.WriteLine($"Rate limited (429): {throttled}");
+    if (successfulSample is not null)
+    {
+        Console.WriteLine($"Sample successful upsert client elapsed: {successfulSample.ElapsedMs:F1} ms");
+    }
+    if (throttledSample is not null)
+    {
+        Console.WriteLine($"Sample 429 client elapsed: {throttledSample.ElapsedMs:F1} ms");
+        string retryAfter = throttledSample.RetryAfterMs is double milliseconds
+            ? $"{milliseconds:F1} ms" : "not returned";
+        Console.WriteLine($"Retry after: {retryAfter}");
+        Console.WriteLine($"Activity ID of a rate-limited request: {throttledSample.ActivityId}");
+    }
+    else
+    {
+        Console.WriteLine("No application-visible 429s. Check the account, 400 RU/s setting, and service metrics.");
+    }
+
+    record RequestSample(double ElapsedMs, string ActivityId, double? RetryAfterMs);
+    ```
+
+1. Find `MaxRetryAttemptsOnRateLimitedRequests = 0`, the 32-worker limit, and the exception filter that handles only `TooManyRequests`. Notice that other failures aren't counted as throttling. The application prints a client-measured elapsed time and retry-after value for a sample rate-limited request.
+
+1. Run the application. It takes about a minute plus the time to read the container.
+
+    ```powershell
+    dotnet run --no-restore -- $endpoint
     ```
 
     ```output
-    {
-      "enabled": true,
-      "name": "Rate limited requests",
-      "severity": 2,
-      "window": "0:05:00"
-    }
+    Read 295 products.
+    Workload start (UTC): 2026-10-20T12:00:00+00:00
+    Workload end (UTC): 2026-10-20T12:01:02+00:00
+    Succeeded: 3184
+    Rate limited (429): 9260
+    Sample successful upsert client elapsed: 12.5 ms
+    Sample 429 client elapsed: 14.2 ms
+    Retry after: 100.0 ms
+    Activity ID of a rate-limited request: 4f2c8b1e-6a3d-4c05-9f7b-1d2e3a4b5c6d
     ```
 
-    A threshold of 100 suits this exercise, where the container is small and the load is deliberate. On a real workload, size the threshold against expected traffic. If 1 to 5 percent of requests returning 429 is healthy for your account, a threshold below that band fires constantly and gets muted, which leaves you worse off than having no rule.
+1. Record your UTC workload window, rate-limited count, sample client elapsed times, and activity ID. These are from your account, unlike the synthetic records in Task 4.
 
-    The rule becomes active within about 10 minutes. It can still fire if the earlier load remains inside its five-minute lookback window. Once that load falls outside the window, it no longer contributes to the rule's request count.
+    The output above is illustrative. Your counts and timings depend on region, item size, and client concurrency. The run takes about a minute plus catalog reads and in-flight requests. If no 429 reaches your code, verify that you targeted the disposable 400-RU/s account and inspect the service metrics; don't invent a count or repeatedly rerun the workload to wait for logs.
 
-## Task 5: Find the throttled operations in Log Analytics
+1. Return to the shared folder for subsequent CLI commands.
 
-Metrics told you that throttling happened and roughly when. Logs tell you which operation caused it and what each call cost.
-
-1. In the Azure portal, return to the Azure Cosmos DB account and select **Logs** under **Monitoring**. Close the queries dialog if it opens.
-
-1. Run the following query to find the share of requests that were rate limited, broken down by operation.
-
-    ```kusto
-    CDBDataPlaneRequests
-    | where TimeGenerated >= ago(1h)
-    | summarize throttledOperations = dcountif(ActivityId, StatusCode == 429),
-                totalOperations = dcount(ActivityId),
-                totalConsumedRU = sum(RequestCharge)
-        by OperationName, bin(TimeGenerated, 1min)
-    | extend averageRUPerOperation = 1.0 * totalConsumedRU / totalOperations
-    | extend fractionOf429s = 1.0 * throttledOperations / totalOperations
-    | order by fractionOf429s desc
+    ```powershell
+    Set-Location ..
     ```
 
-    If the query returns nothing, the logs haven't finished arriving. Wait a few minutes and run it again.
+## Task 3: Investigate throttling, latency, and partition utilization
 
-    The result names `Upsert` as the operation being rate limited, reports the average request charge of each call, and shows the fraction rejected in each minute. That's the level of detail that tells you whether to raise throughput, reduce the write rate, or make each write cheaper.
+The client saw its own failures. Now confirm the same event from the service's side, where the count includes every rate-limited response rather than only the ones that reached your code.
 
-1. Run the following query to see request unit consumption per logical partition key.
+1. In a browser, open the [Azure portal](https://portal.azure.com) and go to the Azure Cosmos DB account this exercise created.
+
+1. In the resource menu, under **Monitoring**, select **Insights**.
+
+1. Select the **Requests** tab and find the **Total Requests by Status Code** chart. Set the time range to the last hour and filter to the `cosmicworks` database and `product` container.
+
+    Locate your recorded workload window and look for 429 responses alongside successful requests. Platform metrics can take a few minutes to appear. If the newest points aren't present, do Task 4 and check once more before cleanup; don't wait for diagnostic logs.
+
+1. Select the **Throughput** tab and find the **Normalized RU Consumption (%) By PartitionKeyRangeID** chart.
+
+    Filter to the same database and container. Look for utilization near 100 percent during the workload. A new, small 400-RU/s container is expected to have one physical partition; check how many ranges are actually shown. One range can't demonstrate skew between physical partitions. In a larger container, one saturated range while others idle suggests skew; all ranges saturated suggests broader capacity pressure. A brief 100-percent peak alone doesn't establish a problem.
+
+1. In the account's resource menu, under **Monitoring**, select **Metrics**.
+
+1. Confirm **Scope** is the account created for this exercise. In **Metric namespace**, choose the Cosmos DB standard metrics namespace. In **Metric**, select **Total Requests**, then set **Aggregation** to **Count**.
+
+1. Set the time range to **Last hour** and select **Apply**. Select **Apply splitting**, then choose the `StatusCode` dimension.
+
+    The split chart separates the status codes present in the selected window. Successful upserts of the existing products return 200; an upsert returns 201 only when it creates an item. Compare the 429 count here with the count your application reported.
+
+    The two numbers are close for the same workload window because you disabled automatic 429 retries. With the default retries, some rate-limited attempts succeed on retry and never become application errors. Rerunning this timed workload can also change the request volume and the service's 429 count, so compare each run within its own time window.
+
+1. Select **New chart** and use the same scope and metric namespace. Choose **Server Side Latency Direct** with **Avg** aggregation. Your C# application explicitly uses direct connectivity. Filter to the `cosmicworks` database and `product` container and, for an upsert comparison, the `Upsert` operation type.
+
+    Compare the chart during your workload window with the sample client elapsed times. The chart measures server processing; the client timing also includes network transit and, with normal SDK settings, retry waits. This application's 429 retries are disabled. A single client sample and an aggregated metric aren't identical measurements, so don't subtract them to calculate exact network latency or treat a difference as proof of a service fault.
+
+1. Record a short finding: which status code indicates throttling, what the utilization chart supports, and why client elapsed time can exceed server-side latency. Choose an alert threshold for a real application against expected traffic and acceptable latency rather than copying this lab's threshold.
+
+## Task 4: Investigate a synthetic incident with KQL
+
+This required task uses synthetic teaching data, not logs captured from your workload. The `datatable` operator defines rows inside the query, so you can run the investigation immediately even if your account's diagnostic tables don't exist yet.
+
+1. In the Azure portal, open the **dp420lab14-logs** Log Analytics workspace you created, then select **Logs**. Close the queries dialog if it opens.
+
+    > **Note**: You might need to turn off **Agent mode** and select **KQL mode** in the upper-right corner of the Logs pane to display the query editor.
+
+1. Create a new query in the workspace's Logs pane and paste the following code. Select all the query text and select **Run** so both table declarations and the investigation pipeline execute together.
 
     ```kusto
-    CDBPartitionKeyRUConsumption
-    | where TimeGenerated >= ago(1h)
-    | where CollectionName == "product"
-    | where isnotempty(PartitionKey)
-    | summarize sum(RequestCharge) by PartitionKey, bin(TimeGenerated, 1s)
-    | order by sum_RequestCharge desc
+    // Synthetic teaching data, not telemetry from your account or a complete workload.
+    let IncidentStart = bin(now(), 1m) - 5m;
+    let SampleRequests = datatable(
+        OffsetSeconds:long, ActivityId:string, OperationName:string,
+        StatusCode:int, RequestCharge:real, DurationMs:real)
+    [
+        0, "11111111-1111-4111-8111-111111111101", "Upsert", 200, 7.0, 2.1,
+        0, "11111111-1111-4111-8111-111111111102", "Upsert", 200, 7.0, 2.4,
+        0, "11111111-1111-4111-8111-111111111103", "Upsert", 200, 7.0, 2.0,
+        1, "11111111-1111-4111-8111-111111111104", "Upsert", 200, 7.0, 2.6,
+        1, "11111111-1111-4111-8111-111111111105", "Upsert", 429, 0.0, 0.3,
+        1, "11111111-1111-4111-8111-111111111106", "Upsert", 429, 0.0, 0.4,
+        1, "11111111-1111-4111-8111-111111111107", "Upsert", 200, 7.0, 2.3,
+        2, "11111111-1111-4111-8111-111111111108", "Upsert", 200, 7.0, 2.2,
+        2, "11111111-1111-4111-8111-111111111109", "Upsert", 429, 0.0, 0.3,
+        2, "11111111-1111-4111-8111-111111111110", "Upsert", 429, 0.0, 0.5,
+        0, "11111111-1111-4111-8111-111111111111", "Read",   200, 1.0, 1.0,
+        1, "11111111-1111-4111-8111-111111111112", "Read",   200, 1.0, 1.2,
+        1, "11111111-1111-4111-8111-111111111113", "Read",   200, 1.0, 1.1,
+        2, "11111111-1111-4111-8111-111111111114", "Read",   200, 1.0, 1.3
+    ]
+    | extend TimeGenerated = IncidentStart + OffsetSeconds * 1s
+    | project-away OffsetSeconds;
+    let SamplePartitionRU = datatable(OffsetSeconds:long, PartitionKey:string, RequestCharge:real)
+    [
+        0, "bikes",       15.0,
+        0, "components",   7.0,
+        1, "bikes",       14.0,
+        1, "components",   1.0,
+        1, "accessories",  1.0,
+        2, "bikes",        7.0,
+        2, "accessories",  1.0
+    ]
+    | extend TimeGenerated = IncidentStart + OffsetSeconds * 1s
+    | project-away OffsetSeconds;
+    // Investigation query: keep all declarations above when replacing this pipeline.
+    SampleRequests
+    | summarize Requests = count(),
+                ThrottledRequests = countif(StatusCode == 429),
+                TotalRU = sum(RequestCharge)
+        by OperationName
+    | extend RateLimitedPercent = round(100.0 * ThrottledRequests / Requests, 1)
+    | order by RateLimitedPercent desc
     ```
 
-    Each row is one `categoryId` value in one second. The workload touches every category, but categories contain different numbers of products and writes can have different request charges. Compare the measured consumption across keys. Touching every category doesn't prove that the load is evenly distributed or rule out a hot key.
+    `SampleRequests` models selected fields from `CDBDataPlaneRequests`; `SamplePartitionRU` models per-key, per-second charges from `CDBPartitionKeyRUConsumption`. They are query-local tables, not workspace tables, and nothing is ingested. Their timestamps are generated relative to query execution to keep the sample in a recent time range.
 
-1. Look up the specific request behind the activity ID your application printed. Replace the placeholder with the value you recorded.
+    The first result should be:
+
+    | OperationName | Requests | ThrottledRequests | TotalRU | RateLimitedPercent |
+    | :--- | ---: | ---: | ---: | ---: |
+    | Upsert | 10 | 4 | 42 | 40 |
+    | Read | 4 | 0 | 4 | 0 |
+
+    Explain why the status-code filter matters: only upserts are rate limited in this sample. These small records are an illustrative subset, not enough evidence to measure the account's full workload or diagnose every cause of 429.
+
+1. Keep all declarations above the `// Investigation query` comment. Replace only the final `SampleRequests` pipeline with the following query, then select all the text and run it:
 
     ```kusto
-    CDBDataPlaneRequests
-    | where ActivityId == "<your-activity-id>"
+    SamplePartitionRU
+    | summarize TotalRU = sum(RequestCharge) by PartitionKey
+    | order by TotalRU desc
+    ```
+
+    Expect `bikes` at **36 RU**, `components` at **8 RU**, and `accessories` at **2 RU**. The charges total 46 RU, matching the first query. `bikes` dominates this subset; that suggests a question about skew, not proof of a hot physical partition. Use the physical-partition utilization pattern and a representative workload window before choosing between more throughput and a partition-key change.
+
+1. A **synthetic client error** for this incident reports status `429` and activity ID `11111111-1111-4111-8111-111111111105`. Keeping the declarations, replace the final pipeline with:
+
+    ```kusto
+    SampleRequests
+    | where ActivityId == "11111111-1111-4111-8111-111111111105"
     | project TimeGenerated, OperationName, StatusCode, RequestCharge, DurationMs
     ```
 
-    One row comes back: the exact request your application saw fail, as the service recorded it. That join between an application's exception and a service's log entry is what turns "some writes are failing" into a specific, reproducible finding.
+    Expect one `Upsert` row with status `429`, charge **0 RU**, and duration **0.3 ms**. You correlated a supplied client error with its supplied request record. Don't substitute your own activity ID here: your workload didn't create these sample rows.
+
+### Optional: Inspect your account's live logs
+
+Only if time remains, run this separate query in the workspace. These are real diagnostic records, unlike the required sample investigation:
+
+```kusto
+CDBDataPlaneRequests
+| where TimeGenerated >= ago(2h)
+| where DatabaseName == "cosmicworks" and CollectionName == "product"
+| summarize Requests = count() by AccountName, StatusCode
+```
+
+If no records are returned or the table doesn't exist yet, skip this extension. Don't wait or rerun the workload. If records are present, insert an `ActivityId` filter using your own recorded ID before `summarize` to try request correlation. Missing live logs or an unmatched ID doesn't prevent completion.
 
 ## Clean up resources
 
@@ -424,4 +501,4 @@ az group delete --name $resourceGroup --yes --no-wait
 
 If your lab provided `ResourceGroup1`, or the group holds other resources, keep the group. In the Azure portal, delete only this exercise's account, Log Analytics workspace, alert rule, and action group.
 
-You diagnosed the same event three times, from the application's exceptions, from platform metrics, and from diagnostic logs, and each pass answered a question the previous one raised. That progression, from a symptom to a measurement to a specific operation, is the shape of every Azure Cosmos DB investigation worth doing.
+You generated and investigated live throttling, compared client and server-side signals, configured a real metric alert, and practiced request-level investigation with synthetic diagnostic records. You completed the required work without depending on live log delivery or an alert notification.

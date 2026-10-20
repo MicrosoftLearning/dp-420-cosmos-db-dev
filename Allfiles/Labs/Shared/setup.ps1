@@ -381,6 +381,7 @@ $Profiles = @{
         # resource is deleted or renamed, so keeping both in a group of their own means
         # one delete cleans up everything.
         Account = @{
+            Providers         = @('Microsoft.Insights', 'Microsoft.OperationalInsights')
             RegionalResources = @(@{ ProviderNamespace = 'Microsoft.OperationalInsights'; ResourceType = 'workspaces' })
         }
         Databases = @(
