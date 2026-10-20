@@ -424,6 +424,7 @@ $Profiles = @{
         # only when their regions and their service tier match.
         Account   = @{
             AccountCount = 2
+            Providers = @('Microsoft.Insights', 'Microsoft.Storage')
             RegionalResources = @(
                 @{ ProviderNamespace = 'Microsoft.DocumentDB'; ResourceType = 'fleets' }
                 @{ ProviderNamespace = 'Microsoft.Storage'; ResourceType = 'storageAccounts' }

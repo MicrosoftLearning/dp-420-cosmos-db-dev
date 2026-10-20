@@ -14,9 +14,7 @@ lab:
 
 # Create and Monitor a Fleet
 
-In this exercise, you build the fleet structure end to end. You create a fleet, add a fleetspace with a shared throughput pool, enroll two Azure Cosmos DB accounts into it, read the pool's throughput and the dedicated-versus-pooled split in Azure Monitor, and send fleet analytics to an Azure Data Lake Storage Gen2 account.
-
-Two things about the shape of this exercise are worth knowing before you start. Resource and fleet management use the control plane, but seeding the accounts and creating the storage filesystem use data-plane operations. You don't write application code, but the setup script requires PowerShell 7 and the Azure CLI. And the accounts you enroll are idle lab accounts, so nothing draws from the pool. What you can observe is where the evidence lives and what each number means, which is what you need when the accounts aren't idle.
+In this exercise, you create a fleet and a fleetspace with a shared throughput pool, enroll two Azure Cosmos DB accounts, inspect throughput metrics in Azure Monitor, and configure fleet analytics to export to Azure Data Lake Storage Gen2.
 
 This exercise takes approximately **45** minutes to complete.
 
@@ -28,11 +26,11 @@ If your lab environment isn't set up yet, follow [Set up your lab environment](h
 
 This exercise runs no local application code, so no .NET or Python installation is required.
 
-> &#9888; A throughput pool has a minimum of 100,000 RU/s, and an idle pool is billed at its minimum for every hour and every region it covers. That charge is far more than any other resource in this course. Complete the exercise in one sitting, and delete the fleetspace as soon as you finish Task 5 rather than leaving it in place.
+> &#9888; This exercise configures a 10,000-RU/s throughput pool. An idle pool is billed at its configured minimum for every hour and every region it covers. Complete the exercise in one sitting, and delete the fleetspace as soon as you finish Task 5.
 
 ## Set up your Azure Cosmos DB resources
 
-This exercise creates its own Azure Cosmos DB accounts and deletes them at the end, so it doesn't use the shared account from the rest of this learning path. A fleet groups accounts, so this profile creates two of them rather than one.
+The setup script creates two dedicated Azure Cosmos DB accounts for this exercise. Delete them during cleanup rather than leaving them in the shared course environment.
 
 1. Start **Visual Studio Code**.
 
@@ -48,7 +46,7 @@ This exercise creates its own Azure Cosmos DB accounts and deletes them at the e
 
 1. Open the context menu for the folder and select **Open in Integrated Terminal**. If the terminal isn't PowerShell, select the dropdown beside the **+** in the terminal toolbar and choose **PowerShell**.
 
-1. Sign in to the Azure CLI and follow the interactive prompts. On Windows, the CLI uses Web Account Manager by default.
+1. Sign in to the Azure CLI and follow the interactive prompts.
 
     ```azurecli
     az login
@@ -69,7 +67,7 @@ This exercise creates its own Azure Cosmos DB accounts and deletes them at the e
 
     Azure Cosmos DB account names have to be globally unique, so the script builds them for you by adding six random characters to the prefix, giving names like `dp420lab15a7f3k9`.
 
-1. Wait for the script to finish. This profile creates two accounts one after the other, so it takes 10-20 minutes to run, longer than the other exercises in this course.
+1. Wait for the script to finish. Creating and seeding both accounts usually takes 10-20 minutes.
 
 1. Record both **Account name** values the script prints. You need them in Task 3.
 
@@ -82,7 +80,7 @@ The script creates the following resources:
 | `product` container | Created in each account, partitioned on `/categoryId`, autoscale up to 1,000 RU/s, loaded with 295 CosmicWorks products |
 | Role assignment | Cosmos DB Built-in Data Contributor on each account, granted to your signed-in identity |
 
-Both accounts are created with an identical single-region configuration on purpose. Accounts can share a throughput pool only when their regions and their write configuration match, so two accounts that differ in either respect can't be enrolled in the same fleetspace.
+Both accounts use the same region and write configuration, as required to share a throughput pool.
 
 > &#10071; Fleets are available in a subset of Azure regions. When you create the fleet in Task 1, use a region the portal offers in its **Region** list. The fleet's region is independent of where your accounts live, so it doesn't have to match `$location`.
 
@@ -90,7 +88,7 @@ Both accounts are created with an identical single-region configuration on purpo
 
 ## Task 1: Create the fleet
 
-The fleet is the top-level resource. It holds no configuration of its own, so creating it is quick, and everything else in this exercise is created inside it.
+Create a fleet to organize the two accounts into a fleetspace.
 
 1. Sign in to the [Azure portal](https://portal.azure.com).
 
@@ -104,7 +102,7 @@ The fleet is the top-level resource. It holds no configuration of its own, so cr
     | :--- | :--- |
     | **Subscription** | Your Azure subscription |
     | **Resource group** | `ResourceGroup1` |
-    | **Fleet Name** | A globally unique name, such as `dp420fleet` plus a few random characters |
+    | **Fleet Name** | A unique name, such as `dp420fleet` plus 6 random characters |
     | **Region** | A region offered in the list |
 
 1. Select **Review + create**, wait for validation to succeed, and then select **Create**.
@@ -128,32 +126,34 @@ The fleet is the top-level resource. It holds no configuration of its own, so cr
 
 ## Task 2: Add a fleetspace with a throughput pool
 
-The fleetspace decides which accounts can be grouped together and whether they share throughput. Two of its settings, the write-region type and the regions, are permanent once the fleetspace exists, so read them before you select **Ok**.
+A fleetspace groups accounts that can share throughput. Its service tier and regions can't be changed after creation, so check both before you select **Ok**.
 
 1. In the Azure portal, open the fleet you created.
 
 1. Select **Fleetspaces** in the **Fleet resources** section of the resource menu.
+
+1. Select **+ New fleetspace** to open the configuration dialog.
 
 1. Configure the following options in the dialog:
 
     | Setting | Value |
     | :--- | :--- |
     | **Fleetspace name** | `contoso-westus2` |
+    | **Select region(s) for accounts in fleetspace** | Choose the same region as the two Azure Cosmos DB accounts created during setup (**West US 2** if you used the default `$location`), then select **Add** |
+    | **Select service tier for accounts in fleetspace** | **General purpose** |
     | **Enable throughput pooling** | Selected |
-    | **Select regions for accounts in throughput pool** | Add the same region you passed as `$location` |
-    | **Select write-region type for accounts in throughput pool** | **Single-write region** (General purpose) |
-    | **Throughput pool minimum RU/s** | `100000` |
-    | **Throughput pool maximum RU/s** | `100000` |
+    | **Throughput pool minimum RU/s** | `10000` |
+    | **Throughput pool maximum RU/s** | `10000` |
 
-1. Select **Ok**.
+1. Confirm that the region list contains only the region of your two Azure Cosmos DB accounts, then select **Ok**.
 
-The minimum and the maximum are set to the same value here to keep the exercise's cost predictable. In a real deployment, you set a maximum up to 10 times the minimum, so the pool can scale into demand, and you're billed for the highest value it reaches in each hour.
+Setting the minimum and maximum to the same value keeps the pool's capacity fixed. For a scaling pool, the maximum can be up to 10 times the minimum. Billing is based on the highest throughput reached in each hour, per region.
 
-The write-region type is what the fleetspace calls a service tier. **Single-write region** maps to `GeneralPurpose`, and **Multi-write region** maps to `BusinessCritical`. Both accounts from the setup script are single-region write accounts, which is why this exercise selects the first option.
+The **General purpose** service tier (`GeneralPurpose`) is for accounts with one write region, which can also have additional read regions. **Business critical** (`BusinessCritical`) is for accounts with multi-region writes. Accounts sharing a throughput pool must have the same region set and write mode. Both accounts from the setup script use a single write region, so select **General purpose**. See the [fleet pool configuration rules](https://learn.microsoft.com/azure/cosmos-db/fleet-pools#configuration-rules).
 
 ## Task 3: Enroll both accounts in the fleetspace
 
-Enrolling an account registers it with the fleetspace. It doesn't move data, change the account's endpoint, or interrupt anything running against it.
+Enrollment registers an existing account with the fleetspace without moving its data or changing its endpoint.
 
 1. In the fleet's resource menu, select **Database accounts** in the **Fleet resources** section.
 
@@ -161,9 +161,7 @@ Enrolling an account registers it with the fleetspace. It doesn't move data, cha
 
 1. Enable the **Browse accounts to add to this fleetspace** option.
 
-1. Select the first account the setup script created, and then select **+ Add to fleetspace**.
-
-1. Repeat the previous step for the second account.
+1. Select both accounts the setup script created, then select **+ Add to fleetspace**.
 
 1. Return to the terminal and list the registrations, substituting the fleet name you chose in Task 1.
 
@@ -178,37 +176,37 @@ Enrolling an account registers it with the fleetspace. It doesn't move data, cha
 
     Two rows come back, one per enrolled account.
 
-1. Try to add one of the accounts to the fleetspace a second time. The portal doesn't offer it, because an account belongs to exactly one fleetspace and one fleet. Moving an account elsewhere means deleting its fleetspace account registration first.
-
 ## Task 4: Read the pool and the dedicated throughput split
 
-The pool is now configured, and both accounts can draw from it. This task locates the two places that report on it.
+Use fleet metrics to inspect pool capacity and account metrics to compare dedicated and pooled consumption.
 
-1. In the fleet's resource menu, open the **Metrics** page.
+1. In the fleet's resource menu, under **Monitoring**, open the **Metrics** page.
 
-1. Select the `FleetspaceAutoscaledThroughput` metric.
+1. Select **Fleetspace Autoscaled Throughput (Preview)** and set **Aggregation** to **Max**.
 
-    The chart reports the RU/s the pool scaled to, which is the quantity you're billed for. With no load on either account, it sits at the pool minimum of 100,000 RU/s. The pool minimum is the cost of an idle pool, and it's the number that makes pool sizing a decision rather than a formality.
+1. Set the time range to **Last hour** and the time granularity to **5 minutes**. Use **Add filter** to select the `contoso-westus2` fleetspace for `FleetspaceName` and your accounts' region for `Region`.
 
-1. Open one of the two Azure Cosmos DB accounts in the portal, and then open its **Metrics** page.
+    With the pool minimum and maximum both set to 10,000 RU/s, look for a value of **10,000 RU/s**. This is scaled pool capacity, not throughput consumed by the accounts. An idle pool is billed at its configured minimum.
+
+1. Open one of the two Azure Cosmos DB accounts in the portal, and then open its **Monitoring** > **Metrics** page.
 
 1. Select the **Total Requests** metric, filter to the `cosmicworks` database and the `product` container, and apply splitting by **Capacity Type**.
 
-    This split separates requests served from the container's own dedicated throughput from requests served out of the pool. A resource always spends its dedicated allowance first and reaches for the pool only when it exceeds that allowance.
+    This split separates requests served by dedicated throughput from those served by the pool. Resources consume dedicated RU/s first, then use the pool when demand exceeds that allocation.
 
 1. Select the **Total Request Units** metric and split it by **Capacity Type** as well.
 
-    This chart answers the same question in request units rather than request counts, which is the form to use when you're deciding whether a pool is earning its minimum.
+    This metric shows request units consumed from each capacity type rather than the number of requests.
 
 1. Expect no pooled consumption from these idle accounts. A time range that includes setup can show the seed requests under dedicated capacity. During an interval with no requests, the charts might show zero values or no data.
 
-    That result is correct rather than a failure. The `product` container is provisioned at autoscale up to 1,000 RU/s and receives no traffic, so it never exceeds its dedicated allowance and never draws from the pool. In production, a sustained pooled share of zero means the dedicated allowances are already large enough and the pool isn't paying for itself.
+    For a production workload, compare dedicated and pooled usage over a representative period before adjusting the pool size.
 
 ## Task 5: Send fleet analytics to a storage account
 
-Fleet analytics writes hourly usage, configuration, and cost data for every account in the fleet to a destination you own. This task configures a Data Lake Storage Gen2 destination and grants the write permission it needs.
+Fleet analytics exports hourly usage, configuration, and cost data. Configure a Data Lake Storage Gen2 destination and grant the analytics service permission to write to it.
 
-1. Create a storage account with the hierarchical namespace enabled. Fleet analytics requires the hierarchical namespace, and enabling it after the account exists takes a one-way migration.
+1. Create a Data Lake Storage Gen2 account with the hierarchical namespace enabled.
 
     ```azurecli
     az storage account create `
@@ -237,7 +235,7 @@ Fleet analytics writes hourly usage, configuration, and cost data for every acco
         --scope $storageAccountId
     ```
 
-    Allow a few minutes for the assignment to propagate. If filesystem creation reports an authorization failure, confirm this principal and scope and retry after propagation. Don't switch to account keys to bypass the test.
+    If filesystem creation returns an authorization error, allow a few minutes for the role assignment to take effect, then retry.
 
 1. Create a container in the storage account for the exported tables.
 
@@ -252,6 +250,8 @@ Fleet analytics writes hourly usage, configuration, and cost data for every acco
 
 1. Select **Add destination**.
 
+1. Enter a name for the destination.
+
 1. Select **Send to storage account**, choose the storage account you created and the `fleetanalytics` container, and then save the destination.
 
 1. Open the storage account, and then open its **Access Control (IAM)** page.
@@ -260,15 +260,13 @@ Fleet analytics writes hourly usage, configuration, and cost data for every acco
 
 1. Select **+ Select members**, search for the shared **Cosmos DB Fleet Analytics** service principal, select it, and then select **Review + assign**.
 
-    Skipping this step is the most common reason no data appears. The destination saves successfully without it, and then nothing is ever written.
+1. Fleet analytics can take up to an hour to begin exporting. You don't need to wait for exported files before cleanup.
 
-1. Note that data takes up to an hour to start arriving, so the container is most likely still empty when you finish this exercise. If more than 24 hours pass with no data, the missing role assignment is the first thing to check.
-
-When data does arrive, it lands as Delta Lake tables named for the schema: `FactRequestHourly`, `FactResourceUsageHourly`, `FactAccountHourly`, `FactMeterUsageHourly`, `FactFleetHourly`, and the dimension tables that give them meaning, including `DimResource` and `DimMeter`.
+Exports use Delta Lake tables, including `FactRequestHourly`, `FactResourceUsageHourly`, `FactAccountHourly`, `FactMeterUsageHourly`, `FactFleetHourly`, `DimResource`, and `DimMeter`.
 
 ## Clean up resources
 
-Delete the fleetspace first. It carries the throughput pool, which is billed on its minimum for every hour it exists, so removing it stops the largest charge in this exercise immediately.
+Delete the account registrations and fleetspace before the remaining resources to stop ongoing throughput-pool charges.
 
 1. In the fleet's resource menu, select **Database accounts**, and delete both fleetspace account registrations.
 
@@ -281,5 +279,3 @@ Delete the fleetspace first. It carries the throughput pool, which is billed on 
     ```
 
 1. Confirm in the portal that the exercise's resources are gone. If your lab provided the resource group, confirm that the group still exists.
-
-This exercise deletes its own resources rather than leaving them until the end of the course, because a throughput pool is billed continuously whether or not anything uses it.

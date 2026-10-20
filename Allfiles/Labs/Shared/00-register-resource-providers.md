@@ -36,8 +36,9 @@ The shared [setup script](setup.ps1) registers the following providers based on 
 | :--- | :--- | :--- |
 | `Microsoft.DocumentDB` | All profiles | Azure Cosmos DB accounts, databases, and containers |
 | `Microsoft.ContainerInstance` | `security` profile | The hosted container used to access Azure Cosmos DB with a managed identity |
-| `Microsoft.Insights` | `monitoring` profile | Diagnostic settings and alert rules |
+| `Microsoft.Insights` | `monitoring` and `fleet` profiles | Azure Monitor metrics, diagnostic settings, and alert rules |
 | `Microsoft.OperationalInsights` | `monitoring` profile | Log Analytics workspaces |
+| `Microsoft.Storage` | `fleet` profile | The Data Lake Storage Gen2 destination for fleet analytics |
 | `Microsoft.CognitiveServices` | Any profile with `-EnableFoundry` | Foundry resources, projects, and model deployments |
 
 Normal setup handles these registrations automatically. For manual registration or check-only mode, run only the additional commands that apply to your exercise:
@@ -46,6 +47,7 @@ Normal setup handles these registrations automatically. For manual registration 
 az provider register --namespace Microsoft.ContainerInstance --wait
 az provider register --namespace Microsoft.Insights --wait
 az provider register --namespace Microsoft.OperationalInsights --wait
+az provider register --namespace Microsoft.Storage --wait
 az provider register --namespace Microsoft.CognitiveServices --wait
 ```
 
