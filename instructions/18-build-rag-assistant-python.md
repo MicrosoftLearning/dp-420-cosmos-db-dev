@@ -162,13 +162,19 @@ Retrieval needs something to retrieve. In this task, you read the CosmicWorks pr
 1. Install the packages the exercise uses.
 
     ```powershell
-    pip install --upgrade azure-cosmos azure-identity openai requests
+    python -m pip install --upgrade azure-cosmos azure-identity openai truststore
     ```
+
+    The `truststore` package uses the operating system's certificate store for the catalog download while keeping certificate verification enabled. If the download reports `CERTIFICATE_VERIFY_FAILED`, ensure your lab environment's trusted root and intermediate certificates are installed. On a network that inspects HTTPS traffic, ask your administrator for the required certificates rather than disabling verification.
 
 1. Create a file named **load.py** and add the following code. Replace both endpoint placeholders with the values you recorded.
 
     ```python
-    import requests
+    import json
+    import ssl
+    import urllib.request
+
+    import truststore
     from azure.cosmos import CosmosClient
     from azure.identity import DefaultAzureCredential, get_bearer_token_provider
     from openai import OpenAI
@@ -192,7 +198,9 @@ Retrieval needs something to retrieve. In this task, you read the CosmicWorks pr
             credential, "https://ai.azure.com/.default"),
     )
 
-    products = requests.get(DATA_URL, timeout=60).json()
+    ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    with urllib.request.urlopen(DATA_URL, context=ssl_context, timeout=60) as response:
+        products = json.load(response)
     print(f"Products downloaded: {len(products)}")
 
     # Batch embedding inputs, then store each vector with the product fields
@@ -284,6 +292,8 @@ The examples set reasoning effort to `none` for short catalog responses and omit
 
 Now put your catalog in front of the model. In this task, you embed the question, retrieve the closest products, render them into a context block, and instruct the model to answer only from it.
 
+The retrieval query enables cross-partition execution so it can search every product category.
+
 1. Create a file named **grounded.py** and add the following code. Replace both endpoint placeholders.
 
     ```python
@@ -336,6 +346,7 @@ Now put your catalog in front of the model. In this task, you embed the question
                 {"name": "@topN", "value": top_n},
                 {"name": "@queryVector", "value": vector},
             ],
+            enable_cross_partition_query=True,
         )
         items = list(results)
         # This header belongs to the final query response, not a sum across pages.

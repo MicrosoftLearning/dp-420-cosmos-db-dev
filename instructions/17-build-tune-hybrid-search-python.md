@@ -165,15 +165,19 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
 1. Install the packages the exercise uses.
 
     ```powershell
-    pip install azure-cosmos azure-identity openai
+    python -m pip install azure-cosmos azure-identity openai truststore
     ```
+
+    The `truststore` package uses the operating system's certificate store for the catalog download while keeping certificate verification enabled. If the download reports `CERTIFICATE_VERIFY_FAILED`, ensure your lab environment's trusted root and intermediate certificates are installed. On a network that inspects HTTPS traffic, ask your administrator for the required certificates rather than disabling verification.
 
 1. Create a file named **load.py** and add the following code. Replace the two placeholder values with your endpoints.
 
     ```python
     import json
+    import ssl
     import urllib.request
 
+    import truststore
     from azure.cosmos import CosmosClient
     from azure.identity import DefaultAzureCredential, get_bearer_token_provider
     from openai import AzureOpenAI
@@ -201,7 +205,8 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
         .get_container_client("productSearch")
     )
 
-    with urllib.request.urlopen(DATA_URL) as response:
+    ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    with urllib.request.urlopen(DATA_URL, context=ssl_context) as response:
         products = json.load(response)
 
     print(f"Downloaded {len(products)} products.")

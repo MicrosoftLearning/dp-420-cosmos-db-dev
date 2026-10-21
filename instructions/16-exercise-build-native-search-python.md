@@ -163,16 +163,20 @@ Combine each product's name and category into `searchText`, then generate an emb
 1. Install the packages the exercise uses.
 
     ```powershell
-    pip install azure-cosmos azure-identity openai
+    python -m pip install azure-cosmos azure-identity openai truststore
     ```
+
+    The `truststore` package uses the operating system's certificate store for the catalog download while keeping certificate verification enabled. If the download reports `CERTIFICATE_VERIFY_FAILED`, ensure your lab environment's trusted root and intermediate certificates are installed. On a network that inspects HTTPS traffic, ask your administrator for the required certificates rather than disabling verification.
 
 1. Create a file named **load.py** and add the following code. Replace the two placeholder values with your endpoints.
 
     ```python
     import hashlib
     import json
+    import ssl
     import urllib.request
 
+    import truststore
     from azure.cosmos import CosmosClient
     from azure.identity import DefaultAzureCredential, get_bearer_token_provider
     from openai import AzureOpenAI
@@ -211,7 +215,8 @@ Combine each product's name and category into `searchText`, then generate an emb
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-    with urllib.request.urlopen(DATA_URL) as response:
+    ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    with urllib.request.urlopen(DATA_URL, context=ssl_context) as response:
         products = json.load(response)
 
     print(f"Downloaded {len(products)} products.")
@@ -397,6 +402,7 @@ Search for products by meaning rather than exact keywords.
     results = container.query_items(
         query=query,
         parameters=[{"name": "@queryVector", "value": query_vector}],
+        enable_cross_partition_query=True,
     )
 
     print(f'Query: "{search_text}"')
@@ -405,6 +411,8 @@ Search for products by meaning rather than exact keywords.
 
     print(f"Request charge: {container.client_connection.last_response_headers['x-ms-request-charge']} RUs")
     ```
+
+    The catalog spans multiple `categoryId` partitions. Setting `enable_cross_partition_query=True` lets the query search across all categories.
 
 1. Run the application.
 
@@ -424,21 +432,23 @@ Record the five product names and distance scores. The phrase doesn't contain *h
     ORDER BY VectorDistance(c.embedding, @queryVector)
     ```
 
-1. Bind `@categoryId` to the helmet category identifier. Replace the existing `results = container.query_items(...)` call with the following code, which keeps the query vector parameter and adds the category parameter.
+1. Bind `@categoryId` to the helmet category identifier. Replace the existing `results = container.query_items(...)` call with the following code, which keeps the query vector parameter, adds the category parameter, and explicitly targets that partition.
 
     ```python
+    category_id = "14A1AD5D-59EA-4B63-A189-67B077783B0E"
     results = container.query_items(
         query=query,
         parameters=[
             {"name": "@queryVector", "value": query_vector},
-            {"name": "@categoryId", "value": "14A1AD5D-59EA-4B63-A189-67B077783B0E"},
+            {"name": "@categoryId", "value": category_id},
         ],
+        partition_key=category_id,
     )
     ```
 
     Run the application again with `python search.py` and compare the request charge with the unfiltered query.
 
-    Filtering on `categoryId`, the partition key, limits the search to one logical partition. The request charge might not decrease on this small dataset.
+    Setting `partition_key` to the same `categoryId` used in the filter limits the search to one logical partition, so this query doesn't need cross-partition execution. The request charge might not decrease on this small dataset.
 
 > &#128221; The `diskANN` index requires at least 1,000 vectors. With only 295 vectors, these queries use a full scan.
 
