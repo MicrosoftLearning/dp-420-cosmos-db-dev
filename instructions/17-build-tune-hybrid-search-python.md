@@ -2,8 +2,8 @@
 lab:
   title: Build and Tune Hybrid Search in Python
   module: Module 17 - Implement Hybrid Search and Optimize AI Retrieval in Azure Cosmos DB for NoSQL
-  description: Load a catalog with searchable text and embeddings, measure keyword and semantic retrieval separately, fuse them with RRF, weight the fusion, and optimize the query against measured request charges.
-  duration: 45 minutes
+  description: Compare keyword, vector, and RRF retrieval, adjust fusion weights, and measure relevance, request charge, and latency.
+  duration: 60 minutes
   level: 300
   islab: true
   primarytopics:
@@ -14,11 +14,9 @@ lab:
 
 # Build and Tune Hybrid Search in Python
 
-In this exercise, you build a hybrid retrieval pipeline on one Azure Cosmos DB for NoSQL container and tune it with measurements rather than impressions. You load the CosmicWorks product catalog with a searchable text property and an embedding for every product, run the keyword and semantic halves separately so you can see what each one misses, fuse them with `RRF`, bias the fusion with weights, and then measure what each optimization does to the request charge.
+In this exercise, you build hybrid search over the CosmicWorks product catalog in Azure Cosmos DB for NoSQL. You compare keyword and vector results, combine them with `RRF`, and adjust the weights while measuring request charge and latency.
 
-The catalog is chosen to make both failure modes visible. No product name or category name in the 295 products contains the word *see* or the word *night*, while 96 of them contain the word *road*, so a keyword query for *something to see the road at night* has exactly one usable term and it points away from the answer. The catalog also holds four size variants of the same touring bike, differing by two characters and priced identically, so a semantic query for one of them has almost nothing to separate them by.
-
-This exercise takes approximately **45** minutes to complete.
+This exercise takes approximately **60** minutes to complete.
 
 ## Before you start
 
@@ -28,7 +26,7 @@ If your lab environment isn't set up yet, follow [Set up your lab environment](h
 
 You also need [Python](https://www.python.org/downloads/) 3.12 or 3.13 installed.
 
-The setup script creates a Microsoft Foundry resource, project, and `text-embedding-3-small` deployment. Your subscription needs quota for that model in the Foundry region. You don't need an existing Foundry project.
+The setup script creates a Microsoft Foundry resource, project, and `text-embedding-3-small` deployment. Your subscription needs quota for that model in the Foundry region.
 
 ## Set up your Azure Cosmos DB resources
 
@@ -48,7 +46,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
 
 1. Open the context menu for the folder and select **Open in Integrated Terminal**. If the terminal isn't PowerShell, select the dropdown beside the **+** in the terminal toolbar and choose **PowerShell**.
 
-1. Sign in to the Azure CLI. Follow the sign-in prompt, which uses an account picker on supported Windows systems or a browser on other systems.
+1. Sign in to the Azure CLI and follow the sign-in prompt.
 
     ```azurecli
     az login
@@ -67,9 +65,9 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab17 -LabProfile search -AccountOnly -EnableFoundry -EmbeddingOnly -FoundryLocation $location
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab17a7f3k9`.
+    The script generates a unique account name, such as `dp420lab17a7f3k9`.
 
-1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
+1. Wait for the script to finish. This takes 5-10 minutes.
 
 1. Record the **Account name**, **Account endpoint**, **Foundry account**, and **OpenAI endpoint** values the script prints. The Cosmos DB endpoint looks like `https://<your-account-name>.documents.azure.com:443/`. The script also saves the Foundry values in `logs/foundry-<account-name>.json`.
 
@@ -79,7 +77,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     $accountName = "<your-account-name>"
     ```
 
-1. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled. Allow up to 15 minutes for vector search activation before creating containers. Full-text search uses the container's full-text policy and index and doesn't require a separate enrollment step for this exercise.
+1. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled. Allow up to 15 minutes for activation before creating containers.
 
 1. Resume setup against this same account to create the database, container, and Cosmos DB role assignment.
 
@@ -88,7 +86,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile search -EnableFoundry -EmbeddingOnly
     ```
 
-    Continue only after setup and verification succeed. If vector search activation is still propagating, rerun against the same account after it completes.
+    Continue after both commands succeed.
 
 After both stages, the script creates the following resources:
 
@@ -102,9 +100,9 @@ After both stages, the script creates the following resources:
 | Embedding deployment | `text-embedding-3-small`, version `1`, Standard deployment, 30 capacity units; produces 1,536-dimensional embeddings by default |
 | Foundry role assignment | Foundry User, granted to your signed-in identity on the Foundry resource |
 
-Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. The setup script uses your Azure CLI identity. The application uses `DefaultAzureCredential`, which can select another configured identity before trying Azure CLI. Make sure the selected identity has the required role assignments. Microsoft Entra ID authentication is the recommended approach for new accounts.
+The applications use `DefaultAzureCredential` for Microsoft Entra ID authentication. Make sure the identity it selects has the role assignments listed above.
 
-> &#9888; Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and the container's vector policy settings can't be edited in place. Never point this exercise at a shared training or production account.
+> &#9888; Use the dedicated account created for this exercise, not a shared training or production account.
 
 1. Set variables for the account name and its endpoint so later commands can use them.
 
@@ -115,7 +113,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Confirm the embedding deployment
 
-Setup deploys the embedding model through `foundry.bicep` and grants your identity access. The `-EmbeddingOnly` switch avoids creating a chat deployment that this exercise doesn't use.
+Confirm that the embedding deployment is ready before loading the catalog.
 
 1. In the **Allfiles/Labs/Shared** terminal, load the saved settings.
 
@@ -138,13 +136,11 @@ Setup deploys the embedding model through `foundry.bicep` and grants your identi
 
     Confirm that `text-embedding-3-small` reports `Succeeded`. Use **OpenAiEndpoint**, not the project endpoint, in the application code that follows. The model's default output length matches the container's 1,536 dimensions.
 
-> &#128221; If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. For a custom Foundry account name, also pass `-FoundryAccountName` to `verify.ps1`. A new role assignment can take several minutes to propagate before inference succeeds.
+> &#128221; New role assignments can take several minutes to take effect.
 
 ## Task 2: Load the catalog with searchable text and embeddings
 
-The container's full-text index covers `/searchText` and its vector index covers `/embedding`, and neither property exists in the CosmicWorks data. In this task, you build both as you load the catalog.
-
-What goes into `searchText` decides what the keyword half can ever find. The CosmicWorks `description` property holds a generated sentence of the form `The product called "<name>"` for all 295 products, with no exceptions. Each description includes a different product name but adds no explanation of the product's purpose. The product name and its category carry the words a shopper types, so this exercise concatenates those two and embeds the same string.
+The catalog descriptions repeat the product names. This exercise combines each name and category into `searchText` and embeds that same text. The container's indexes read `/searchText` and `/embedding`.
 
 1. Create a folder for the application and open it in the integrated terminal.
 
@@ -168,7 +164,7 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
     python -m pip install azure-cosmos azure-identity openai truststore
     ```
 
-    The `truststore` package uses the operating system's certificate store for the catalog download while keeping certificate verification enabled. If the download reports `CERTIFICATE_VERIFY_FAILED`, ensure your lab environment's trusted root and intermediate certificates are installed. On a network that inspects HTTPS traffic, ask your administrator for the required certificates rather than disabling verification.
+    The `truststore` package validates the catalog download using the operating system's trusted certificates.
 
 1. Create a file named **load.py** and add the following code. Replace the two placeholder values with your endpoints.
 
@@ -205,14 +201,14 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
         .get_container_client("productSearch")
     )
 
+    # Validate the download with the operating system's trusted certificates.
     ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     with urllib.request.urlopen(DATA_URL, context=ssl_context) as response:
         products = json.load(response)
 
     print(f"Downloaded {len(products)} products.")
 
-    # Use the same text for keyword and vector search so the comparison
-    # changes the retrieval method, not the indexed product description.
+    # Use the same name-and-category text for both search methods.
     for start in range(0, len(products), 50):
         batch = products[start:start + 50]
         texts = [f"{product['name']} {product['categoryName']}" for product in batch]
@@ -223,6 +219,7 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
         for product, text, data in zip(batch, texts, embeddings.data):
             product["searchText"] = text
             product["embedding"] = data.embedding
+            # Preserve the ID and partition key so reruns replace the same logical item.
             container.upsert_item(product)
 
         print(f"Loaded {start + len(batch)} of {len(products)}.")
@@ -244,20 +241,39 @@ What goes into `searchText` decides what the keyword half can ever find. The Cos
     Loaded 295 of 295.
     ```
 
-Every item now carries the text the full-text index reads and the vector the similarity search ranks, so both halves of a hybrid query have something to work with.
-
 ## Task 3: Measure each retrieval method on its own
 
-Before fusing anything, run the two halves separately so you can see what each one contributes. In this task, you run a keyword query and a similarity query for the same shopper phrase and record what each returns and what each costs.
+Compare keyword and vector results for these two shopper requests.
 
-The phrase is *something to see the road at night*. Its content words are *see*, *road*, and *night*, and only one of them appears anywhere in the catalog's searchable text.
+| Case | Shopper query | Useful result criteria |
+| :--- | :--- | :--- |
+| Hill riding | `I need some tires to ride up the hill.` | Tires rather than complete bikes, pumps, or inner tubes. |
+| Exact bike | `Touring-1000 Blue, 50` | The product must match the model, color, and size. Another size or color doesn't meet this request. |
+
+Each query returns up to five products. Keyword search matches terms in `searchText`; vector search ranks by embedding similarity.
 
 1. Create a file named **compare.py** and add the following code, replacing the two placeholder values with your endpoints.
 
     ```python
+    from time import perf_counter
+
     from azure.cosmos import CosmosClient
     from azure.identity import DefaultAzureCredential, get_bearer_token_provider
     from openai import AzureOpenAI
+
+    # Edit each search phrase and its keyword terms together when testing scenarios.
+    cases = [
+        {
+            "label": "Hill riding",
+            "text": "I need some tires to ride up the hill.",
+            "terms": ["tires", "ride", "hill"],
+        },
+        {
+            "label": "Exact bike",
+            "text": "Touring-1000 Blue, 50",
+            "terms": ["Touring", "1000", "Blue", "50"],
+        },
+    ]
 
     COSMOS_ENDPOINT = "<cosmos-endpoint>"
     OPENAI_ENDPOINT = "<openai-endpoint>"
@@ -279,59 +295,64 @@ The phrase is *something to see the road at night*. Its content words are *see*,
         .get_container_client("productSearch")
     )
 
-    SEARCH_TEXT = "something to see the road at night"
-    TERMS = ["see", "road", "night"]
-
-
-    def embed(text):
-        # Query vectors must use the same deployment as the stored product vectors.
-        return openai_client.embeddings.create(input=text, model=DEPLOYMENT).data[0].embedding
-
 
     def run(label, query, parameters):
         request_charges = []
 
         def record_charge(headers, response):
-            # Capture each response's RU charge rather than only the final page's.
-            request_charges.append(float(headers.get("x-ms-request-charge", 0)))
+            # The hook runs per response; the final page alone isn't the total RU charge.
+            request_charges.append(float(headers["x-ms-request-charge"]))
 
-        # Materialize the lazy results so every response reaches the hook
-        # before calculating the complete query charge.
+        # Query execution is lazy; consume every page before totaling charge and elapsed time.
+        start = perf_counter()
         results = list(container.query_items(
             query=query,
             parameters=parameters,
             enable_cross_partition_query=True,
             response_hook=record_charge,
         ))
+        elapsed_ms = (perf_counter() - start) * 1000
         charge = sum(request_charges)
-        print(f"\n{label}  ({charge} RUs)")
+        print(f"\n{label}: {charge:.2f} RUs; {elapsed_ms:.1f} ms")
         for item in results:
             print(f"  {item['name']}  |  {item['categoryName']}")
 
 
-    # Keyword ranking uses explicit terms; it doesn't embed the shopper's phrase.
-    keyword_query = """
-        SELECT TOP 5 c.name, c.categoryName
-        FROM c
-        ORDER BY RANK FullTextScore(c.searchText, @term1, @term2, @term3)
-    """
+    for case in cases:
+        # Generate once per case and reuse across methods; time this model call separately.
+        start = perf_counter()
+        response = openai_client.embeddings.create(input=case["text"], model=DEPLOYMENT)
+        embedding_ms = (perf_counter() - start) * 1000
+        query_vector = response.data[0].embedding
 
-    # Vector ranking uses the meaning encoded in the complete shopper phrase.
-    vector_query = """
-        SELECT TOP 5 c.name, c.categoryName
-        FROM c
-        ORDER BY RANK VectorDistance(c.embedding, @queryVector)
-    """
+        print(f"\n{case['label']}: {case['text']}")
+        print(f"Query embedding: {embedding_ms:.1f} ms")
 
-    run("Keyword only", keyword_query, [
-        {"name": "@term1", "value": TERMS[0]},
-        {"name": "@term2", "value": TERMS[1]},
-        {"name": "@term3", "value": TERMS[2]},
-    ])
+        # Bind term values as parameters; generate only the placeholder names.
+        term_parameters = [
+            {"name": f"@term{i}", "value": term}
+            for i, term in enumerate(case["terms"])
+        ]
+        term_arguments = ", ".join(parameter["name"] for parameter in term_parameters)
+        vector_parameters = [{"name": "@queryVector", "value": query_vector}]
 
-    run("Vector only", vector_query, [
-        {"name": "@queryVector", "value": embed(SEARCH_TEXT)},
-    ])
+        # Rank products that contain at least one search term.
+        keyword_query = f"""
+            SELECT TOP 5 c.id, c.name, c.categoryName
+            FROM c
+            WHERE FullTextContainsAny(c.searchText, {term_arguments})
+            ORDER BY RANK FullTextScore(c.searchText, {term_arguments})
+        """
+
+        # Rank by meaning without requiring a keyword match.
+        vector_query = """
+            SELECT TOP 5 c.id, c.name, c.categoryName
+            FROM c
+            ORDER BY RANK VectorDistance(c.embedding, @queryVector)
+        """
+
+        run("Keyword only", keyword_query, term_parameters)
+        run("Vector only", vector_query, vector_parameters)
     ```
 
 1. Run the application.
@@ -340,127 +361,86 @@ The phrase is *something to see the road at night*. Its content words are *see*,
     python compare.py
     ```
 
-1. Compare the two result lists and record them. The catalog holds exactly three items in the *Accessories, Lights* category, and those three are what the shopper is asking for.
+1. Review the **Hill riding** results. In a sample run:
 
-    The corpus, not the ranking, constrains the keyword result. The words *see* and *night* appear in no product name or category in the catalog, so the only term BM25 can score on is *road*, which 96 items carry. The similarity result reads the phrase as a description of purpose.
+    - **Keyword only** mixes road, mountain, and touring tires. It found the requested product type by matching the word `tires`.
+    - In **Vector only**, the three mountain-tire variants appear first even though the query never uses the word `mountain`.
 
-    Record which list contains any of the three lights, and the request charge each query reported. Ranking depends on your data and model deployment. Approximate indexing can also affect ranking when the index is active, but this catalog is below the threshold explained in task 6. Write down what your queries return rather than matching them to an expected list.
+    Both methods returned tires. Keyword search uses the indexed words; vector search also takes the hill-riding context into account.
 
-1. Now change the shopper phrase. Change `SEARCH_TEXT` to `Touring-1000 Blue, 50` and the three terms to `Touring`, `1000`, and `Blue`, and run the application again.
+1. Review the **Exact bike** results.
 
-    The catalog holds four size variants of that model, all priced identically and differing by two characters. The keyword terms match the model and color but omit the requested size, so they don't distinguish the four variants by size. Similarity scoring compares four almost identical strings. Record the order from each method without assuming either one ranks the requested size first.
+    Both methods place `Touring-1000 Blue, 50` first. An exact product name gives keyword search a strong match.
+
+    The remaining keyword results include a yellow bike and a frame that share some terms. The remaining vector results are similar blue touring bikes, but include other sizes and the `Touring-2000` model. Similarity doesn't enforce an exact model or size requirement.
+
+1. Review the cost and timing measurements.
+
+    Vector search used **19.90 RU** for each case, compared with **7.98 RU** for the keyword hill-riding query and **14.06 RU** for the keyword exact-bike query in this run.
+
+    The database **ms** excludes **Query embedding** time. The sample hill-riding query takes about **1.16 seconds** in Cosmos DB plus **8.8 seconds** to generate the embedding. Keyword search doesn't need that model call. Include both times when assessing response time.
+
+    Timing can vary, especially on the first request while connections are established.
+
+> &#128221; This catalog has 295 vectors, below the 1,000-vector threshold for `diskANN` indexing. Vector queries use a full scan, so these measurements don't represent indexed production performance.
 
 ## Task 4: Fuse the two rankings with RRF
 
-You now have results from both retrieval methods. In this task, you run both in one query and let `RRF` combine the rankings.
+Combine the word-based and meaning-based rankings in one query with `RRF`.
 
-1. Add the following query and call to the end of your application, before you rerun it. Restore `SEARCH_TEXT` to `something to see the road at night` and the terms to `see`, `road`, and `night` first.
+1. In `for case in cases:`, insert this code immediately after `run("Vector only", vector_query, vector_parameters)`, at the same indentation.
 
     ```python
-    # RRF combines rank positions from the two retrieval methods,
-    # not their raw distance and full-text score values.
-    hybrid_query = """
-        SELECT TOP 5 c.name, c.categoryName
+    # Fuse rank positions, not raw scores.
+    hybrid_query = f"""
+        SELECT TOP 5 c.id, c.name, c.categoryName
         FROM c
         ORDER BY RANK RRF(
             VectorDistance(c.embedding, @queryVector),
-            FullTextScore(c.searchText, @term1, @term2, @term3))
+            FullTextScore(c.searchText, {term_arguments}))
     """
 
-    run("Hybrid", hybrid_query, [
-        {"name": "@queryVector", "value": embed(SEARCH_TEXT)},
-        {"name": "@term1", "value": TERMS[0]},
-        {"name": "@term2", "value": TERMS[1]},
-        {"name": "@term3", "value": TERMS[2]},
-    ])
+    run("Hybrid, equal weights", hybrid_query,
+        vector_parameters + term_parameters)
     ```
 
-1. Run the application and compare all three lists.
+1. Run the application **once**. It prints all three lists for each case. In a sample run:
 
-    The fused list draws from both rankings, so items that only one method found can appear alongside items that both found. Record how many of the five results came from each of the earlier lists, and record the hybrid query's request charge next to the other two.
+    - **Hill riding:** hybrid search keeps the mountain tires at the top, as vector search did. The road tires below them change order.
+    - **Exact bike:** the requested bike stays first, followed by blue size variants of the same model. The yellow bike and frame don't appear, but other sizes still do.
+    - **Cost:** hybrid search uses **47.77 RU** for hill riding and **52.28 RU** for the exact bike, more than either method alone. It keeps the same first result as vector search for both queries.
 
-1. Confirm one of the rules that governs where `RRF` can appear. Add `, c.price` to the projection and run again, which works. Then try to project the fused score itself by adding `RRF(...) AS score` to the `SELECT` list.
-
-    The query fails because `RRF` can't appear in the projection. `FullTextScore` also can't be projected or used in a `WHERE` clause. You can project `VectorDistance` separately, but its value isn't the fused score. Remove the invalid `RRF` projection before continuing.
+    `RRF` combines rank positions from keyword and vector search rather than adding their raw scores. The hybrid query reuses the existing query vector, so it doesn't make another embedding request.
 
 ## Task 5: Weight the fusion and compare the results
 
-An unweighted fusion treats both rankings as equally credible. In this task, you bias it in each direction and watch the result list move.
+Change the balance between keyword and vector rankings with a weights array.
 
-1. Change the hybrid query to weight the vector half twice as heavily as the keyword half, by adding a weights array as the last argument to `RRF`.
-
-    ```sql
-    ORDER BY RANK RRF(
-        VectorDistance(c.embedding, @queryVector),
-        FullTextScore(c.searchText, @term1, @term2, @term3),
-        [2, 1])
-    ```
-
-1. Run the application and record the result list.
-
-1. Change the weights to `[1, 2]` and run it again.
-
-    The weights correspond to the functions positionally, so `[2, 1]` favors the function listed first and `[1, 2]` favors the second. Record how the list changes between the two runs.
-
-1. Now introduce the mistake the positional rule invites. Swap the order of the two functions inside `RRF` while leaving the weights at `[1, 2]`, and run it once more.
-
-    ```sql
-    ORDER BY RANK RRF(
-        FullTextScore(c.searchText, @term1, @term2, @term3),
-        VectorDistance(c.embedding, @queryVector),
-        [1, 2])
-    ```
-
-    The query runs and now favors vector search instead of keyword search. Swapping the functions doesn't cause an error, which is why the function order and the weights array get reviewed together.
-
-## Task 6: Optimize the hybrid query and measure the difference
-
-In this task, you apply the cheapest optimizations in order and record what each one does to the request charge.
-
-> &#128221; The container holds 295 vectors, and the `diskANN` index takes effect only once at least 1,000 vectors are indexed. Every similarity and hybrid query in this exercise runs a full scan instead, so the results are correct and the request charges are not representative of production. Read the numbers as a comparison between two queries in the same container rather than as a capacity figure.
-
-1. Restore the unweighted `TOP 5` hybrid query from task 4, with the original shopper phrase and terms. Run it and record its request charge as your baseline.
-
-1. Reduce the result count. Change `TOP 5` to `TOP 3` in the hybrid query, run the application, and record the charge.
-
-1. Add a partition key filter. The three lights all sit in one category, so filtering to it routes the query to a single logical partition.
+1. In `for case in cases:`, insert this code after the `Hybrid, equal weights` call, at the same indentation.
 
     ```python
-    # A known category narrows both the partition scope and the candidate set.
-    # Don't apply it when the shopper is asking you to discover the category.
-    filtered_query = """
-        SELECT TOP 3 c.name, c.categoryName
-        FROM c
-        WHERE c.categoryId = @categoryId
-        ORDER BY RANK RRF(
-            VectorDistance(c.embedding, @queryVector),
-            FullTextScore(c.searchText, @term1, @term2, @term3))
-    """
+    # The first weight applies to VectorDistance; the second applies to FullTextScore.
+    for weights in ("[2, 1]", "[1, 2]"):
+        weighted_query = f"""
+            SELECT TOP 5 c.id, c.name, c.categoryName
+            FROM c
+            ORDER BY RANK RRF(
+                VectorDistance(c.embedding, @queryVector),
+                FullTextScore(c.searchText, {term_arguments}),
+                {weights})
+        """
 
-    run("Hybrid, filtered", filtered_query, [
-        {"name": "@categoryId", "value": "11EF8851-816A-49E2-9D5C-8D17AB82C5FF"},
-        {"name": "@queryVector", "value": embed(SEARCH_TEXT)},
-        {"name": "@term1", "value": TERMS[0]},
-        {"name": "@term2", "value": TERMS[1]},
-        {"name": "@term3", "value": TERMS[2]},
-    ])
+        run(f"Hybrid {weights}", weighted_query,
+            vector_parameters + term_parameters)
     ```
 
-1. Run the application and record the charge.
+1. Run the application **once**. It prints the equal-weight and both weighted hybrid lists for each case. In a sample run:
 
-    The filter narrows the ranked set to one category. Use your measurements to determine its effect on request charge rather than assuming it produces the largest saving. It returns lights and nothing else, so it works only when the application already knows the category, and it's the wrong tool when the category is what the shopper is trying to discover.
+    - **Hill riding:** equal weights and `[2, 1]` keep the mountain-tire variants together at the top. With `[1, 2]`, a road tire moves ahead of one of the mountain tires.
+    - **Exact bike:** the requested bike stays first with all three settings. The vector-heavy setting moves a similar blue bike from another model higher. The keyword-heavy setting brings in a yellow bike that shares the requested model and size. More keyword weight doesn't require every term to match.
+    - **Cost:** all three settings cost **47.77 RU** for hill riding and **52.28 RU** for the exact bike. Here, the weights change the order, not the RU charge. Timing varies between runs.
 
-1. Establish a ground truth for the semantic half. Run a similarity query with the third argument to `VectorDistance` set to `true`, which forces an exhaustive comparison against every stored vector.
-
-    ```sql
-    SELECT TOP 5 c.name, c.categoryName
-    FROM c
-    ORDER BY VectorDistance(c.embedding, @queryVector, true)
-    ```
-
-1. Compare that list against the unfiltered `TOP 5` similarity results from task 3 for the same shopper phrase and query vector, and record the request charge next to the others.
-
-    At this container's size, both queries scan rather than use the `diskANN` index. Compare their top-five results, allowing for ties, and measure their charges instead of assuming the charges are close. On a container with an active `diskANN` index and at least 1,000 indexed vectors, comparing the same number of results against brute force measures the approximate query's recall.
+    Weights follow function order. With `VectorDistance` first and `FullTextScore` second, `[2, 1]` favors vector search and `[1, 2]` favors keyword search.
 
 ## Clean up resources
 
@@ -476,7 +456,3 @@ If your lab environment provided the resource group, keep it. Delete only the Co
 az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
 az cognitiveservices account delete --name $openAiName --resource-group $resourceGroup
 ```
-
-Deleting the group removes the account, the AI Services resource, and the deployment together. The role assignment you created is scoped to the AI Services resource, so it goes with it.
-
-You now have a row of request charges beside a row of result lists for the same shopper phrase. That pairing is what turns retrieval tuning into a decision the product can make, because every change you tried has both a relevance consequence and a cost consequence, and neither one is visible without the other.
