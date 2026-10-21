@@ -181,6 +181,7 @@ Load the CosmicWorks catalog into your container and generate an embedding from 
     CosmosClient cosmosClient = new(CosmosEndpoint, credential);
     Container container = cosmosClient.GetDatabase("cosmicworks").GetContainer("productSearch");
 
+    // Use a renewable Entra token for the OpenAI-compatible endpoint.
     BearerTokenPolicy tokenPolicy = new(credential, "https://ai.azure.com/.default");
     OpenAIClient openAiClient = new(tokenPolicy, new OpenAIClientOptions
     {
@@ -198,6 +199,7 @@ Load the CosmicWorks catalog into your container and generate an embedding from 
     for (int start = 0; start < products.Count; start += 50)
     {
         List<Product> batch = products.Skip(start).Take(50).ToList();
+        // Embed names and categories; keep prices as separate document fields.
         List<string> texts = batch.Select(p => $"{p.name} {p.categoryName}").ToList();
 
         OpenAIEmbeddingCollection embeddings = await embeddingClient.GenerateEmbeddingsAsync(texts);
@@ -270,6 +272,7 @@ Ask the chat model about Contoso's products without providing data from your con
 
     const string OpenAiEndpoint = "<your-openai-endpoint>";
 
+    // Use a renewable Entra token for the OpenAI-compatible endpoint.
     BearerTokenPolicy tokenPolicy = new(new DefaultAzureCredential(), "https://ai.azure.com/.default");
     OpenAIClient openAiClient = new(tokenPolicy, new OpenAIClientOptions
     {
@@ -335,6 +338,7 @@ Use vector search to retrieve matching products, then pass them to the chat mode
     CosmosClient cosmosClient = new(CosmosEndpoint, credential);
     Container container = cosmosClient.GetDatabase("cosmicworks").GetContainer("productSearch");
 
+    // Use a renewable Entra token for the OpenAI-compatible endpoint.
     BearerTokenPolicy tokenPolicy = new(credential, "https://ai.azure.com/.default");
     OpenAIClient openAiClient = new(tokenPolicy, new OpenAIClientOptions
     {
@@ -348,8 +352,8 @@ Use vector search to retrieve matching products, then pass them to the chat mode
     // Embed the question with the same deployment used to load the catalog.
     OpenAIEmbedding embedding = await embeddingClient.GenerateEmbeddingAsync(question);
 
-    // TOP limits the context size but doesn't impose a relevance threshold.
-    // Project business fields, not the stored embedding, into the prompt.
+    // Rank products by vector similarity; return catalog fields, not embedding arrays.
+    // TOP limits the result count, not the minimum similarity.
     QueryDefinition query = new QueryDefinition("""
         SELECT TOP 5 c.id, c.name, c.categoryName, c.price, c.sku
         FROM c
@@ -493,9 +497,11 @@ Change a product's price in Azure Cosmos DB and check that the assistant uses th
     Container container = cosmosClient.GetDatabase("cosmicworks").GetContainer("productSearch");
     PartitionKey partitionKey = new(CategoryId);
 
+    // Read the current price using the item's ID and partition key.
     ItemResponse<ProductPrice> before = await container.ReadItemAsync<ProductPrice>(
         ProductId, partitionKey);
 
+    // Change only price, leaving the search text and embedding unchanged.
     ItemResponse<ProductPrice> after = await container.PatchItemAsync<ProductPrice>(
         ProductId,
         partitionKey,

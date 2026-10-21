@@ -195,6 +195,7 @@ Load the CosmicWorks catalog into your container and generate an embedding from 
             credential, "https://ai.azure.com/.default"),
     )
 
+    # Use the operating system's trusted certificates for the catalog download.
     ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     with urllib.request.urlopen(DATA_URL, context=ssl_context, timeout=60) as response:
         products = json.load(response)
@@ -204,6 +205,7 @@ Load the CosmicWorks catalog into your container and generate an embedding from 
     # that retrieval will later supply to the chat model.
     for start in range(0, len(products), 50):
         batch = products[start:start + 50]
+        # Embed names and categories; keep prices as separate document fields.
         texts = [f"{p['name']} {p['categoryName']}" for p in batch]
 
         response = openai_client.embeddings.create(input=texts, model=EMBEDDING_DEPLOYMENT)
@@ -255,6 +257,7 @@ Ask the chat model about Contoso's products without providing data from your con
     OPENAI_ENDPOINT = "<your-openai-endpoint>"
     CHAT_DEPLOYMENT = "gpt-5.4-mini"
 
+    # Pass an Entra token provider through the client's api_key parameter.
     openai_client = OpenAI(
         base_url=OPENAI_ENDPOINT.rstrip("/") + "/openai/v1/",
         api_key=get_bearer_token_provider(
@@ -313,6 +316,7 @@ The retrieval query enables cross-partition execution so it can search every pro
                  .get_database_client("cosmicworks")
                  .get_container_client("productSearch"))
 
+    # Pass an Entra token provider through the client's api_key parameter.
     openai_client = OpenAI(
         base_url=OPENAI_ENDPOINT.rstrip("/") + "/openai/v1/",
         api_key=get_bearer_token_provider(
@@ -324,8 +328,8 @@ The retrieval query enables cross-partition execution so it can search every pro
         vector = openai_client.embeddings.create(
             input=question, model=EMBEDDING_DEPLOYMENT).data[0].embedding
 
-        # TOP limits the context size but doesn't impose a relevance threshold.
-        # Project business fields, not the stored embedding, into the prompt.
+        # Rank products by vector similarity; return catalog fields, not embedding arrays.
+        # TOP limits the result count, not the minimum similarity.
         query = """
             SELECT TOP @topN c.id, c.name, c.categoryName, c.price, c.sku
             FROM c
@@ -453,7 +457,9 @@ Change a product's price in Azure Cosmos DB and check that the assistant uses th
     cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=DefaultAzureCredential())
     container = cosmos_client.get_database_client("cosmicworks").get_container_client("productSearch")
 
+    # Read the current price using the item's ID and partition key.
     before = container.read_item(item=PRODUCT_ID, partition_key=CATEGORY_ID)
+    # Change only price, leaving the search text and embedding unchanged.
     after = container.patch_item(
         item=PRODUCT_ID,
         partition_key=CATEGORY_ID,
