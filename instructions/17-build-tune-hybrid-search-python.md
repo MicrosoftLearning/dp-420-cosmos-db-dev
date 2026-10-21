@@ -348,7 +348,7 @@ Each query returns up to five products. Keyword search matches terms in `searchT
         vector_query = """
             SELECT TOP 5 c.id, c.name, c.categoryName
             FROM c
-            ORDER BY RANK VectorDistance(c.embedding, @queryVector)
+            ORDER BY VectorDistance(c.embedding, @queryVector)
         """
 
         run("Keyword only", keyword_query, term_parameters)
@@ -414,7 +414,7 @@ Combine the word-based and meaning-based rankings in one query with `RRF`.
 
 ## Task 5: Weight the fusion and compare the results
 
-Change the balance between keyword and vector rankings with a weights array.
+The unweighted query treats keyword and vector rankings equally. Adding weights lets you favor one ranking without changing the search text, terms, or query vector. For the hill-riding request, giving vector search more weight can keep mountain tires near the top. Giving keyword search more weight can move road tires higher because they also match `tires`.
 
 1. In `for case in cases:`, insert this code after the `Hybrid, equal weights` call, at the same indentation.
 
