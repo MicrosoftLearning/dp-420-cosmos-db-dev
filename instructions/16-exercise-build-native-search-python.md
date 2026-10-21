@@ -3,7 +3,7 @@ lab:
   title: Build Native Search Over a Product Catalog in Python
   module: Module 16 - Implement Full-Text and Vector Search in Azure Cosmos DB for NoSQL
   description: Load the CosmicWorks catalog with searchable text and embeddings, run BM25 and VectorDistance queries against one container, and refresh a stale embedding from the change feed.
-  duration: 45 minutes
+  duration: 60 minutes
   level: 300
   islab: true
   primarytopics:
@@ -14,11 +14,11 @@ lab:
 
 # Build Native Search Over a Product Catalog in Python
 
-In this exercise, you build both retrieval methods on one Azure Cosmos DB for NoSQL container. You load the CosmicWorks product catalog with a searchable text property and an embedding for every product, run BM25 keyword queries against a full-text index, run similarity queries with `VectorDistance`, and then use the change feed to refresh an embedding after the product it describes is renamed.
+In this exercise, you add full-text and vector search to a CosmicWorks product catalog in Azure Cosmos DB for NoSQL. You load searchable text and embeddings, run keyword and similarity queries, and use the change feed to refresh an embedding after renaming a product.
 
-The container you work with already carries a full-text policy, a vector policy, and both indexes. The setup script configures these settings before you load data. What the container doesn't carry is data. Building the text that gets indexed and calling the model that produces the vectors are application decisions, and they're the decisions this exercise is about.
+The setup script configures the container's full-text and vector policies and indexes. Your application prepares the searchable text and generates the embeddings.
 
-This exercise takes approximately **45** minutes to complete.
+This exercise takes approximately **60** minutes to complete.
 
 ## Before you start
 
@@ -48,7 +48,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
 
 1. Open the context menu for the folder and select **Open in Integrated Terminal**. If the terminal isn't PowerShell, select the dropdown beside the **+** in the terminal toolbar and choose **PowerShell**.
 
-1. Sign in to the Azure CLI. Follow the sign-in prompt. On Windows, the Azure CLI uses Web Account Manager by default. On Linux and macOS, it uses browser-based sign-in by default.
+1. Sign in to the Azure CLI and follow the sign-in prompt.
 
     ```azurecli
     az login
@@ -67,7 +67,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab16 -LabProfile search -AccountOnly -EnableFoundry -EmbeddingOnly -FoundryLocation $location
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab16a7f3k9`.
+    The script generates a globally unique account name, such as `dp420lab16a7f3k9`.
 
 1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
 
@@ -79,16 +79,16 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     $accountName = "<your-account-name>"
     ```
 
-1. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled, then enable **Full Text & Hybrid Search for NoSQL API**. Allow up to 15 minutes for enrollment and confirm both features are enabled before continuing. If either feature is unavailable, stop and resolve that prerequisite before creating containers.
+1. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled, then enable **Full Text & Hybrid Search for NoSQL API**. Allow up to 15 minutes for enrollment. Confirm both features are enabled before continuing.
 
-1. Resume setup against this same account. The `-SearchFeaturesReady` compatibility switch requires an existing account name. It doesn't verify your portal check, and setup can enable missing vector-search account capabilities.
+1. Complete setup and verify the resources using the account name you recorded.
 
     ```powershell
     ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -AccountName $accountName -LabProfile search -SearchFeaturesReady -EnableFoundry -EmbeddingOnly -FoundryLocation $location
     ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile search -EnableFoundry -EmbeddingOnly
     ```
 
-    Continue only after setup and verification succeed. If enrollment is still propagating, rerun against the same account after it completes.
+    Continue after both commands succeed.
 
 After both stages, the script creates the following resources:
 
@@ -102,7 +102,7 @@ After both stages, the script creates the following resources:
 | Embedding deployment | `text-embedding-3-small`, version `1`, Standard deployment, 30 capacity units; produces 1,536-dimensional embeddings by default |
 | Foundry role assignment | Foundry User, granted to your signed-in identity on the Foundry resource |
 
-Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Azure operations use Microsoft Entra ID authentication, which is the recommended approach for new accounts. The application code uses `DefaultAzureCredential`, which can select another configured identity before your Azure CLI identity. Confirm that the selected identity has the required roles.
+The applications use `DefaultAzureCredential` for Microsoft Entra ID authentication. It can select another configured identity before your Azure CLI identity, so ensure the selected identity has the roles listed above.
 
 > &#9888; Use only the resource group and account this script creates. Vector indexing and search can't be disabled on a container after enablement, and vector policy settings can't be edited directly. Never point this exercise at a shared training or production account.
 
@@ -115,7 +115,7 @@ Because key-based authentication is disabled, no key or connection string appear
 
 ## Task 1: Confirm the embedding deployment
 
-Setup deploys the embedding model through `foundry.bicep` and grants your identity access. The `-EmbeddingOnly` switch avoids creating a chat deployment that this exercise doesn't use.
+Confirm that the `text-embedding-3-small` deployment is ready before loading the catalog.
 
 1. In the **Allfiles/Labs/Shared** terminal, load the saved settings.
 
@@ -138,13 +138,11 @@ Setup deploys the embedding model through `foundry.bicep` and grants your identi
 
     Confirm that `text-embedding-3-small` reports `Succeeded`. Use **OpenAiEndpoint**, not the project endpoint, in the application code that follows. The model's default output length matches the container's 1,536 dimensions.
 
-> &#128221; If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. A new role assignment can take several minutes to propagate before inference succeeds.
+> &#128221; New role assignments can take several minutes to take effect.
 
 ## Task 2: Load the catalog with searchable text and embeddings
 
-The container's full-text index covers `/searchText` and its vector index covers `/embedding`, and neither property exists in the CosmicWorks data. In this task, you build both as you load the catalog.
-
-The searchable text matters more than it sounds. The CosmicWorks `description` property holds a generated sentence of the form `The product called "<name>"` for all 295 products, so it repeats the same boilerplate around each product's distinct name. The product name and its category carry the words a shopper types, so this exercise concatenates those two into `searchText` and embeds the same string.
+Combine each product's name and category into `searchText`, then generate an embedding from that text. These fields provide more useful search terms than the catalog's generated descriptions. Store the text in `/searchText` and the vector in `/embedding`, which are the paths configured in the container's indexes.
 
 1. Create a folder for the application and open it in the integrated terminal.
 
@@ -252,15 +250,15 @@ The searchable text matters more than it sounds. The CosmicWorks `description` p
     Loaded 295 of 295.
     ```
 
-The catalog is loaded, and every item now carries the text the full-text index reads, the vector the similarity search ranks, and the hash that task 5 uses to decide whether either needs regenerating.
+Each product now has `searchText`, an `embedding`, and a `contentHash`. Task 5 uses the hash to detect changes to the embedding input.
 
 ## Task 3: Search the catalog with BM25 ranking
 
-In this task, you run the three kinds of full-text query against the data you loaded and confirm each returns what the catalog contains.
+Use full-text functions to match search terms and rank products by relevance.
 
-1. In the [Azure portal](https://portal.azure.com), open your Azure Cosmos DB account, select **Data Explorer**, expand the `cosmicworks` database and the `productSearch` container, and select **Items**.
+1. In the [Azure portal](https://portal.azure.com), open your Azure Cosmos DB account, select **Data Explorer**, and expand the `cosmicworks` database.
 
-1. Select **New SQL Query** and run the following query, which finds every item whose searchable text contains the term.
+1. Right-click the `productSearch` container and select **New SQL Query**. Run the following query, which finds every item whose searchable text contains the term.
 
     ```sql
     SELECT c.name, c.categoryName, c.price
@@ -304,7 +302,7 @@ In this task, you run the three kinds of full-text query against the data you lo
     WHERE FullTextContainsAny(c.searchText, "mountain", "helmet")
     ```
 
-    The count jumps to roughly 90: every mountain bike, mountain frame, and mountain accessory, plus the three helmets. The exact number depends on how the analyzer tokenizes each name, so record what yours returns.
+    This query counts products that match either term, including mountain products and the three helmets. Record the count.
 
 1. Rank results by relevance instead of filtering them.
 
@@ -314,9 +312,30 @@ In this task, you run the three kinds of full-text query against the data you lo
     ORDER BY RANK FullTextScore(c.searchText, "mountain", "frame")
     ```
 
-    Items that carry both terms sort above items that carry one. Now add `FullTextScore(c.searchText, "mountain", "frame") AS score` to the `SELECT` list and run the query again. It fails, because the score can appear only in an `ORDER BY RANK` clause.
+    Items that carry both terms sort above items that carry one.
 
-1. Compare the cost of the index against a substring scan. Run each of the following queries, and after each one open the **Query Stats** tab and record the **Request Charge**.
+1. Run the following query, which adds `FullTextScore` to the `SELECT` list.
+
+    ```sql
+    SELECT TOP 10 c.name, c.categoryName,
+        FullTextScore(c.searchText, "mountain", "frame") AS score
+    FROM c
+    ORDER BY RANK FullTextScore(c.searchText, "mountain", "frame")
+    ```
+
+    This query is expected to fail because `FullTextScore` can appear only in an `ORDER BY RANK` clause.
+
+1. Remove `FullTextScore` from the `SELECT` list and keep it in `ORDER BY RANK`. Run the corrected query.
+
+    ```sql
+    SELECT TOP 10 c.name, c.categoryName
+    FROM c
+    ORDER BY RANK FullTextScore(c.searchText, "mountain", "frame")
+    ```
+
+    The query returns products ranked by relevance without including the score in the results.
+
+1. Compare the request charges for full-text search and substring matching. Run each of the following queries, and after each one open the **Query Stats** tab and record the **Request Charge**.
 
     ```sql
     SELECT VALUE COUNT(1) FROM c WHERE FullTextContains(c.searchText, "helmet")
@@ -326,11 +345,11 @@ In this task, you run the three kinds of full-text query against the data you lo
     SELECT VALUE COUNT(1) FROM c WHERE CONTAINS(c.searchText, "Helmet")
     ```
 
-    At 295 items both queries are cheap, and the gap between them is small. The published comparison on a production-sized container is not small: 3.11 RUs for `FullTextContains` against 12,614 RUs for `CONTAINS`. The reason is visible in the two queries you just ran. One reads a prepared index; the other reads every item.
+    Request charges can be similar for this small catalog. `FullTextContains` uses the full-text index to match tokens, while `CONTAINS` matches literal substrings, so the results can differ.
 
 ## Task 4: Search the catalog by meaning
 
-In this task, you run a similarity query whose search terms appear nowhere in the catalog.
+Search for products by meaning rather than exact keywords.
 
 1. Create a file named **search.py** and add the following code, replacing the two placeholder values with your endpoints.
 
@@ -393,9 +412,9 @@ In this task, you run a similarity query whose search terms appear nowhere in th
     python search.py
     ```
 
-The search phrase contains none of the words *helmet*, *Sport-100*, or *Accessories*, so the query that returned three results in task 3 returns nothing for this text. The similarity query ranks the whole catalog by meaning instead, and the helmets are the products whose meaning is closest. Record the five names and scores your run returns. With only 295 vectors, this query uses a full scan rather than the approximate index.
+Record the five product names and distance scores. The phrase doesn't contain *helmet*, but helmet products should appear among the closest matches. Lower distances indicate closer matches.
 
-1. Add a metadata filter and compare the request charge. Replace the query in your application with the following code, and set the parameter to the helmet category identifier `14A1AD5D-59EA-4B63-A189-67B077783B0E`.
+1. Add a metadata filter by replacing the SQL text inside the existing `query` string with the following query. The new `@categoryId` parameter is bound in the next step.
 
     ```sql
     SELECT TOP 5 c.name, c.price,
@@ -405,9 +424,23 @@ The search phrase contains none of the words *helmet*, *Sport-100*, or *Accessor
     ORDER BY VectorDistance(c.embedding, @queryVector)
     ```
 
-    The equality filter targets one logical partition and routes to its physical partition. It can reduce the request charge, but a small container can already occupy one physical partition, so a reduction isn't guaranteed.
+1. Bind `@categoryId` to the helmet category identifier. Replace the existing `results = container.query_items(...)` call with the following code, which keeps the query vector parameter and adds the category parameter.
 
-> &#128221; This container holds 295 vectors, and `diskANN` needs at least 1,000 before its index takes effect. Every similarity query you just ran used a full scan. The queries still rank the stored vectors, but these request charges don't predict the cost of searching a larger, indexed container. Treat the numbers as a comparison between the two queries you ran rather than as a figure to plan capacity from.
+    ```python
+    results = container.query_items(
+        query=query,
+        parameters=[
+            {"name": "@queryVector", "value": query_vector},
+            {"name": "@categoryId", "value": "14A1AD5D-59EA-4B63-A189-67B077783B0E"},
+        ],
+    )
+    ```
+
+    Run the application again with `python search.py` and compare the request charge with the unfiltered query.
+
+    Filtering on `categoryId`, the partition key, limits the search to one logical partition. The request charge might not decrease on this small dataset.
+
+> &#128221; The `diskANN` index requires at least 1,000 vectors. With only 295 vectors, these queries use a full scan.
 
 ## Task 5: Refresh an embedding from the change feed
 
@@ -421,9 +454,25 @@ Renaming a product doesn't update its stored `searchText` or embedding. The full
     WHERE c.name = "Sport-100 Helmet, Red"
     ```
 
-1. Select the item in the **Items** list, change its `name` to `Sport-100 Head Protector, Red`, and select **Update**.
+1. In the **Data Explorer** tree, expand the `productSearch` container under `cosmicworks` and select **Items**.
 
-1. Confirm the mismatch. Run the previous query again with the new name and compare `name` against `searchText`. The name changed, and the searchable text and the vector still describe the old one.
+1. In the filter field, enter the following filter, replacing `<product-id>` with the `id` you recorded from the query result. Select **Apply**.
+
+    ```sql
+    WHERE c.id = "<product-id>"
+    ```
+
+1. Select the matching item in the filtered list. In the JSON editor, change only its `name` value to `Sport-100 Head Protector, Red`, then select **Update**.
+
+1. Confirm the mismatch. Run the following query in **Data Explorer** and compare `name` against `searchText`.
+
+    ```sql
+    SELECT c.id, c.categoryId, c.name, c.searchText
+    FROM c
+    WHERE c.name = "Sport-100 Head Protector, Red"
+    ```
+
+    The name changed, but `searchText` still contains the old name. The stored embedding hasn't been regenerated either.
 
 1. Create a file named **refresh.py** and add the following code, replacing the two placeholder values with your endpoints.
 
@@ -503,7 +552,7 @@ Renaming a product doesn't update its stored `searchText` or embedding. The full
     Scanned 295 changes, refreshed 1.
     ```
 
-Latest-version mode returns the latest available version of each changed item when the feed is read, not a history of every write. The rename replaces the version the load wrote. Writes made while the consumer runs can appear in later pages, including the embedding refresh itself, so the scanned count can exceed 295. Only the renamed product needs an embedding refresh in this exercise.
+    Latest-version mode returns the latest version of each changed item, not every intermediate write. The scan can include the consumer's own update, so the scanned count can exceed 295. Only the renamed product should need a refresh.
 
 1. Run the consumer a second time without changing anything.
 
@@ -511,9 +560,17 @@ Latest-version mode returns the latest available version of each changed item wh
     Scanned 295 changes, refreshed 0.
     ```
 
-    The consumer reads the same 295 products, and this time every hash matches the text, so nothing is refreshed. The refresh in the previous run was itself a write. That write can appear in the same run or in a later read, depending on when the consumer reads the feed. A continuation token resumes from the last read position. Without the hash guard, the consumer would re-embed its own output on every pass and never stop.
+    The stored hashes now match the product text, so no embeddings are regenerated. The hash check also prevents unnecessary embedding calls when the consumer reads its own updates.
 
-1. Confirm the repair in the portal. Run the query from the start of this task with `WHERE c.name = "Sport-100 Head Protector, Red"` and check that `searchText` now carries the new name.
+1. Confirm the repair. In the portal **Data Explorer**, run the following query.
+
+    ```sql
+    SELECT c.id, c.categoryId, c.name, c.searchText
+    FROM c
+    WHERE c.name = "Sport-100 Head Protector, Red"
+    ```
+
+    Check that `searchText` now *contains* the new name, `Sport-100 Head Protector, Red`.
 
 ## Clean up resources
 
@@ -529,7 +586,3 @@ If your lab environment provided the resource group, keep it. Delete only the Co
 az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
 az cognitiveservices account delete --name $openAiName --resource-group $resourceGroup
 ```
-
-Deleting the group removes the account, the AI Services resource, and the deployment together. The role assignment you created is scoped to the AI Services resource, so it goes with it.
-
-Two retrieval methods now run against one container, over one copy of the data, under one set of permissions. The full-text index maintains itself as items change, and the vectors need a refresh path you own, which is the operational difference worth carrying out of this exercise.
