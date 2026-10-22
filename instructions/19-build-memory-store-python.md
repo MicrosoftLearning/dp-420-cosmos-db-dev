@@ -2,8 +2,8 @@
 lab:
   title: Build a durable agent memory store in Python
   module: Module 19 - Design and Implement Agent Memory Stores in Azure Cosmos DB
-  description: Write conversation turns that expire on their own, distill durable facts and embed them, recall one by meaning in a new session, measure what memory costs in a prompt, then supersede a contradiction and erase the user.
-  duration: 45 minutes
+  description: Store conversation history, extract and recall durable facts, compare prompt token usage, and manage memory updates and deletion.
+  duration: 60 minutes
   level: 300
   islab: true
   primarytopics:
@@ -14,11 +14,11 @@ lab:
 
 # Build a durable agent memory store in Python
 
-In this exercise, you build a durable agent memory store for the Contoso product assistant on two Azure Cosmos DB for NoSQL containers. You write conversation turns that expire on their own, distill durable facts out of those turns, recall a fact by meaning in a session that has never seen the conversation it came from, inject that memory into a prompt and measure what it costs, then retire a contradiction and erase the user completely.
+In this exercise, you build a memory store for the Contoso product assistant using Azure Cosmos DB for NoSQL. You store conversation history, extract durable facts, retrieve them by meaning in a new session, and use them in a prompt. You then update a shopper's budget and delete their stored data.
 
-The two containers are deliberately different. Conversation state is partitioned on the thread, because a live conversation reads one thread at a time. Long-term memory is partitioned on the user, because recall crosses every thread that person ever opened. Watching the same information move from one to the other is the point of the exercise.
+Conversation turns are partitioned by thread for single-thread reads. Durable facts are partitioned by user so they can be recalled across conversations.
 
-This exercise takes approximately **45** minutes to complete.
+This exercise takes approximately **60** minutes to complete.
 
 ## Before you start
 
@@ -48,7 +48,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
 
 1. Open the context menu for the folder and select **Open in Integrated Terminal**. If the terminal isn't PowerShell, select the dropdown beside the **+** in the terminal toolbar and choose **PowerShell**.
 
-1. Sign in to the Azure CLI and follow the sign-in prompts. On Windows, the CLI uses an account broker by default rather than a browser.
+1. Sign in to the Azure CLI and follow the sign-in prompts.
 
     ```azurecli
     az login
@@ -67,9 +67,9 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab19 -LabProfile agentmemory -AccountOnly -EnableFoundry -FoundryLocation $location
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab19a7f3k9`.
+    The script generates a globally unique account name, such as `dp420lab19a7f3k9`.
 
-1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
+1. Wait for setup to finish. It takes approximately 5-10 minutes.
 
 1. Record the **Account name**, **Account endpoint**, **Foundry account**, and **OpenAI endpoint** values the script prints. The Cosmos DB endpoint looks like `https://<your-account-name>.documents.azure.com:443/`. The script also saves the Foundry values in `logs/foundry-<account-name>.json`.
 
@@ -79,7 +79,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     $accountName = "<your-account-name>"
     ```
 
-1. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled. Allow up to 15 minutes for vector search activation before continuing. The next setup stage configures the full-text policy and index for the English-language content in this exercise.
+1. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled. Allow up to 15 minutes for vector search activation before continuing.
 
 1. To create the database and containers, resume setup against this same account.
 
@@ -104,11 +104,9 @@ After both stages, the script creates the following resources:
 | Chat deployment | `gpt-5.4-mini`, version `2026-03-17`, GlobalStandard deployment, 30 capacity units |
 | Foundry role assignment | Foundry User, granted to your signed-in identity on the Foundry resource |
 
-Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
+Both services authenticate with your Azure CLI identity. You don't need service keys or connection strings.
 
 > &#9888; Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and a container's vector policy can't be changed after creation. Never point this exercise at a shared training or production account.
-
-> &#128221; The setup script creates both containers for you. The Cosmos DB data-plane SDK can't create databases or containers when it authenticates with Microsoft Entra ID. Provision these resources through the control plane with the required permissions, as the setup script does.
 
 1. Set variables for the account name and its endpoint so later commands can use them.
 
@@ -117,11 +115,9 @@ Because key-based authentication is disabled, no key or connection string appear
     $cosmosEndpoint = "https://$accountName.documents.azure.com:443/"
     ```
 
-The setup profile includes the delete-by-partition-key capability required by Task 6. No additional account update is needed.
-
 ## Task 1: Confirm the model deployments
 
-Setup deploys both models through `foundry.bicep` and grants your identity access. The embedding model makes stored facts searchable, and the chat model extracts facts from conversation turns.
+The embedding model makes stored facts searchable, and the chat model extracts facts from conversation turns.
 
 1. In the **Allfiles/Labs/Shared** terminal, load the saved settings.
 
@@ -144,11 +140,11 @@ Setup deploys both models through `foundry.bicep` and grants your identity acces
 
     Confirm that `text-embedding-3-small` and `gpt-5.4-mini` report `Succeeded`. Use **OpenAiEndpoint**, not the project endpoint, in the application code that follows. The embedding model's default output length matches the container's 1,536 dimensions.
 
-> &#128221; If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. A new role assignment can take several minutes to propagate before inference succeeds.
+> &#128221; Model availability and quota vary by region. If you change `-FoundryLocation` or `-FoundryAccountName`, use the same values in both setup stages and keep the same Cosmos DB account. New role assignments can take several minutes to take effect.
 
 ## Task 2: Write conversation state and read it back
 
-Short-term memory is the log every agent needs. In this task, you write six turns of a shopper conversation into the `conversation` container and read the most recent turns back with a single-partition query.
+Write six turns of a shopper conversation into the `conversation` container, then read the most recent turns with a single-partition query.
 
 1. Open a new terminal in Visual Studio Code, create a folder for the application, and move into it.
 
@@ -161,10 +157,8 @@ Short-term memory is the log every agent needs. In this task, you write six turn
 
     ```powershell
     python -m venv .venv
-    .venv\Scripts\activate
+    .venv\Scripts\Activate.ps1
     ```
-
-    On Windows PowerShell, activate the environment with `.venv\Scripts\Activate.ps1` if the previous command doesn't run.
 
 1. Install the packages the exercise uses.
 
@@ -188,7 +182,6 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     THREAD_ID = "thread-1042"
     BUDGET_FACT_ID = "explicit-headlight-budget"
 
-    # Use the az login identity for both services, without storing service keys.
     credential = AzureCliCredential()
 
     cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
@@ -210,7 +203,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
         return response.data[0].embedding
     ```
 
-1. Create a file named **turns.py** and add the following code. The six turns hold four statements that stay true after the conversation ends and several that don't.
+1. Create a file named **turns.py** and add the following code to store six shopper conversation turns.
 
     ```python
     from datetime import datetime, timezone
@@ -305,11 +298,11 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     Request charge: 2.89 RU
     ```
 
-    Record the request charge your run reports rather than the one shown here. The three turns come back in the order they happened, because the query orders by `turnIndex` descending and the loop reverses the result.
+    Record the request charge your run reports; it can differ from the example.
 
 ## Task 3: Distill durable facts and store them with embeddings
 
-Six turns is a log. In this task, you turn it into a handful of individually retrievable facts, embed each one, and write it to the `memory` container.
+Extract durable facts from the conversation, generate an embedding for each fact, and store them in the `memory` container.
 
 1. Create a file named **distill.py** and add the following code.
 
@@ -360,7 +353,6 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
             for turn in turns for message in turn["messages"]
         )
 
-        # JSON mode requests valid JSON, not a validated schema or verified facts.
         # The returned confidence is the model's estimate, not a calibrated probability.
         response = openai_client.chat.completions.create(
             model=CHAT_DEPLOYMENT,
@@ -380,7 +372,6 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
 
         print(f"Facts stored: {len(facts)}")
 
-    # Importing store_fact from another script must not trigger extraction again.
     if __name__ == "__main__":
         main()
     ```
@@ -391,15 +382,14 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
     python distill.py
     ```
 
-    How many facts the model returns, and how it words them, isn't fixed. Record what your run produces. The conversation holds four statements that satisfy the prompt's definition of durable, so a result well below that suggests the extraction prompt needs tightening, and a result well above it suggests the model is treating the current task as durable.
+    Review the extracted facts for the shopper's bike, riding conditions, weather-resistance needs, and budget. Questions and one-time plans shouldn't become durable facts. The number and wording of the facts can vary between runs.
 
-1. Add one fact of your own with wording you control, so the next task has something deterministic to search for. Create a file named **add-fact.py** and add the following code.
+1. Create a file named **add-fact.py** and add the following code. It stores a budget fact with fixed wording for the keyword and vector search comparison in Task 4.
 
     ```python
     from distill import store_fact
     from shared import BUDGET_FACT_ID
 
-    # Keep this controlled fact stable so recall isn't dependent on extraction wording.
     store_fact(
         "The shopper rides a touring bike and won't spend more than 40 dollars on a headlight.",
         "requirement",
@@ -419,11 +409,11 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
     Explicit fact stored.
     ```
 
-    Importing `store_fact` doesn't run extraction. The main guard keeps the transcript query and extraction call out of imports. The explicit fact has a stable identifier, so rerunning this step updates that fact rather than creating another copy. Adding it still calls the embedding model once.
+    The stable identifier lets you rerun this step without creating a duplicate.
 
 ## Task 4: Recall a memory by meaning in a new session
 
-Nothing so far proves the memory is findable. In this task, you search it two ways with a query that shares no words with the fact you stored, and compare what each returns.
+Compare keyword and vector search to find a stored budget fact using different wording.
 
 1. Create a file named **recall.py** and add the following code. The first query matches on keywords and the second matches on meaning.
 
@@ -432,7 +422,6 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
 
     QUESTION = "how much is this person willing to pay for lights"
 
-    # Restrict the lexical check to the controlled fact, not variable model output.
     keyword_hits = list(memory.query_items(
         query="""
             SELECT c.content FROM c
@@ -447,8 +436,7 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
     ))
     print(f"Keyword matches: {len(keyword_hits)}")
 
-    # Search only this user's active facts. Superseded records remain stored
-    # but are excluded from recall; distance isn't the fact's confidence value.
+    # Exclude superseded facts from recall.
     vector_hits = list(memory.query_items(
         query="""
             SELECT TOP 3 c.content, c.category, c.confidence,
@@ -475,15 +463,15 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
     python recall.py
     ```
 
-The keyword query searches only the explicit fact and returns zero, because its controlled wording contains none of *pay*, *willing*, or *much*. Generated facts might contain those words, so they aren't part of that deterministic check. The vector query searches all active facts and returns results for the same question. Record which fact ranks first rather than assuming the explicit budget fact does.
+The keyword query returns zero because the budget fact contains none of *pay*, *willing*, or *much*. The vector query searches all active facts by meaning. Note which fact ranks first; lower `score` values indicate closer matches.
 
-> &#128221; Your memory container holds a handful of vectors, and a `quantizedFlat` index takes effect only once a container holds at least 1,000 of them. Every similarity query in this exercise therefore runs a full scan. The results are correct, and the request charges aren't representative of the same query at production scale.
+> &#128221; The `quantizedFlat` index requires at least 1,000 vectors. This lab stores fewer, so vector queries use a full scan. Their request charges aren't representative of queries at production scale.
 
-Note what this proves and what it doesn't. Vector search found a fact stated in words the question never used, which is the recall behavior long-term memory exists for. It found it in a process that never read the conversation that produced it, which is the cross-session behavior.
+The recall process reads stored facts without loading the original conversation, demonstrating how memory carries across sessions.
 
 ## Task 5: Inject memory into a prompt and measure what it costs
 
-Memory has to fit a budget. In this task, you answer the same question with and without memory and compare the prompt token counts.
+Answer the same question with and without memory, then compare the responses and prompt token counts.
 
 1. Create a file named **inject.py** and add the following code.
 
@@ -543,15 +531,15 @@ Memory has to fit a budget. In this task, you answer the same question with and 
     python inject.py
     ```
 
-Both answers vary between runs, so compare their shape rather than their wording. The answer without memory receives no stored facts about the shopper. The answer with memory receives only the facts selected by the query. Check whether it uses those facts and asks fewer clarifying questions; retrieval and model generation don't guarantee that outcome.
+Compare how the answers use the shopper's budget and preferences. Check whether the answer with memory asks for information already stored in the retrieved facts. Responses can vary between runs.
 
-Compare the two prompt token counts. The difference measures the extra input tokens from the memory block, not the entire cost of memory on this request. It excludes the embedding call, the Cosmos DB query, and output tokens. Record both numbers. The comparison doesn't establish a fixed number of conversation turns saved.
+Record both prompt token counts and their difference. The difference measures the extra input tokens added by the memory block. It excludes the embedding call, database queries, and output tokens.
 
 ## Task 6: Reconcile a contradiction and erase the user
 
-People change their minds, and eventually they ask to be forgotten. In this task, you retire a fact without deleting it, confirm retrieval stops returning it, then remove the person from every container.
+Update the shopper's budget from 40 to 60 dollars, exclude superseded facts from recall, then delete the shopper's memory and conversation history.
 
-1. Create a file named **reconcile.py** and add the following code. It stores a new fact that contradicts the budget cap and points the old record at it.
+1. Create a file named **reconcile.py** and add the following code. It stores the new budget and points each selected obsolete fact at the new record.
 
     ```python
     from datetime import datetime, timezone
@@ -568,7 +556,6 @@ People change their minds, and eventually they ask to be forgotten. In this task
     for fact in active:
         print(f"{fact['id']}: {fact['content']}")
 
-    # Human review catches paraphrases of the old budget; exact text matching wouldn't.
     additional_ids = input(
         "Enter comma-separated IDs of any other facts containing the old headlight budget, or press Enter: "
     )
@@ -587,8 +574,7 @@ People change their minds, and eventually they ask to be forgotten. In this task
         item_id="revised-headlight-budget",
     )
 
-    # Retire old facts without deleting the history. These are separate writes,
-    # not an atomic reconciliation; recall excludes records with supersededBy set.
+    # Preserve the old facts and link them to the replacement.
     for obsolete_id in obsolete_ids:
         item = memory.read_item(item=obsolete_id, partition_key=USER_ID)
         item["supersededBy"] = new_id
@@ -605,7 +591,6 @@ People change their minds, and eventually they ask to be forgotten. In this task
         parameters=[{"name": "@userId", "value": USER_ID}],
         partition_key=USER_ID,
     ))
-    # Verify retirement by querying again rather than trusting successful writes alone.
     if obsolete_ids & {fact["id"] for fact in active}:
         raise RuntimeError("A selected obsolete fact is still active.")
     print(f"Active facts after:  {len(active)}")
@@ -620,21 +605,26 @@ People change their minds, and eventually they ask to be forgotten. In this task
     python reconcile.py
     ```
 
-1. Review every active fact the program prints. The explicit fact is selected by its known ID. At the prompt, enter the IDs of any generated facts that also state the old budget, including paraphrases, separated by commas. Don't select unrelated facts. This exercise uses your review rather than guessing contradictions from an exact text match.
+1. Review every active fact the program prints. The explicit fact is selected by its known ID. At the prompt, enter the IDs of any generated facts that also state the old budget, including paraphrases, separated by commas. Don't select unrelated facts.
 
-    On the first run, the active count changes by one minus the number of records you retire. The total count rises by one because the retired records remain. Review the final active list and rerun **recall.py** to confirm it no longer presents the old budget. If you missed a paraphrase, reconcile that record before claiming that the contradiction is resolved. Don't rerun extraction or **add-fact.py** afterward, because doing so reintroduces the original conversation or budget.
+    The new budget adds one fact. Retired facts stay in the container but no longer count as active. If the final active list still contains an old-budget fact, run reconciliation again and select its ID.
 
-1. Create a file named **erase.py** and add the following code. Long-term memory is derived from the conversation, so both containers hold information about this person and both have to be cleared.
+1. Rerun the unchanged **recall.py** from Task 4 and check that the vector results no longer include the old 40-dollar budget.
+
+    ```powershell
+    python recall.py
+    ```
+
+    Don't rerun extraction or **add-fact.py** afterward, because those steps reintroduce old-budget facts.
+
+1. Create a file named **erase.py** and add the following code to delete the shopper's stored facts and conversation turns.
 
     ```python
     from shared import conversation, memory, USER_ID, THREAD_ID
 
-    # The containers use different partition keys. This lab has one known thread;
-    # erasing a real user's history must cover every thread belonging to that user.
     memory.delete_all_items_by_partition_key(USER_ID)
     conversation.delete_all_items_by_partition_key(THREAD_ID)
 
-    # Partition deletion runs in the background; submission isn't proof of completion.
     remaining = list(memory.query_items(
         query="SELECT VALUE COUNT(1) FROM c WHERE c.userId = @userId",
         parameters=[{"name": "@userId", "value": USER_ID}],
@@ -653,9 +643,9 @@ People change their minds, and eventually they ask to be forgotten. In this task
     Memories remaining: 0
     ```
 
-    If the count isn't zero, run the file again after a moment. Delete by partition key runs as a background operation limited to about 10 percent of the container's request units per second, so it doesn't complete the instant the call returns.
+    Deletion runs in the background. If the memory count isn't zero, wait briefly and run the file again. This output checks the memory partition, not the conversation partition.
 
-Note what the two calls needed to know. Memory is keyed on the user and conversation state is keyed on the thread, so erasing one person means enumerating every thread they opened and their memory partition. If long-term memory is partitioned on the thread, known thread IDs still allow partition-scoped deletion. Finding those threads from only a user ID requires a cross-partition query unless you maintain a separate user-to-thread lookup.
+Memory is partitioned by user and conversation state by thread. An application with multiple threads per user must delete every associated conversation partition as well as the user's memory partition.
 
 ## Clean up resources
 
@@ -672,4 +662,4 @@ az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
 az cognitiveservices account delete --name $openAiName --resource-group $resourceGroup
 ```
 
-You built a memory store that writes a log, distills it, recalls it by meaning across sessions, corrects itself when the person changes their mind, and forgets them completely on request. The two partition keys keep thread reads and user-memory operations scoped to a logical partition. Actual costs still depend on the data, queries, indexes, and model calls.
+You stored conversation history, extracted and recalled durable facts, compared prompt token usage, retired an outdated budget, and deleted the shopper's data.

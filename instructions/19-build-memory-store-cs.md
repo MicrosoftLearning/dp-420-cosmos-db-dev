@@ -2,8 +2,8 @@
 lab:
   title: Build a durable agent memory store in C#
   module: Module 19 - Design and Implement Agent Memory Stores in Azure Cosmos DB
-  description: Write conversation turns that expire on their own, distill durable facts and embed them, recall one by meaning in a new session, measure what memory costs in a prompt, then supersede a contradiction and erase the user.
-  duration: 45 minutes
+  description: Store conversation history, extract and recall durable facts, compare prompt token usage, and manage memory updates and deletion.
+  duration: 60 minutes
   level: 300
   islab: true
   primarytopics:
@@ -14,11 +14,11 @@ lab:
 
 # Build a durable agent memory store in C#
 
-In this exercise, you build a durable agent memory store for the Contoso product assistant on two Azure Cosmos DB for NoSQL containers. You write conversation turns that expire on their own, distill durable facts out of those turns, recall a fact by meaning in a session that has never seen the conversation it came from, inject that memory into a prompt and measure what it costs, then retire a contradiction and erase the user completely.
+In this exercise, you build a memory store for the Contoso product assistant using Azure Cosmos DB for NoSQL. You store conversation history, extract durable facts, retrieve them by meaning in a new session, and use them in a prompt. You then update a shopper's budget and delete their stored data.
 
-The two containers are deliberately different. Conversation state is partitioned on the thread, because a live conversation reads one thread at a time. Long-term memory is partitioned on the user, because recall crosses every thread that person ever opened. Watching the same information move from one to the other is the point of the exercise.
+Conversation turns are partitioned by thread for single-thread reads. Durable facts are partitioned by user so they can be recalled across conversations.
 
-This exercise takes approximately **45** minutes to complete.
+This exercise takes approximately **60** minutes to complete.
 
 ## Before you start
 
@@ -48,7 +48,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
 
 1. Open the context menu for the folder and select **Open in Integrated Terminal**. If the terminal isn't PowerShell, select the dropdown beside the **+** in the terminal toolbar and choose **PowerShell**.
 
-1. Sign in to the Azure CLI and follow the sign-in prompts. On Windows, the CLI uses an account broker by default rather than a browser.
+1. Sign in to the Azure CLI and follow the sign-in prompts.
 
     ```azurecli
     az login
@@ -67,9 +67,9 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab19 -LabProfile agentmemory -AccountOnly -EnableFoundry -FoundryLocation $location
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab19a7f3k9`.
+    The script generates a globally unique account name, such as `dp420lab19a7f3k9`.
 
-1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
+1. Wait for setup to finish. It takes approximately 5-10 minutes.
 
 1. Record the **Account name**, **Account endpoint**, **Foundry account**, and **OpenAI endpoint** values the script prints. The Cosmos DB endpoint looks like `https://<your-account-name>.documents.azure.com:443/`. The script also saves the Foundry values in `logs/foundry-<account-name>.json`.
 
@@ -79,7 +79,7 @@ This exercise creates its own Azure Cosmos DB account and deletes it at the end,
     $accountName = "<your-account-name>"
     ```
 
-1. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled. Allow up to 15 minutes for vector search activation before continuing. The next setup stage configures the full-text policy and index for the English-language content in this exercise.
+1. Under **Settings**, select **Features**. Confirm **Vector Search for NoSQL API** is enabled. Allow up to 15 minutes for vector search activation before continuing.
 
 1. To create the database and containers, resume setup against this same account.
 
@@ -104,11 +104,9 @@ After both stages, the script creates the following resources:
 | Chat deployment | `gpt-5.4-mini`, version `2026-03-17`, GlobalStandard deployment, 30 capacity units |
 | Foundry role assignment | Foundry User, granted to your signed-in identity on the Foundry resource |
 
-Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
+Both services authenticate with your Azure CLI identity. You don't need service keys or connection strings.
 
 > &#9888; Use only the resource group and account this script creates. Vector search is an account capability that can't be turned off once it's enabled, and a container's vector policy can't be changed after creation. Never point this exercise at a shared training or production account.
-
-> &#128221; The setup script creates both containers for you. The Cosmos DB data-plane SDK can't create databases or containers when it authenticates with Microsoft Entra ID. Provision these resources through the control plane with the required permissions, as the setup script does.
 
 1. Set variables for the account name and its endpoint so later commands can use them.
 
@@ -117,11 +115,9 @@ Because key-based authentication is disabled, no key or connection string appear
     $cosmosEndpoint = "https://$accountName.documents.azure.com:443/"
     ```
 
-The setup profile includes the delete-by-partition-key capability required by Task 6. No additional account update is needed.
-
 ## Task 1: Confirm the model deployments
 
-Setup deploys both models through `foundry.bicep` and grants your identity access. The embedding model makes stored facts searchable, and the chat model extracts facts from conversation turns.
+The embedding model makes stored facts searchable, and the chat model extracts facts from conversation turns.
 
 1. In the **Allfiles/Labs/Shared** terminal, load the saved settings.
 
@@ -144,11 +140,11 @@ Setup deploys both models through `foundry.bicep` and grants your identity acces
 
     Confirm that `text-embedding-3-small` and `gpt-5.4-mini` report `Succeeded`. Use **OpenAiEndpoint**, not the project endpoint, in the application code that follows. The embedding model's default output length matches the container's 1,536 dimensions.
 
-> &#128221; If setup fails because of model availability or quota, resolve the issue and rerun against the same Cosmos DB account. Use `-FoundryLocation` and, for a different Foundry resource, `-FoundryAccountName` consistently on both setup stages. A new role assignment can take several minutes to propagate before inference succeeds.
+> &#128221; Model availability and quota vary by region. If you change `-FoundryLocation` or `-FoundryAccountName`, use the same values in both setup stages and keep the same Cosmos DB account. New role assignments can take several minutes to take effect.
 
 ## Task 2: Write conversation state and read it back
 
-Short-term memory is the log every agent needs. In this task, you write six turns of a shopper conversation into the `conversation` container and read the most recent turns back with a single-partition query.
+Write six turns of a shopper conversation into the `conversation` container, then read the most recent turns with a single-partition query.
 
 1. Create a console project and open its folder in the integrated terminal.
 
@@ -166,7 +162,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     dotnet add package OpenAI
     ```
 
-1. Create **Shared.cs** in the project folder with the following code. Replace both endpoint placeholders with the values you recorded. Keep this file throughout the exercise. `AzureCliCredential` uses your Azure CLI identity for both services. The OpenAI client connects to the resource's `/openai/v1/` endpoint with a bearer-token policy instead of an API key.
+1. Create **Shared.cs** in the project folder with the following code. Replace both endpoint placeholders with the values you recorded. Keep this file throughout the exercise. Both clients use your Azure CLI identity.
 
     ```csharp
     using Azure.Identity;
@@ -186,10 +182,8 @@ Short-term memory is the log every agent needs. In this task, you write six turn
         public const string ThreadId = "thread-1042";
         public const string BudgetFactId = "explicit-headlight-budget";
 
-        // Use the az login identity for both services, without storing service keys.
         private static readonly AzureCliCredential Credential = new();
         private static readonly CosmosClient Cosmos = new(CosmosEndpoint, Credential);
-        // The v1 client uses a renewable Entra bearer-token policy.
         private static readonly OpenAIClient Models = new(
             new BearerTokenPolicy(Credential, "https://ai.azure.com/.default"),
             new OpenAIClientOptions
@@ -235,7 +229,7 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     #pragma warning restore OPENAI001
     ```
 
-    The warning directive applies to the OpenAI SDK's experimental authentication-policy constructor. The query helper reads every result page and sums their request charges.
+    The query helper reads every result page and sums their request charges.
 
 1. Replace **Program.cs** with the following code to store the same six conversation turns used throughout the exercise.
 
@@ -332,11 +326,11 @@ Short-term memory is the log every agent needs. In this task, you write six turn
     Request charge: 2.89 RU
     ```
 
-    Record the request charge your run reports rather than the example value. The query orders by `turnIndex` descending, and reversing the list displays the turns chronologically. Keep **Shared.cs** and replace only **Program.cs** when a later step instructs you to do so.
+    Record the request charge your run reports; it can differ from the example. Keep **Shared.cs** and replace only **Program.cs** when a later step instructs you to do so.
 
 ## Task 3: Distill durable facts and store them with embeddings
 
-Six turns is a log. In this task, you turn it into a handful of individually retrievable facts, embed each one, and write it to the `memory` container.
+Extract durable facts from the conversation, generate an embedding for each fact, and store them in the `memory` container.
 
 1. Create **Distillation.cs** in the project folder with the following code. Keep this file alongside **Shared.cs** for the remaining tasks. `StoreFactAsync` embeds and stores one fact. `ExtractAsync` reads the conversation and asks the chat model to extract durable facts.
 
@@ -395,7 +389,6 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
             string transcript = string.Join("\n", turns.SelectMany(turn =>
                 turn["messages"]!.Select(message => $"{message["role"]}: {message["content"]}")));
 
-            // JSON mode requests valid JSON, not a validated schema or verified facts.
             // Confidence is the model's estimate, not a calibrated probability.
             ChatCompletion completion = await Shared.Chat.CompleteChatAsync(
                 [new SystemChatMessage(ExtractionPrompt), new UserChatMessage(transcript)],
@@ -422,20 +415,17 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
     #pragma warning restore OPENAI001
     ```
 
-    The warning directive allows the SDK's experimental reasoning-effort setting. This request uses `None`.
-
 1. Replace **Program.cs** with the following code, then run `dotnet run`.
 
     ```csharp
     await Distillation.ExtractAsync();
     ```
 
-    How many facts the model returns, and how it words them, isn't fixed. Record what your run produces. The conversation holds four statements that satisfy the prompt's definition of durable, so a result well below that suggests the extraction prompt needs tightening, and a result well above it suggests the model is treating the current task as durable.
+    Review the extracted facts for the shopper's bike, riding conditions, weather-resistance needs, and budget. Questions and one-time plans shouldn't become durable facts. The number and wording of the facts can vary between runs.
 
-1. Replace **Program.cs** with the following code to store one fact with controlled wording and a stable identifier. Run `dotnet run` again.
+1. Replace **Program.cs** with the following code to add a budget fact with fixed wording for the keyword and vector search comparison in Task 4. Run `dotnet run` again.
 
     ```csharp
-    // Keep this controlled fact stable so recall isn't dependent on extraction wording.
     await Distillation.StoreFactAsync(
         "The shopper rides a touring bike and won't spend more than 40 dollars on a headlight.",
         "requirement",
@@ -448,11 +438,11 @@ Six turns is a log. In this task, you turn it into a handful of individually ret
     Explicit fact stored.
     ```
 
-    Calling `StoreFactAsync` doesn't run `ExtractAsync`. Rerunning this entry point updates the same fact rather than creating another copy, but still calls the embedding model once. Keep **Distillation.cs** for Task 6.
+    The stable identifier lets you rerun this step without creating a duplicate. Keep **Distillation.cs** for Task 6.
 
 ## Task 4: Recall a memory by meaning in a new session
 
-Nothing so far proves the memory is findable. In this task, you search it two ways with a query that shares no words with the fact you stored, and compare what each returns.
+Compare keyword and vector search to find a stored budget fact using different wording.
 
 1. Replace **Program.cs** with the following code. The keyword query tests only the explicit fact. The vector query searches active facts in the user's partition.
 
@@ -461,7 +451,6 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
     using Newtonsoft.Json.Linq;
 
     const string question = "how much is this person willing to pay for lights";
-    // Restrict the lexical check to the controlled fact, not variable model output.
     QueryDefinition keywordQuery = new QueryDefinition("""
         SELECT c.content FROM c
         WHERE c.userId = @userId AND c.id = @budgetId
@@ -473,8 +462,7 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
         Shared.Memory, keywordQuery, Shared.UserId);
     Console.WriteLine($"Keyword matches: {keywordHits.Count}");
 
-    // Search only this user's active facts. Superseded records remain stored
-    // but are excluded from recall; distance isn't the fact's confidence value.
+    // Exclude superseded facts from recall.
     QueryDefinition vectorQuery = new QueryDefinition("""
         SELECT TOP 3 c.content, c.category, c.confidence,
                VectorDistance(c.embedding, @queryVector) AS score
@@ -493,17 +481,17 @@ Nothing so far proves the memory is findable. In this task, you search it two wa
     }
     ```
 
-1. Run `dotnet run`. Each run starts a new process. This entry point reads memory without loading the conversation or running extraction.
+1. Run `dotnet run`.
 
-The keyword query searches only the explicit fact and returns zero, because its controlled wording contains none of *pay*, *willing*, or *much*. Generated facts might contain those words, so they aren't part of that deterministic check. The vector query searches all active facts and returns results for the same question. Record which fact ranks first rather than assuming the explicit budget fact does.
+The keyword query returns zero because the budget fact contains none of *pay*, *willing*, or *much*. The vector query searches all active facts by meaning. Note which fact ranks first; lower `score` values indicate closer matches.
 
-> &#128221; Your memory container holds a handful of vectors, and a `quantizedFlat` index takes effect only once a container holds at least 1,000 of them. Every similarity query in this exercise therefore runs a full scan. The results are correct, and the request charges aren't representative of the same query at production scale.
+> &#128221; The `quantizedFlat` index requires at least 1,000 vectors. This lab stores fewer, so vector queries use a full scan. Their request charges aren't representative of queries at production scale.
 
-Note what this proves and what it doesn't. Vector search found a fact stated in words the question never used, which is the recall behavior long-term memory exists for. It found it in a process that never read the conversation that produced it, which is the cross-session behavior.
+The recall process reads stored facts without loading the original conversation, demonstrating how memory carries across sessions.
 
 ## Task 5: Inject memory into a prompt and measure what it costs
 
-Memory has to fit a budget. In this task, you answer the same question with and without memory and compare the prompt token counts.
+Answer the same question with and without memory, then compare the responses and prompt token counts.
 
 1. Replace **Program.cs** with the following code, then run `dotnet run`.
 
@@ -560,13 +548,13 @@ Memory has to fit a budget. In this task, you answer the same question with and 
     #pragma warning restore OPENAI001
     ```
 
-Both answers vary between runs, so compare their shape rather than their wording. The answer without memory receives no stored facts about the shopper. The answer with memory receives only the facts selected by the query. Check whether it uses those facts and asks fewer clarifying questions; retrieval and model generation don't guarantee that outcome.
+Compare how the answers use the shopper's budget and preferences. Check whether the answer with memory asks for information already stored in the retrieved facts. Responses can vary between runs.
 
-Compare the two prompt token counts. The difference measures the extra input tokens from the memory block, not the entire cost of memory on this request. It excludes the embedding call, the Cosmos DB query, and output tokens. Record both numbers. The comparison doesn't establish a fixed number of conversation turns saved.
+Record both prompt token counts and their difference. The difference measures the extra input tokens added by the memory block. It excludes the embedding call, database queries, and output tokens.
 
 ## Task 6: Reconcile a contradiction and erase the user
 
-People change their minds, and eventually they ask to be forgotten. In this task, you retire a fact without deleting it, confirm retrieval stops returning it, then remove the person from every container.
+Update the shopper's budget from 40 to 60 dollars, exclude superseded facts from recall, then delete the shopper's memory and conversation history.
 
 1. Replace **Program.cs** with the following code. It stores a new fact that contradicts the budget cap and points each selected obsolete fact at the new record.
 
@@ -585,7 +573,6 @@ People change their minds, and eventually they ask to be forgotten. In this task
         Console.WriteLine($"{fact["id"]}: {fact["content"]}");
     }
 
-    // Human review catches paraphrases of the old budget; exact matching wouldn't.
     Console.Write("Enter comma-separated IDs of any other facts containing the old headlight budget, or press Enter: ");
     string selection = Console.ReadLine() ?? "";
     HashSet<string> activeIds = active.Select(fact => fact["id"]!.Value<string>()!).ToHashSet();
@@ -604,8 +591,7 @@ People change their minds, and eventually they ask to be forgotten. In this task
     string newId = await Distillation.StoreFactAsync(
         "The shopper raised their headlight budget to 60 dollars after comparing options.",
         "requirement", 0.95, "revised-headlight-budget");
-    // Retire old facts without deleting history. These are separate writes,
-    // not an atomic reconciliation; recall excludes records with supersededBy set.
+    // Preserve the old facts and link them to the replacement.
     foreach (string obsoleteId in obsoleteIds)
     {
         ItemResponse<JObject> response = await Shared.Memory.ReadItemAsync<JObject>(
@@ -621,7 +607,6 @@ People change their minds, and eventually they ask to be forgotten. In this task
     QueryDefinition totalQuery = new QueryDefinition("SELECT c.id FROM c WHERE c.userId = @userId")
         .WithParameter("@userId", Shared.UserId);
     var (total, _) = await Shared.QueryAsync<JObject>(Shared.Memory, totalQuery, Shared.UserId);
-    // Verify retirement by querying again, not just by trusting successful writes.
     if (remainingActive.Any(fact => obsoleteIds.Contains(fact["id"]!.Value<string>()!)))
     {
         throw new InvalidOperationException("A selected obsolete fact is still active.");
@@ -636,15 +621,58 @@ People change their minds, and eventually they ask to be forgotten. In this task
 
 1. Run `dotnet run`. Review the printed facts. The explicit fact is selected by its known ID. At the prompt, enter the IDs of any generated facts that also state the old budget, including paraphrases, separated by commas. Don't select unrelated facts.
 
-    On the first run, the active count changes by one minus the number of records you retire. The total count rises by one because retired records remain. If you missed a paraphrase, run reconciliation again and select that record. Restore the Task 4 recall code to **Program.cs** and run it to confirm retrieval no longer presents the old budget. Don't rerun extraction or the explicit-fact insertion afterward, because those operations reintroduce the old budget.
+    The new budget adds one fact. Retired facts stay in the container but no longer count as active. If the final active list still contains an old-budget fact, run reconciliation again and select its ID.
 
-1. Replace **Program.cs** with the following code to erase memory and conversation state. Both containers hold information about this person. The stream API returns a response whose success must be checked before checking the count.
+1. Replace **Program.cs** with the following recall code. This is the same code from Task 4.
+
+    ```csharp
+    using Microsoft.Azure.Cosmos;
+    using Newtonsoft.Json.Linq;
+
+    const string question = "how much is this person willing to pay for lights";
+    QueryDefinition keywordQuery = new QueryDefinition("""
+        SELECT c.content FROM c
+        WHERE c.userId = @userId AND c.id = @budgetId
+          AND FullTextContainsAny(c.content, "pay", "willing", "much")
+        """)
+        .WithParameter("@userId", Shared.UserId)
+        .WithParameter("@budgetId", Shared.BudgetFactId);
+    var (keywordHits, _) = await Shared.QueryAsync<JObject>(
+        Shared.Memory, keywordQuery, Shared.UserId);
+    Console.WriteLine($"Keyword matches: {keywordHits.Count}");
+
+    // Exclude superseded facts from recall.
+    QueryDefinition vectorQuery = new QueryDefinition("""
+        SELECT TOP 3 c.content, c.category, c.confidence,
+               VectorDistance(c.embedding, @queryVector) AS score
+        FROM c
+        WHERE c.userId = @userId AND c.type = 'fact' AND IS_NULL(c.supersededBy)
+        ORDER BY VectorDistance(c.embedding, @queryVector)
+        """)
+        .WithParameter("@userId", Shared.UserId)
+        .WithParameter("@queryVector", await Shared.EmbedAsync(question));
+    var (vectorHits, _) = await Shared.QueryAsync<JObject>(
+        Shared.Memory, vectorQuery, Shared.UserId);
+    Console.WriteLine($"Vector matches: {vectorHits.Count}");
+    foreach (JObject hit in vectorHits)
+    {
+        Console.WriteLine($"  {hit["score"]!.Value<double>():F4}  {hit["category"],-14} {hit["content"]}");
+    }
+    ```
+
+1. Run the application and check that the vector results no longer include the old 40-dollar budget.
+
+    ```powershell
+    dotnet run
+    ```
+
+    Don't rerun extraction or the explicit-fact insertion afterward, because those steps reintroduce old-budget facts.
+
+1. Replace **Program.cs** with the following code to delete the shopper's stored facts and conversation turns.
 
     ```csharp
     using Microsoft.Azure.Cosmos;
 
-    // The containers use different partition keys. This lab has one known thread;
-    // erasing a real user's history must cover every thread belonging to that user.
     using ResponseMessage memoryDelete = await Shared.Memory.DeleteAllItemsByPartitionKeyStreamAsync(
         new PartitionKey(Shared.UserId));
     memoryDelete.EnsureSuccessStatusCode();
@@ -652,8 +680,6 @@ People change their minds, and eventually they ask to be forgotten. In this task
         new PartitionKey(Shared.ThreadId));
     conversationDelete.EnsureSuccessStatusCode();
 
-    // Deletion runs in the background. A successful response accepts the operation;
-    // query afterward to check whether the data has actually disappeared.
     QueryDefinition query = new QueryDefinition("SELECT VALUE COUNT(1) FROM c WHERE c.userId = @userId")
         .WithParameter("@userId", Shared.UserId);
     var (remaining, _) = await Shared.QueryAsync<int>(Shared.Memory, query, Shared.UserId);
@@ -666,9 +692,9 @@ People change their minds, and eventually they ask to be forgotten. In this task
     Memories remaining: 0
     ```
 
-    Delete by partition key runs in the background and aims to use at most 10 percent of the container's request units per second. Count queries can temporarily include items pending deletion. If the count isn't zero, run the entry point again after a moment.
+    Deletion runs in the background. If the memory count isn't zero, wait briefly and run the application again. This output checks the memory partition, not the conversation partition.
 
-Note what the two calls needed to know. Memory is keyed on the user and conversation state is keyed on the thread, so erasing one person means enumerating every thread they opened and their memory partition. If long-term memory is partitioned on the thread, known thread IDs still allow partition-scoped deletion. Finding those threads from only a user ID requires a cross-partition query unless you maintain a separate user-to-thread lookup.
+Memory is partitioned by user and conversation state by thread. An application with multiple threads per user must delete every associated conversation partition as well as the user's memory partition.
 
 ## Clean up resources
 
@@ -685,4 +711,4 @@ az cosmosdb delete --name $accountName --resource-group $resourceGroup --yes
 az cognitiveservices account delete --name $openAiName --resource-group $resourceGroup
 ```
 
-You built a memory store that writes a log, distills it, recalls it by meaning across sessions, corrects itself when the person changes their mind, and forgets them completely on request. The two partition keys keep thread reads and user-memory operations scoped to a logical partition. Actual costs still depend on the data, queries, indexes, and model calls.
+You stored conversation history, extracted and recalled durable facts, compared prompt token usage, retired an outdated budget, and deleted the shopper's data.
