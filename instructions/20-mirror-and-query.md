@@ -26,7 +26,9 @@ If your lab environment isn't set up yet, follow [Set up your lab environment](h
 
 This exercise also requires:
 
-- An active **Microsoft Fabric capacity**, a workspace assigned to that capacity, and the **admin** or **member** role in the workspace. If you don't have a capacity, [start a Fabric trial](/fabric/fundamentals/fabric-trial).
+- An active **Microsoft Fabric capacity** or **Fabric trial capacity**. If you don't have a capacity, [start a Fabric trial](/fabric/fundamentals/fabric-trial).
+- Permission to create a workspace, or an administrator-provided workspace with the **admin** or **member** role.
+- Permission to create **Mirrored Azure Cosmos DB** items. Your Fabric administrator must enable this feature and, if needed, allow you to start a Fabric trial.
 - The same Microsoft Entra ID account signed in to both the Azure CLI and the Fabric portal, because Fabric connects to Azure Cosmos DB as that identity.
 
 ## Set up your Azure Cosmos DB resources
@@ -66,11 +68,11 @@ Use a dedicated Azure Cosmos DB account for this exercise rather than the shared
     ./setup.ps1 -ResourceGroup $resourceGroup -Location $location -NamePrefix dp420lab20 -LabProfile mirroring
     ```
 
-    Azure Cosmos DB account names have to be globally unique, so the script builds one for you by adding six random characters to the prefix, giving a name like `dp420lab20a7f3k9`.
+    The script appends six random characters to `dp420lab20` to create a unique account name, for example `dp420lab20a7f3k9`.
 
-1. Wait for the script to finish. The whole script takes 5-10 minutes to run.
+1. Wait 5-10 minutes for the script to finish.
 
-1. Record the **Account name** and **Account endpoint** values the script prints. You need the endpoint later in this exercise, and it looks like `https://<your-account-name>.documents.azure.com:443/`.
+1. Record the **Account name** and **Account endpoint** from the script output.
 
 The script creates the following resources:
 
@@ -84,7 +86,7 @@ The script creates the following resources:
 
 > &#9888; Don't use a shared training or production account. Mirroring requires continuous backup, which can't be disabled after enablement. This exercise also requires public network access for all networks; don't remove network restrictions from an existing account to run it.
 
-1. Set a variable for the account name so the Azure CLI commands in this exercise can use it.
+1. Set `$accountName` to the account name from the script output.
 
     ```powershell
     $accountName = "<your-account-name>"
@@ -141,7 +143,7 @@ Continue in the same PowerShell terminal.
         --output table
     ```
 
-1. Read back the ID of the role you created and store it in a variable.
+1. Store the custom role's ID in `$roleId`.
 
     ```powershell
     $roleId = az cosmosdb sql role definition list `
@@ -192,59 +194,70 @@ Continue in the same PowerShell terminal.
 
 1. In a browser, open the [Fabric portal](https://fabric.microsoft.com/) and sign in with the same identity you used for `az login`.
 
-1. Open a workspace assigned to your active Fabric capacity. For example, select **My workspace** in the left navigation pane if it is assigned to a Fabric or trial capacity. Otherwise, select **Workspaces** and open an existing workspace assigned to that capacity, or create and assign a new one. You need the **admin** or **member** role in the workspace.
+1. Create a workspace for this exercise unless your Fabric administrator has provided one with the required Fabric or trial capacity and mirroring permissions.
+
+    To create a workspace:
+
+    1. Select **Workspaces** in the left navigation pane, then **New workspace**.
+    1. Name it `dp420lab20cosmos` followed by six random lowercase letters or digits, for example `dp420lab20cosmosa7f3k9`.
+    1. Assign it to your active Fabric or trial capacity and finish creating it.
+
+    Open the workspace to continue.
 
 1. In the workspace toolbar, select **+ New item**. In the **New item** pane, select **All items**, search for `Mirrored Azure Cosmos DB`, and select the **Mirrored Azure Cosmos DB** tile.
 
-1. Enter `cosmicworks-mirror` as the name and select **Create**.
+1. Under **New sources**, select **Azure Cosmos DB v2**.
 
-1. In the **New connection** section, select **Azure Cosmos DB for NoSQL** and provide the following values.
+1. On **New source**, enter the following connection settings.
 
     | Setting | Value |
     | :--- | :--- |
-    | **Azure Cosmos DB endpoint** | The account endpoint you recorded, for example `https://<your-account-name>.documents.azure.com:443/` |
+    | **Cosmos DB Endpoint** | The account endpoint you recorded, for example `https://<your-account-name>.documents.azure.com:443/` |
+    | **Connection** | **Create new connection** |
     | **Connection name** | `dp420lab20-cosmos` |
     | **Authentication kind** | **Organizational account** |
+    | **Privacy level** | **None** |
 
     Sign in with the Microsoft Entra ID account that received the custom role in Task 1.
 
 1. Select **Connect**.
 
-1. Select the `cosmicworks` database, and leave both containers selected.
+1. Select the `cosmicworks` database and select **Connect**.
 
-1. Select **Mirror database**.
+1. On **Choose data**, confirm that `customer` and `product` are selected. Leave **Automatically mirror future tables** selected, then select **Connect**.
 
-Replication starts, and Fabric moves you to the replication status view.
+1. On **Destination**, enter `cosmicworks-mirror` for **Name** and select **Create mirrored database**.
+
+Fabric opens the mirrored database with **Replication status** selected in **Explorer**.
 
 ## Task 3: Read the replication status
 
 Confirm that both containers have finished their initial replication before querying the mirrored data.
 
-1. In the mirrored database, open **Monitor replication** if the view isn't already open.
+1. In **Explorer**, select **Replication status** if it isn't already selected, then scroll down to **Monitor replication**.
 
-1. Wait two to five minutes, refreshing occasionally.
+1. Wait two to five minutes, selecting **Refresh** periodically. The table list may initially show **No data has landed**, even while the overall status is **Running**.
 
-1. Confirm the database-level status reaches **Running**, and that both tables show **Running** as well.
+1. Confirm that the overall **Status** is **Running** and that the table list shows the following values.
 
-1. Read the **Rows replicated** column for each table once the initial snapshot finishes. It should show 295 for the product container and 282 for the customer container.
+    | Name | Status | Rows replicated |
+    | :--- | :--- | ---: |
+    | `[cosmicworks].[product]` | **Running** | 295 |
+    | `[cosmicworks].[customer]` | **Running** | 282 |
 
 1. Note the **Last completed** timestamp on each table.
 
     The timestamp advances when the source container changes. It can remain unchanged while the mirror is idle.
 
-1. Select **View**, then **Source database**, to open the read-only Azure Cosmos DB data explorer, then return to the mirrored database.
-
-    > &#128221; Reads from this source view are routed to Azure and consume request units on your account. Queries against the SQL analytics endpoint or lakehouse shortcuts read the replicated copy in OneLake and don't consume source request units.
-
 ## Task 4: Query the mirrored data with T-SQL
 
 Query the mirrored product catalog, then compare two ways to expand its nested JSON arrays.
 
-1. In the mirrored database, switch the experience selector from **Mirrored Azure Cosmos DB** to **SQL analytics endpoint**.
+1. In the mirrored database, switch the experience selector from **Mirrored database** to **SQL analytics endpoint**.
 
-1. Expand **Schemas**, then **dbo**, then **Tables**, and note the names of the two tables. The following queries use `cosmicworks_product` and `cosmicworks_customer`. If your table names differ, update the queries to match.
+1. In **Explorer**, expand **cosmicworks-mirror**, then **Schemas**, then **cosmicworks**, then **Tables**. Confirm that the `customer` and `product` tables are listed.
 
-1. Open the context menu for the product table, select **New SQL query**, and run an aggregate across the catalog.
+1. On the **Home** toolbar, select **New SQL query** and run an aggregate across the catalog.
 
     ```sql
     SELECT
@@ -252,7 +265,7 @@ Query the mirrored product catalog, then compare two ways to expand its nested J
         COUNT(*) AS productCount,
         AVG(price) AS averagePrice
     FROM
-        cosmicworks_product
+        [cosmicworks].[product]
     GROUP BY
         categoryName
     ORDER BY
@@ -261,21 +274,21 @@ Query the mirrored product catalog, then compare two ways to expand its nested J
 
     The query returns 37 rows, one per category, with `Bikes, Road Bikes` at the top with 43 products.
 
-1. Confirm that nested data arrives as text rather than structure.
+1. Replace the existing query with the following query and run it to inspect the `tags` column.
 
     ```sql
-    SELECT TOP 5 name, tags FROM cosmicworks_product
+    SELECT TOP 5 name, tags FROM [cosmicworks].[product]
     ```
 
     The `tags` column holds a JSON string, not a set of columns.
 
-1. Expand that array with `OPENJSON` and `CROSS APPLY`, declaring the shape of each element.
+1. Replace the existing query with the following query and run it to expand the `tags` array with `OPENJSON` and `CROSS APPLY`.
 
     ```sql
     SELECT
         COUNT(*) AS tagRows
     FROM
-        cosmicworks_product AS p
+        [cosmicworks].[product] AS p
         CROSS APPLY OPENJSON(p.tags) WITH (
             tagId   varchar(100) '$.id',
             tagName varchar(100) '$.name'
@@ -288,13 +301,13 @@ Query the mirrored product catalog, then compare two ways to expand its nested J
     767
     ```
 
-1. Run the same query with `OUTER APPLY` instead.
+1. Replace the existing query with the following version, which uses `OUTER APPLY`, and run it.
 
     ```sql
     SELECT
         COUNT(*) AS tagRows
     FROM
-        cosmicworks_product AS p
+        [cosmicworks].[product] AS p
         OUTER APPLY OPENJSON(p.tags) WITH (
             tagId   varchar(100) '$.id',
             tagName varchar(100) '$.name'
@@ -309,14 +322,14 @@ Query the mirrored product catalog, then compare two ways to expand its nested J
 
     The 45 extra rows represent products with an empty `tags` array. `CROSS APPLY` excludes those products; `OUTER APPLY` keeps them with null tag columns.
 
-1. Query the customer table and see what mirroring does with a container holding two document types.
+1. Replace the existing query with the following query and run it to count each document type in the customer table.
 
     ```sql
     SELECT
         type,
         COUNT(*) AS documentCount
     FROM
-        cosmicworks_customer
+        [cosmicworks].[customer]
     GROUP BY
         type
     ```
@@ -328,13 +341,13 @@ Query the mirrored product catalog, then compare two ways to expand its nested J
     salesOrder              272
     ```
 
-1. Confirm that the table is the union of both shapes.
+1. Replace the existing query with the following query and run it to compare the fields of the two document types.
 
     ```sql
     SELECT TOP 10
         type, firstName, emailAddress, orderDate, salesOrderCount
     FROM
-        cosmicworks_customer
+        [cosmicworks].[customer]
     ORDER BY
         type
     ```
@@ -344,6 +357,8 @@ Query the mirrored product catalog, then compare two ways to expand its nested J
 ## Task 5: Watch a change reach the mirror
 
 Mirroring replicates inserts, updates, and deletes continuously. Add a document to the source and confirm that it appears in Fabric.
+
+1. Record the product table's **Last completed** timestamp and **Rows replicated** count in **Monitor replication**.
 
 1. In a separate browser tab, open the [Azure portal](https://portal.azure.com) and go to the Azure Cosmos DB account this exercise created.
 
@@ -364,15 +379,15 @@ Mirroring replicates inserts, updates, and deletes continuously. Add a document 
     }
     ```
 
-1. Return to the Fabric portal and open **Monitor replication** on the mirrored database.
+1. Return to the Fabric portal and switch to the **Mirrored database** view. In **Explorer**, select **Replication status** and scroll down to **Monitor replication**.
 
-1. Refresh the view until the **Last completed** timestamp for the product table advances and **Rows replicated** increases.
+1. Refresh the view until the **Last completed** timestamp for the product table advances and **Rows replicated** increases. Allow a few minutes for the change to replicate.
 
-1. Switch to the SQL analytics endpoint and confirm the new item is present.
+1. Switch to the SQL analytics endpoint. Replace the existing query with the following query and run it to confirm that the new item is present.
 
     ```sql
     SELECT name, price, categoryName
-    FROM cosmicworks_product
+    FROM [cosmicworks].[product]
     WHERE id = 'dp420lab20-sample'
     ```
 
@@ -384,9 +399,20 @@ Mirroring replicates inserts, updates, and deletes continuously. Add a document 
 
     If the row hasn't appeared yet, wait a moment and run the query again.
 
-1. Re-run the `OUTER APPLY` count from Task 4.
+1. Replace the existing query with the following `OUTER APPLY` count and run it.
 
-    It now returns 813 rather than 812, because the item you added carries an empty `tags` array and `OUTER APPLY` keeps it.
+    ```sql
+    SELECT
+        COUNT(*) AS tagRows
+    FROM
+        [cosmicworks].[product] AS p
+        OUTER APPLY OPENJSON(p.tags) WITH (
+            tagId   varchar(100) '$.id',
+            tagName varchar(100) '$.name'
+        ) AS t
+    ```
+
+    The count increases from 812 to 813 because `OUTER APPLY` includes the new product despite its empty `tags` array.
 
 ## Task 6: Query the mirrored data with Spark
 
@@ -394,29 +420,41 @@ Use OneLake shortcuts to make the mirrored Delta tables available in a lakehouse
 
 1. In the Fabric portal, return to your workspace and select **+ New item**.
 
-1. In the **New item** pane, select **All items**, search for `Lakehouse`, and select the **Lakehouse** tile. Name it `cosmicworks_lake` and select **Create**.
+1. In the **New item** pane, select **All items**, search for `Lakehouse`, and select the **Lakehouse** tile. Name it `cosmicworks_lake`, leave **Lakehouse schemas** enabled, and select **Create**.
 
-1. Select **Get data**, then **New shortcut**, then **Microsoft OneLake**.
+1. In the lakehouse **Explorer**, expand **Tables**, open the context menu for **dbo**, and select **New table shortcut**. Select **Microsoft OneLake**.
 
-1. Select the `cosmicworks-mirror` mirrored database, select both tables, select **Next**, and then select **Create**.
+1. Select the `cosmicworks-mirror` mirrored database, then select **Next**.
 
-    Shortcuts reference the existing data without copying it.
+1. In **Connection method**, leave **Passthrough identity** selected and select **Connect**.
 
-1. Open the context menu for the product table and select **New notebook**.
+1. Under **Tables**, expand **cosmicworks** and select `customer` and `product`. Select **Next**, keep the shortcut names `customer` and `product`, and select **Create**.
 
-1. In the first cell, read the table into a dataframe and display it.
+    The shortcuts appear as `dbo.customer` and `dbo.product` in the lakehouse and reference the existing data without copying it.
+
+1. Expand **Tables** to verify that the shortcuts for `customer` and `product` appear under `dbo`.
+
+1. Return to your workspace and select **+ New item**. In the **New item** pane, select **All items**, search for `Notebook`, and select the **Notebook** tile.
+
+1. In **New Notebook**, enter `cosmicworks_analysis` for **Name**, confirm that **Location** is the workspace you're using for this exercise, and select **Create**.
+
+1. In **Explorer**, on the **Data items** tab, select **Add data items**, then **From OneLake catalog**.
+
+1. Add the existing `cosmicworks_lake` lakehouse and set it as the notebook's default lakehouse.
+
+1. In the first cell, keep **PySpark (Python)** selected and replace the sample comments with the following code. Select the run button to the left of the cell to preview the product table.
 
     ```python
-    df = spark.sql("SELECT * FROM cosmicworks_product LIMIT 1000")
+    df = spark.sql("SELECT * FROM dbo.product LIMIT 1000")
     display(df)
     ```
 
-1. Run the same aggregate you ran in T-SQL, to confirm both engines read the same data.
+1. Add a new code cell below the first one and run the following aggregate to confirm that Spark and T-SQL read the same data.
 
     ```python
     summary = spark.sql("""
         SELECT categoryName, COUNT(*) AS productCount
-        FROM cosmicworks_product
+        FROM dbo.product
         GROUP BY categoryName
         ORDER BY productCount DESC
     """)
@@ -425,10 +463,10 @@ Use OneLake shortcuts to make the mirrored Delta tables available in a lakehouse
 
     The top row is `Bikes, Road Bikes` with 44 products, one more than the 43 you saw in Task 4, because the item you added in Task 5 is in that category.
 
-1. Confirm that nested data is a string column here too.
+1. Add another code cell and run the following query to inspect the `tags` column.
 
     ```python
-    spark.sql("SELECT name, tags FROM cosmicworks_product LIMIT 5").show(truncate=False)
+    spark.sql("SELECT name, tags FROM dbo.product LIMIT 5").show(truncate=False)
     ```
 
     The `tags` column also contains JSON text in Spark. Use Spark's JSON functions to expand it.
@@ -437,7 +475,7 @@ Use OneLake shortcuts to make the mirrored Delta tables available in a lakehouse
 
 Remove only the resources you created for this exercise, starting with the Fabric items.
 
-1. In the Fabric portal, delete the notebook, `cosmicworks_lake` lakehouse, and `cosmicworks-mirror` mirrored database you created. Remove the `dp420lab20-cosmos` connection only if nothing else uses it. Delete the workspace only if you created it for this exercise and it contains nothing you need to keep. If you started a Fabric trial for this exercise and no longer need it, cancel the trial as well.
+1. In the Fabric portal, delete the `cosmicworks_analysis` notebook, `cosmicworks_lake` lakehouse, and `cosmicworks-mirror` mirrored database you created. Remove the `dp420lab20-cosmos` connection only if nothing else uses it. Delete the workspace only if you created it for this exercise and it contains nothing you need to keep; keep any administrator-provided workspace. If you started a Fabric trial for this exercise and no longer need it, cancel the trial as well.
 
 1. Delete the Azure resource group only if you created it for this exercise and it contains no resources you need to keep:
 
