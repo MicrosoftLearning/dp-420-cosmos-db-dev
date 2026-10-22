@@ -3,7 +3,7 @@ lab:
   title: Mirror an Azure Cosmos DB database and query it in Microsoft Fabric
   module: Module 20 - Implement Operational Analytics With Microsoft Fabric
   description: Grant the custom role mirroring needs, mirror a database into Microsoft Fabric, read the replication status, query the mirrored tables with T-SQL including nested JSON, watch a change replicate, and read the same tables from Spark.
-  duration: 45 minutes
+  duration: 60 minutes
   level: 300
   islab: true
   primarytopics:
@@ -14,11 +14,9 @@ lab:
 
 # Mirror an Azure Cosmos DB database and query it in Microsoft Fabric
 
-In this exercise, you mirror an Azure Cosmos DB for NoSQL database into Microsoft Fabric and query the replicated copy. You grant Fabric the one permission no built-in role provides, create the mirrored database, read the replication status, run T-SQL aggregates and nested-JSON expansions against the mirrored tables, watch a single edit in Azure Cosmos DB reach the analytical copy, and finish by reading the same tables from a Spark notebook.
+In this exercise, you mirror an Azure Cosmos DB for NoSQL database into Microsoft Fabric, query the mirrored data with T-SQL and Spark, and observe how source changes replicate. You also compare how `CROSS APPLY` and `OUTER APPLY` handle nested JSON arrays.
 
-The account this exercise creates is configured for continuous backup, because mirroring requires it. That setting can't be turned off once it's on, which is why the exercise builds its own account and deletes it at the end.
-
-This exercise takes approximately **45** minutes to complete.
+This exercise takes approximately **60** minutes to complete.
 
 ## Before you start
 
@@ -28,14 +26,12 @@ If your lab environment isn't set up yet, follow [Set up your lab environment](h
 
 This exercise also requires:
 
-- An active **Microsoft Fabric capacity**, a workspace assigned to that capacity, and the **admin** or **member** role in the workspace. If you don't have a capacity, [start a Fabric trial](/fabric/fundamentals/fabric-trial). The shared script doesn't create a Fabric capacity or workspace.
+- An active **Microsoft Fabric capacity**, a workspace assigned to that capacity, and the **admin** or **member** role in the workspace. If you don't have a capacity, [start a Fabric trial](/fabric/fundamentals/fabric-trial).
 - The same Microsoft Entra ID account signed in to both the Azure CLI and the Fabric portal, because Fabric connects to Azure Cosmos DB as that identity.
-
-No local runtime is needed. Every step runs in the Azure CLI, the Azure portal, or the Fabric portal.
 
 ## Set up your Azure Cosmos DB resources
 
-This exercise creates its own Azure Cosmos DB account and deletes it at the end, so it doesn't use the shared account from the rest of this learning path.
+Use a dedicated Azure Cosmos DB account for this exercise rather than the shared account from the rest of this learning path.
 
 1. Start **Visual Studio Code**.
 
@@ -86,9 +82,7 @@ The script creates the following resources:
 | `customer` container | Partitioned on `/customerId`, autoscale up to 1,000 RU/s, loaded with 282 CosmicWorks documents: 10 customers and 272 sales orders |
 | Role assignment | Cosmos DB Built-in Data Contributor, granted to your signed-in identity |
 
-Because key-based authentication is disabled, no key or connection string appears anywhere in this exercise. Every operation authenticates with the identity from your `az login` session, which is the recommended approach for new accounts.
-
-> &#9888; Use a dedicated lab account. Continuous backup can't be disabled after enablement. Setup doesn't migrate backup mode or remove network restrictions from existing accounts. Never point this exercise at a shared training or production account. If your environment requires private networking, stop and resolve that setup separately before continuing.
+> &#9888; Don't use a shared training or production account. Mirroring requires continuous backup, which can't be disabled after enablement. This exercise also requires public network access for all networks; don't remove network restrictions from an existing account to run it.
 
 1. Set a variable for the account name so the Azure CLI commands in this exercise can use it.
 
@@ -102,17 +96,22 @@ Because key-based authentication is disabled, no key or connection string appear
     ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile mirroring
     ```
 
-    Continue only when the checks pass. In Data Explorer, confirm 295 items in `cosmicworks/product` and 282 in `cosmicworks/customer` with `SELECT VALUE COUNT(1) FROM c`. A rerun preserves existing containers and doesn't remove extra items. Resolve any difference from these starting counts before continuing.
+    Confirm that all checks pass. In Data Explorer, use `SELECT VALUE COUNT(1) FROM c` to confirm 295 items in `cosmicworks/product` and 282 in `cosmicworks/customer` before continuing. Rerunning setup doesn't remove extra items.
 
 ## Task 1: Grant Fabric permission to read analytics
 
-Fabric connects to the source account as your Microsoft Entra ID identity, and it needs two data actions: `readMetadata` and `readAnalytics`. The Cosmos DB Built-in Data Contributor role the setup script assigned covers the first and not the second, and no built-in role covers `readAnalytics` at all. In this task, you define a custom role that grants both and assign it to yourself.
+Fabric needs the `readMetadata` and `readAnalytics` data actions. The Cosmos DB Built-in Data Contributor role grants `readMetadata` but not `readAnalytics`. Create a custom role with both permissions and assign it to your signed-in identity.
 
-1. In the same terminal, build the role definition and write it to a file. Replace `<subscription-id>` with your own subscription ID, which `az account show --query id --output tsv` prints.
+Continue in the same PowerShell terminal.
+
+1. Get the account's resource ID for the role scope, build the role definition, and write it to a file.
 
     ```powershell
-    $subscriptionId = "<subscription-id>"
-    $scope = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.DocumentDB/databaseAccounts/$accountName"
+    $scope = az cosmosdb show `
+        --name $accountName `
+        --resource-group $resourceGroup `
+        --query id `
+        --output tsv
 
     $roleDefinition = @{
         RoleName         = "CosmosMirroringReader"
@@ -137,48 +136,47 @@ Fabric connects to the source account as your Microsoft Entra ID identity, and i
     az cosmosdb sql role definition create `
         --account-name $accountName `
         --resource-group $resourceGroup `
-        --body "@mirroring-role.json"
+        --body "@mirroring-role.json" `
+        --query "{Role:roleName,RoleId:name}" `
+        --output table
     ```
 
-    > &#10071; Keep the quotation marks around `"@mirroring-role.json"`. Passing the definition from a file avoids shell quoting problems with inline JSON, and `@` is a PowerShell special character.
+1. Read back the ID of the role you created and store it in a variable.
 
-1. Read back the ID of the role you created.
-
-    ```azurecli
-    az cosmosdb sql role definition list `
+    ```powershell
+    $roleId = az cosmosdb sql role definition list `
         --account-name $accountName `
         --resource-group $resourceGroup `
         --query "[?roleName=='CosmosMirroringReader'].id | [0]" `
         --output tsv
     ```
 
-1. Store that value and your own principal ID, then create the assignment.
+1. Assign the custom role to your signed-in user at account scope.
 
     ```powershell
-    $roleId = "<role-definition-id>"
     $principalId = az ad signed-in-user show --query id --output tsv
-    ```
 
-    ```azurecli
     az cosmosdb sql role assignment create `
         --account-name $accountName `
         --resource-group $resourceGroup `
         --role-definition-id $roleId `
         --principal-id $principalId `
-        --scope $scope
-    ```
-
-1. Confirm the assignment exists.
-
-    ```azurecli
-    az cosmosdb sql role assignment list `
-        --account-name $accountName `
-        --resource-group $resourceGroup `
-        --query "[].{principal:principalId, role:roleDefinitionId}" `
+        --scope $scope `
+        --query "{PrincipalId:principalId,RoleDefinitionId:roleDefinitionId,Scope:scope}" `
         --output table
     ```
 
-    Confirm both assignments target your identity: the Built-in Data Contributor role from setup and the custom role you added. Other assignments can also appear on a reused account.
+1. Confirm both role assignments exist for your signed-in user.
+
+    ```powershell
+    az cosmosdb sql role assignment list `
+        --account-name $accountName `
+        --resource-group $resourceGroup `
+        --query "[?principalId=='$principalId'].{PrincipalId:principalId,RoleDefinitionId:roleDefinitionId,Scope:scope}" `
+        --output table
+    ```
+
+    Confirm that the table includes the Built-in Data Contributor role and your custom role. The custom assignment's `RoleDefinitionId` should match `$roleId`, and its `Scope` should match `$scope`.
 
 1. Verify the account-scoped permissions for your signed-in identity.
 
@@ -186,19 +184,17 @@ Fabric connects to the source account as your Microsoft Entra ID identity, and i
     ./verify.ps1 -ResourceGroup $resourceGroup -AccountName $accountName -LabProfile mirroring -CheckMirroringPermissions
     ```
 
-    This command checks the assigned role definitions for `readMetadata` and `readAnalytics`. It doesn't test the Fabric connection or replication.
+    Both `Signed-in user has account-scoped readMetadata` and `Signed-in user has account-scoped readAnalytics` must show `PASS` before you continue.
 
 > &#128221; A new role assignment takes a few minutes to propagate. If Fabric reports an authorization problem in the next task, wait a moment and try again.
 
 ## Task 2: Create the mirrored database in Fabric
 
-Now connect Fabric to the account and start replication. Everything in this task happens in the Fabric portal.
-
 1. In a browser, open the [Fabric portal](https://fabric.microsoft.com/) and sign in with the same identity you used for `az login`.
 
-1. Open an existing workspace assigned to your active Fabric capacity, or create and assign a new workspace. You need the **admin** or **member** role in it.
+1. Open a workspace assigned to your active Fabric capacity. For example, select **My workspace** in the left navigation pane if it is assigned to a Fabric or trial capacity. Otherwise, select **Workspaces** and open an existing workspace assigned to that capacity, or create and assign a new one. You need the **admin** or **member** role in the workspace.
 
-1. Select **Create**, find the **Data Warehouse** section, and select **Mirrored Azure Cosmos DB**.
+1. In the workspace toolbar, select **+ New item**. In the **New item** pane, select **All items**, search for `Mirrored Azure Cosmos DB`, and select the **Mirrored Azure Cosmos DB** tile.
 
 1. Enter `cosmicworks-mirror` as the name and select **Create**.
 
@@ -210,7 +206,7 @@ Now connect Fabric to the account and start replication. Everything in this task
     | **Connection name** | `dp420lab20-cosmos` |
     | **Authentication kind** | **Organizational account** |
 
-    Selecting **Organizational account** is what makes Fabric connect as your Microsoft Entra ID identity, using the custom role from Task 1. The account has key-based authentication disabled, so **Account key** isn't an option here.
+    Sign in with the Microsoft Entra ID account that received the custom role in Task 1.
 
 1. Select **Connect**.
 
@@ -222,11 +218,11 @@ Replication starts, and Fabric moves you to the replication status view.
 
 ## Task 3: Read the replication status
 
-Before trusting any query result, confirm the copy is healthy and complete. In this task, you read the status view and interpret both of its numeric columns.
+Confirm that both containers have finished their initial replication before querying the mirrored data.
 
 1. In the mirrored database, open **Monitor replication** if the view isn't already open.
 
-1. Wait two to five minutes, refreshing occasionally. Transient errors during the first minutes are expected and clear on their own.
+1. Wait two to five minutes, refreshing occasionally.
 
 1. Confirm the database-level status reaches **Running**, and that both tables show **Running** as well.
 
@@ -234,7 +230,7 @@ Before trusting any query result, confirm the copy is healthy and complete. In t
 
 1. Note the **Last completed** timestamp on each table.
 
-    This column advances only when the source container changes. Both containers hold only what the setup script wrote to them, so this timestamp stops moving and stays where it is. That behavior is a healthy mirror with nothing to do, not a stalled one. You verify that reading in Task 5.
+    The timestamp advances when the source container changes. It can remain unchanged while the mirror is idle.
 
 1. Select **View**, then **Source database**, to open the read-only Azure Cosmos DB data explorer, then return to the mirrored database.
 
@@ -242,11 +238,11 @@ Before trusting any query result, confirm the copy is healthy and complete. In t
 
 ## Task 4: Query the mirrored data with T-SQL
 
-With replication running, the data is available as warehouse tables. In this task, you run an aggregate across the product catalog, then expand a nested JSON array two different ways and compare the row counts.
+Query the mirrored product catalog, then compare two ways to expand its nested JSON arrays.
 
 1. In the mirrored database, switch the experience selector from **Mirrored Azure Cosmos DB** to **SQL analytics endpoint**.
 
-1. Expand the **Schemas**, then **dbo**, then **Tables** node, and note the names of the two tables. Each container appears as one table, and the documented naming pattern prefixes the container name with the source database name. Use the names you see in the following queries.
+1. Expand **Schemas**, then **dbo**, then **Tables**, and note the names of the two tables. The following queries use `cosmicworks_product` and `cosmicworks_customer`. If your table names differ, update the queries to match.
 
 1. Open the context menu for the product table, select **New SQL query**, and run an aggregate across the catalog.
 
@@ -311,7 +307,7 @@ With replication running, the data is available as warehouse tables. In this tas
     812
     ```
 
-    The difference is 45, which is exactly the number of products carrying an empty `tags` array. `CROSS APPLY` drops them; `OUTER APPLY` keeps them with null tag columns. A catalog listing built on the first query silently loses 45 products.
+    The 45 extra rows represent products with an empty `tags` array. `CROSS APPLY` excludes those products; `OUTER APPLY` keeps them with null tag columns.
 
 1. Query the customer table and see what mirroring does with a container holding two document types.
 
@@ -343,11 +339,11 @@ With replication running, the data is available as warehouse tables. In this tas
         type
     ```
 
-    Customer rows carry values in `firstName`, `emailAddress`, and `salesOrderCount` and null in `orderDate`. Sales order rows do the opposite. Nothing is wrong: the table faithfully represents a container that was never a single schema.
+    Customer rows have values for `firstName`, `emailAddress`, and `salesOrderCount`; sales order rows have values for `orderDate`. Properties absent from a document appear as null.
 
 ## Task 5: Watch a change reach the mirror
 
-Mirroring replicates inserts, updates, and deletes continuously. In this task, you make one edit in Azure Cosmos DB and watch the status view and the query results follow it.
+Mirroring replicates inserts, updates, and deletes continuously. Add a document to the source and confirm that it appears in Fabric.
 
 1. In a separate browser tab, open the [Azure portal](https://portal.azure.com) and go to the Azure Cosmos DB account this exercise created.
 
@@ -372,8 +368,6 @@ Mirroring replicates inserts, updates, and deletes continuously. In this task, y
 
 1. Refresh the view until the **Last completed** timestamp for the product table advances and **Rows replicated** increases.
 
-    The timestamp moved because the source changed. That advance is the behavior Task 3 predicted, and it's the evidence that separates a stalled mirror from an idle one.
-
 1. Switch to the SQL analytics endpoint and confirm the new item is present.
 
     ```sql
@@ -388,7 +382,7 @@ Mirroring replicates inserts, updates, and deletes continuously. In this task, y
     Mirroring Test Bike   999.99   Bikes, Road Bikes
     ```
 
-    Replication latency varies with the size and rate of changes, so how long this takes on your run depends on your capacity and region. If the row hasn't appeared yet, wait and query again rather than restarting replication.
+    If the row hasn't appeared yet, wait a moment and run the query again.
 
 1. Re-run the `OUTER APPLY` count from Task 4.
 
@@ -396,25 +390,23 @@ Mirroring replicates inserts, updates, and deletes continuously. In this task, y
 
 ## Task 6: Query the mirrored data with Spark
 
-The same Delta files that back the SQL analytics endpoint are readable by Spark, with no Cosmos DB connector involved. In this task, you point a lakehouse at them with a shortcut and query them from a notebook.
+Use OneLake shortcuts to make the mirrored Delta tables available in a lakehouse, then query them from a Spark notebook.
 
-1. In the Fabric portal, return to your workspace and select **Create**.
+1. In the Fabric portal, return to your workspace and select **+ New item**.
 
-1. In the **Data Engineering** section, select **Lakehouse**, name it `cosmicworks_lake`, and select **Create**.
+1. In the **New item** pane, select **All items**, search for `Lakehouse`, and select the **Lakehouse** tile. Name it `cosmicworks_lake` and select **Create**.
 
 1. Select **Get data**, then **New shortcut**, then **Microsoft OneLake**.
 
 1. Select the `cosmicworks-mirror` mirrored database, select both tables, select **Next**, and then select **Create**.
 
-    A shortcut is a pointer, not a copy. This step duplicates no data.
+    Shortcuts reference the existing data without copying it.
 
 1. Open the context menu for the product table and select **New notebook**.
 
 1. In the first cell, read the table into a dataframe and display it.
 
     ```python
-    # Spark reads the mirrored Delta table through the lakehouse shortcut,
-    # not the source Cosmos DB container. LIMIT bounds the preview.
     df = spark.sql("SELECT * FROM cosmicworks_product LIMIT 1000")
     display(df)
     ```
@@ -422,7 +414,6 @@ The same Delta files that back the SQL analytics endpoint are readable by Spark,
 1. Run the same aggregate you ran in T-SQL, to confirm both engines read the same data.
 
     ```python
-    # Repeat the SQL endpoint's grouping against the same mirrored data.
     summary = spark.sql("""
         SELECT categoryName, COUNT(*) AS productCount
         FROM cosmicworks_product
@@ -437,16 +428,14 @@ The same Delta files that back the SQL analytics endpoint are readable by Spark,
 1. Confirm that nested data is a string column here too.
 
     ```python
-    # Display the full tags string to inspect its JSON representation.
-    # show() doesn't parse or expand the nested values.
     spark.sql("SELECT name, tags FROM cosmicworks_product LIMIT 5").show(truncate=False)
     ```
 
-    Spark shows `tags` as text, exactly as the SQL analytics endpoint did. Expanding it in Spark uses Spark's own JSON functions rather than `OPENJSON`, because the engine differs even though the files don't.
+    The `tags` column also contains JSON text in Spark. Use Spark's JSON functions to expand it.
 
 ## Clean up resources
 
-This exercise creates resources in Azure and Fabric. Remove only the resources you created for it.
+Remove only the resources you created for this exercise, starting with the Fabric items.
 
 1. In the Fabric portal, delete the notebook, `cosmicworks_lake` lakehouse, and `cosmicworks-mirror` mirrored database you created. Remove the `dp420lab20-cosmos` connection only if nothing else uses it. Delete the workspace only if you created it for this exercise and it contains nothing you need to keep. If you started a Fabric trial for this exercise and no longer need it, cancel the trial as well.
 
@@ -458,6 +447,4 @@ This exercise creates resources in Azure and Fabric. Remove only the resources y
 
 1. If the lab supplies the resource group, or the group contains other resources, keep the group. In the Azure portal, delete only the disposable Cosmos DB account created for this exercise.
 
-Delete the Fabric items before the Azure resources. A mirrored database whose source account no longer exists reports a replication failure rather than removing itself.
-
-You mirrored an operational database into an analytics platform without writing a line of transformation code, answered a category-level aggregate that would compete for request units on the source, and read the same replicated files from two different engines. The nested-array counts are the part worth remembering: 767 against 812 is the whole difference between `CROSS APPLY` and `OUTER APPLY`, and it's the kind of quiet 45-row loss that a report never reports.
+You mirrored Azure Cosmos DB data into Fabric, queried it with T-SQL and Spark, and observed a source change replicate. You also compared how `CROSS APPLY` and `OUTER APPLY` handle empty JSON arrays.
