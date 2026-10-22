@@ -3,7 +3,7 @@ lab:
   title: Optimize an indexing strategy in C#
   module: Module 12 - Design and Optimize an Indexing Strategy in Azure Cosmos DB
   description: Measure write trimming, require a composite index, index computed properties and spatial data, and verify global secondary index routing, propagation, and write overhead.
-  duration: 75 minutes
+  duration: 45 minutes
   level: 300
   islab: true
   primarytopics:

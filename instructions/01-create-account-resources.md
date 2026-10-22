@@ -16,7 +16,7 @@ lab:
 
 In this exercise, you create an Azure Cosmos DB for NoSQL account, add a database, container, and items in Data Explorer, and query the data. You also use Azure Cloud Shell to grant data access.
 
-This exercise should take approximately **25** minutes to complete.
+This exercise should take approximately **30** minutes to complete.
 
 > &#128221; You need an Azure subscription with permission to create resources and assign Cosmos DB data roles. If you don't have a subscription, create a [free account](https://azure.microsoft.com/free/) before you begin. Provisioned throughput can incur charges, so complete the cleanup steps when you finish.
 

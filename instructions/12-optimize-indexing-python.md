@@ -3,7 +3,7 @@ lab:
   title: Optimize an indexing strategy in Python
   module: Module 12 - Design and Optimize an Indexing Strategy in Azure Cosmos DB
   description: Measure index-maintenance cost, enable composite and computed-property queries, query a spatial index, and verify a global secondary index.
-  duration: 75 minutes
+  duration: 45 minutes
   level: 300
   islab: true
   primarytopics:
